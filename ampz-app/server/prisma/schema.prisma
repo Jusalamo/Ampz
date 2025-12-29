@@ -1,0 +1,100 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String?
+  bio       String?
+  avatar    String?
+  location  String?
+  occupation String?
+  company   String?
+  interests String? // Stored as JSON string or comma-separated
+  isPro     Boolean  @default(false)
+  isMax     Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tickets   Ticket[]
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+  
+  // Matches where this user is user1
+  matchesAsUser1 Match[] @relation("User1Matches")
+  // Matches where this user is user2
+  matchesAsUser2 Match[] @relation("User2Matches")
+}
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  date        DateTime
+  location    String
+  image       String?
+  price       Float    @default(0)
+  currency    String   @default("USD")
+  attendees   Int      @default(0)
+  latitude    Float?
+  longitude   Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tickets     Ticket[]
+}
+
+model Ticket {
+  id           Int      @id @default(autoincrement())
+  qrCode       String   @unique
+  status       String   @default("active") // active, used, cancelled
+  purchaseDate DateTime @default(now())
+  price        Float
+  
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id])
+  
+  eventId      Int
+  event        Event    @relation(fields: [eventId], references: [id])
+}
+
+model Match {
+  id        Int      @id @default(autoincrement())
+  user1Id   Int
+  user2Id   Int
+  status    String   @default("pending") // pending, matched, rejected
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user1     User     @relation("User1Matches", fields: [user1Id], references: [id])
+  user2     User     @relation("User2Matches", fields: [user2Id], references: [id])
+  messages  Message[]
+
+  @@unique([user1Id, user2Id])
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
+  read      Boolean  @default(false)
+
+  matchId   Int
+  match     Match    @relation(fields: [matchId], references: [id])
+
+  senderId  Int
+  sender    User     @relation("SentMessages", fields: [senderId], references: [id])
+
+  receiverId Int
+  receiver   User    @relation("ReceivedMessages", fields: [receiverId], references: [id])
+}
