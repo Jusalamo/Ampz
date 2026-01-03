@@ -1,0 +1,129 @@
+export interface User {
+  id: string;
+  email: string;
+  createdAt: string;
+  profile: UserProfile;
+  subscription: Subscription;
+  settings: UserSettings;
+  blockedUsers: string[];
+  bookmarkedEvents: string[];
+  createdEvents: string[];
+  likesRemaining: number;
+  lastLikeReset: string;
+}
+
+export interface UserProfile {
+  name: string;
+  age: number;
+  bio: string;
+  occupation: string;
+  company: string;
+  location: string;
+  gender: string;
+  interests: string[];
+  profilePhoto: string;
+  phone: string;
+}
+
+export interface Subscription {
+  tier: 'free' | 'pro' | 'max';
+  expiresAt: string | null;
+}
+
+export interface UserSettings {
+  theme: 'dark' | 'light';
+  currency: string;
+  notifications: NotificationSettings;
+  privacy: PrivacySettings;
+}
+
+export interface NotificationSettings {
+  matches: boolean;
+  messages: boolean;
+  events: boolean;
+  profileViews: boolean;
+}
+
+export interface PrivacySettings {
+  searchable: boolean;
+  showDistance: boolean;
+  showOnline: boolean;
+  messageFrom: 'everyone' | 'matches' | 'none';
+}
+
+export interface Event {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  location: string;
+  address: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+  date: string;
+  time: string;
+  price: number;
+  currency: string;
+  maxAttendees: number;
+  attendees: number;
+  organizerId: string;
+  qrCode: string;
+  geofenceRadius: number;
+  customTheme: string;
+  coverImage: string;
+  tags: string[];
+  isFeatured: boolean;
+}
+
+export interface ConnectionProfile {
+  id: string;
+  userId: string;
+  eventId: string;
+  name: string;
+  age: number;
+  bio: string;
+  interests: string[];
+  photo: string;
+  location: string;
+  isPublic: boolean;
+  occupation?: string;
+}
+
+export interface Match {
+  id: string;
+  matchProfile: ConnectionProfile;
+  eventId: string;
+  eventName: string;
+  timestamp: string;
+  lastMessage: string;
+  lastMessageTime: string;
+  unread: boolean;
+  online: boolean;
+}
+
+export interface Message {
+  id: string;
+  chatId: string;
+  senderId: string;
+  text: string;
+  timestamp: string;
+  read: boolean;
+  type: 'text' | 'event';
+}
+
+export interface Ticket {
+  id: string;
+  eventId: string;
+  eventName: string;
+  eventDate: string;
+  eventTime: string;
+  eventLocation: string;
+  purchaseDate: string;
+  price: number;
+  currency: string;
+  quantity: number;
+  qrCode: string;
+  status: 'active' | 'used' | 'cancelled';
+}

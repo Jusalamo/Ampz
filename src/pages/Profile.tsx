@@ -1,0 +1,159 @@
+import { useNavigate } from 'react-router-dom';
+import {
+  Settings,
+  Edit3,
+  Calendar,
+  Users,
+  Star,
+  ChevronRight,
+  LogOut,
+  CreditCard,
+  Shield,
+  Bell,
+  Moon,
+  Sun,
+} from 'lucide-react';
+import { useApp } from '@/contexts/AppContext';
+import { BottomNav } from '@/components/BottomNav';
+import { Switch } from '@/components/ui/switch';
+
+export default function Profile() {
+  const navigate = useNavigate();
+  const { user, theme, toggleTheme, logout } = useApp();
+
+  const stats = [
+    { icon: Calendar, value: user?.bookmarkedEvents.length ?? 0, label: 'Events' },
+    { icon: Users, value: 12, label: 'Matches' },
+    { icon: Star, value: '95%', label: 'Response' },
+  ];
+
+  const menuItems = [
+    {
+      icon: CreditCard,
+      label: 'Subscription',
+      value: user?.subscription.tier?.toUpperCase(),
+      gradient: user?.subscription.tier === 'pro' ? 'gradient-pro' : user?.subscription.tier === 'max' ? 'gradient-max' : '',
+    },
+    { icon: Shield, label: 'Privacy Settings', onClick: () => navigate('/settings/privacy') },
+    { icon: Bell, label: 'Notifications' },
+  ];
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  return (
+    <div className="app-container min-h-screen bg-background pb-nav">
+      <div className="px-5 pt-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">Profile</h1>
+          <button className="w-10 h-10 rounded-full bg-card flex items-center justify-center border border-border hover:border-primary transition-colors">
+            <Settings className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Profile Card */}
+        <div className="glass-card p-6 mb-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full blur-3xl" />
+          <div className="relative">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="relative">
+                <img
+                  src={user?.profile.profilePhoto}
+                  alt={user?.profile.name}
+                  className="w-20 h-20 rounded-full object-cover border-2 border-primary"
+                />
+                <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                  <Edit3 className="w-4 h-4 text-primary-foreground" />
+                </button>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">{user?.profile.name}</h2>
+                <p className="text-muted-foreground text-sm">{user?.profile.location}</p>
+                {user?.subscription.tier !== 'free' && (
+                  <span className={`inline-block mt-1 px-3 py-0.5 text-xs font-semibold rounded-full ${
+                    user?.subscription.tier === 'pro' ? 'gradient-pro' : 'gradient-max'
+                  }`}>
+                    {user?.subscription.tier?.toUpperCase()}
+                  </span>
+                )}
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">{user?.profile.bio}</p>
+            <div className="flex flex-wrap gap-2">
+              {user?.profile.interests.slice(0, 5).map((interest) => (
+                <span
+                  key={interest}
+                  className="px-3 py-1 bg-primary/20 text-primary text-xs font-medium rounded-full"
+                >
+                  {interest}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          {stats.map(({ icon: Icon, value, label }) => (
+            <div key={label} className="glass-card p-4 text-center">
+              <Icon className="w-5 h-5 text-primary mx-auto mb-2" />
+              <p className="text-xl font-bold">{value}</p>
+              <p className="text-xs text-muted-foreground">{label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Theme Toggle */}
+        <div className="glass-card p-4 flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            {theme === 'dark' ? (
+              <Moon className="w-5 h-5 text-primary" />
+            ) : (
+              <Sun className="w-5 h-5 text-brand-yellow" />
+            )}
+            <span className="font-medium">Dark Mode</span>
+          </div>
+          <Switch checked={theme === 'dark'} onCheckedChange={toggleTheme} />
+        </div>
+
+        {/* Menu Items */}
+        <div className="space-y-2 mb-6">
+          {menuItems.map(({ icon: Icon, label, value, gradient, onClick }) => (
+            <button
+              key={label}
+              onClick={onClick}
+              className="w-full glass-card p-4 flex items-center justify-between hover:border-primary transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <Icon className="w-5 h-5 text-primary" />
+                <span className="font-medium">{label}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {value && (
+                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${gradient || 'bg-card'}`}>
+                    {value}
+                  </span>
+                )}
+                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Logout */}
+        <button
+          onClick={handleLogout}
+          className="w-full glass-card p-4 flex items-center justify-center gap-2 text-brand-red hover:border-brand-red transition-all"
+        >
+          <LogOut className="w-5 h-5" />
+          <span className="font-medium">Log Out</span>
+        </button>
+      </div>
+
+      <BottomNav />
+    </div>
+  );
+}
