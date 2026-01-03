@@ -31,7 +31,7 @@ export default function Auth() {
       if (mode === 'login') {
         success = await login(formData.email, formData.password);
       } else {
-        success = await signup(formData.email, formData.password, formData.name);
+        success = await signup(formData.email, formData.password, formData.name, 25);
       }
 
       if (success) {

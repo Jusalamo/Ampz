@@ -127,3 +127,43 @@ export interface Ticket {
   qrCode: string;
   status: 'active' | 'used' | 'cancelled';
 }
+
+export interface CommunityPhoto {
+  id: string;
+  eventId: string;
+  userId: string;
+  userName: string;
+  userPhoto: string;
+  imageUrl: string;
+  timestamp: string;
+  likes: number;
+  likedBy: string[];
+}
+
+export interface CommunityComment {
+  id: string;
+  eventId: string;
+  userId: string;
+  userName: string;
+  userPhoto: string;
+  text: string;
+  timestamp: string;
+  likes: number;
+  likedBy: string[];
+  replies: CommunityComment[];
+  parentId?: string;
+}
+
+export interface AppNotification {
+  id: string;
+  type: 'match' | 'message' | 'event' | 'like' | 'system';
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  data?: {
+    matchId?: string;
+    eventId?: string;
+    userId?: string;
+  };
+}
