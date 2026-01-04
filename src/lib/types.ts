@@ -138,6 +138,7 @@ export interface CommunityPhoto {
   timestamp: string;
   likes: number;
   likedBy: string[];
+  isLiked?: boolean;
 }
 
 export interface CommunityComment {
@@ -150,8 +151,8 @@ export interface CommunityComment {
   timestamp: string;
   likes: number;
   likedBy: string[];
-  replies: CommunityComment[];
-  parentId?: string;
+  isLiked?: boolean;
+  replyTo?: string;
 }
 
 export interface AppNotification {
