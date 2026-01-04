@@ -1,14 +1,106 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { X, Heart, RotateCcw, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
-import { SwipeCard } from '@/components/SwipeCard';
 import { ConnectionProfile } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import {
-  Dialog,
-  DialogContent,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+
+const CARD_COLORS = [
+  'from-violet-600 to-purple-700',
+  'from-pink-500 to-rose-600',
+  'from-blue-500 to-indigo-600',
+  'from-emerald-500 to-teal-600',
+  'from-amber-500 to-orange-600',
+];
+
+function ProfileCard({ 
+  profile, 
+  onSwipe, 
+  isTop 
+}: { 
+  profile: ConnectionProfile; 
+  onSwipe: (direction: 'left' | 'right') => void;
+  isTop: boolean;
+}) {
+  const [exitX, setExitX] = useState(0);
+  const colorIndex = profile.id.charCodeAt(0) % CARD_COLORS.length;
+
+  const handleDragEnd = useCallback((_: unknown, info: PanInfo) => {
+    if (info.offset.x > 100) {
+      setExitX(500);
+      onSwipe('right');
+    } else if (info.offset.x < -100) {
+      setExitX(-500);
+      onSwipe('left');
+    }
+  }, [onSwipe]);
+
+  return (
+    <motion.div
+      className="absolute inset-0"
+      drag={isTop ? 'x' : false}
+      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+      dragElastic={0.7}
+      onDragEnd={handleDragEnd}
+      initial={{ scale: isTop ? 1 : 0.95, y: isTop ? 0 : 20 }}
+      animate={{ 
+        scale: isTop ? 1 : 0.95, 
+        y: isTop ? 0 : 20,
+        rotateZ: 0 
+      }}
+      exit={{ x: exitX, opacity: 0, rotateZ: exitX > 0 ? 20 : -20 }}
+      whileDrag={{ cursor: 'grabbing' }}
+      style={{ 
+        zIndex: isTop ? 10 : 1,
+        transformOrigin: '50% 100%'
+      }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+    >
+      <div className={`w-full h-full rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-br ${CARD_COLORS[colorIndex]} relative`}>
+        {/* Gold frame effect */}
+        <div className="absolute -inset-1 bg-gradient-to-br from-amber-300/30 to-orange-400/30 rounded-3xl -z-10 rotate-2" />
+        
+        {/* Profile Photo */}
+        <div className="relative h-[65%]">
+          <img
+            src={profile.photo}
+            alt={profile.name}
+            className="w-full h-full object-cover"
+            draggable={false}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+        </div>
+
+        {/* Profile Info */}
+        <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+          <div className="flex items-center gap-2 mb-2">
+            <h2 className="text-2xl font-bold">{profile.name}</h2>
+            <span className="text-xl opacity-80">{profile.age}</span>
+          </div>
+          
+          {profile.occupation && (
+            <p className="text-sm opacity-80 mb-2">{profile.occupation}</p>
+          )}
+          
+          <p className="text-sm opacity-90 mb-3 line-clamp-2">{profile.bio}</p>
+          
+          <div className="flex flex-wrap gap-2">
+            {profile.interests.slice(0, 4).map((interest) => (
+              <span
+                key={interest}
+                className="px-3 py-1 bg-white/20 backdrop-blur-sm text-xs font-medium rounded-full"
+              >
+                {interest}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 export default function Connect() {
   const { connectionProfiles, user, addMatch, updateUser } = useApp();
@@ -17,11 +109,10 @@ export default function Connect() {
   const [history, setHistory] = useState<number[]>([]);
   const [matchModal, setMatchModal] = useState<ConnectionProfile | null>(null);
 
-  const currentProfiles = connectionProfiles.slice(currentIndex, currentIndex + 2);
+  const visibleProfiles = connectionProfiles.slice(currentIndex, currentIndex + 2).reverse();
 
-  const handleSwipe = (direction: 'left' | 'right') => {
+  const handleSwipe = useCallback((direction: 'left' | 'right') => {
     if (direction === 'right') {
-      // Check like limit for free users
       if (user?.subscription.tier === 'free' && (user.likesRemaining ?? 0) <= 0) {
         toast({
           title: 'Daily Limit Reached',
@@ -31,22 +122,25 @@ export default function Connect() {
         return;
       }
 
-      // Decrease likes remaining
       if (user?.subscription.tier === 'free') {
         updateUser({ likesRemaining: (user.likesRemaining ?? 10) - 1 });
       }
 
-      // Simulate match (30% chance)
       const profile = connectionProfiles[currentIndex];
       if (Math.random() > 0.7) {
         addMatch(profile);
         setMatchModal(profile);
+      } else {
+        toast({
+          title: `Liked ${profile.name} ❤️`,
+          duration: 1500,
+        });
       }
     }
 
     setHistory([...history, currentIndex]);
     setCurrentIndex((prev) => prev + 1);
-  };
+  }, [user, connectionProfiles, currentIndex, history, addMatch, updateUser, toast]);
 
   const handleUndo = () => {
     if (history.length === 0) return;
@@ -66,8 +160,8 @@ export default function Connect() {
             <h1 className="text-2xl font-bold">Connect</h1>
             <p className="text-muted-foreground text-sm">Find your people at events</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Heart className="w-5 h-5 text-brand-pink" />
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10">
+            <Heart className="w-4 h-4 text-brand-pink" />
             <span className="text-sm font-medium">
               {user?.subscription.tier === 'free'
                 ? `${user?.likesRemaining ?? 10}/10`
@@ -88,26 +182,30 @@ export default function Connect() {
         </div>
 
         {/* Card Stack */}
-        <div className="relative h-[450px] flex items-center justify-center mb-6">
+        <div className="relative h-[450px] w-full max-w-[320px] mx-auto mb-6">
           {noMoreProfiles ? (
-            <div className="text-center">
-              <div className="w-20 h-20 rounded-full bg-card flex items-center justify-center mx-auto mb-4">
-                <Heart className="w-10 h-10 text-muted-foreground" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-20 h-20 rounded-full bg-card flex items-center justify-center mx-auto mb-4">
+                  <Heart className="w-10 h-10 text-muted-foreground" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">That's Everyone!</h3>
+                <p className="text-muted-foreground text-sm">
+                  Check back later for more connections
+                </p>
               </div>
-              <h3 className="text-xl font-bold mb-2">That's Everyone!</h3>
-              <p className="text-muted-foreground text-sm">
-                Check back later for more connections
-              </p>
             </div>
           ) : (
-            currentProfiles.map((profile, index) => (
-              <SwipeCard
-                key={profile.id}
-                profile={profile}
-                onSwipe={handleSwipe}
-                isTop={index === 0}
-              />
-            ))
+            <AnimatePresence mode="popLayout">
+              {visibleProfiles.map((profile, index) => (
+                <ProfileCard
+                  key={profile.id}
+                  profile={profile}
+                  onSwipe={handleSwipe}
+                  isTop={index === visibleProfiles.length - 1}
+                />
+              ))}
+            </AnimatePresence>
           )}
         </div>
 
@@ -116,22 +214,22 @@ export default function Connect() {
           <div className="flex justify-center items-center gap-4">
             <button
               onClick={() => handleSwipe('left')}
-              className="action-btn w-16 h-16 bg-card border border-border text-brand-red"
+              className="w-16 h-16 rounded-full bg-card border-2 border-brand-red/30 text-brand-red flex items-center justify-center transition-all hover:scale-110 hover:border-brand-red active:scale-95"
             >
               <X className="w-7 h-7" />
             </button>
             <button
               onClick={handleUndo}
               disabled={history.length === 0}
-              className="action-btn w-12 h-12 bg-card border border-border text-brand-yellow disabled:opacity-50"
+              className="w-12 h-12 rounded-full bg-card border border-border text-brand-yellow flex items-center justify-center transition-all hover:scale-105 disabled:opacity-30 disabled:hover:scale-100"
             >
               <RotateCcw className="w-5 h-5" />
             </button>
             <button
               onClick={() => handleSwipe('right')}
-              className="action-btn w-20 h-20 gradient-pro glow-pink text-foreground"
+              className="w-20 h-20 rounded-full gradient-pro glow-pink text-foreground flex items-center justify-center transition-all hover:scale-110 active:scale-95"
             >
-              <Heart className="w-8 h-8" />
+              <Heart className="w-9 h-9" />
             </button>
           </div>
         )}
@@ -140,9 +238,18 @@ export default function Connect() {
       {/* Match Modal */}
       <Dialog open={!!matchModal} onOpenChange={() => setMatchModal(null)}>
         <DialogContent className="bg-background/95 backdrop-blur-xl border-border max-w-[350px] text-center">
-          <div className="py-6">
+          <motion.div 
+            className="py-6"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+          >
             <div className="relative w-32 h-32 mx-auto mb-6">
-              <div className="absolute inset-0 rounded-full gradient-pro animate-pulse-glow" />
+              <motion.div 
+                className="absolute inset-0 rounded-full gradient-pro"
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
               <img
                 src={matchModal?.photo}
                 alt={matchModal?.name}
@@ -167,7 +274,7 @@ export default function Connect() {
                 Send Message
               </button>
             </div>
-          </div>
+          </motion.div>
         </DialogContent>
       </Dialog>
 

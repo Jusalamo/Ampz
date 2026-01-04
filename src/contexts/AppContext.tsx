@@ -358,24 +358,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       timestamp: new Date().toISOString(),
       likes: 0,
       likedBy: [],
-      replies: [],
-      parentId,
+      replyTo: parentId,
     };
     
-    if (parentId) {
-      const updated = communityComments.map(c => {
-        if (c.id === parentId) {
-          return { ...c, replies: [...c.replies, comment] };
-        }
-        return c;
-      });
-      setCommunityComments(updated);
-      localStorage.setItem('amps_comments', JSON.stringify(updated));
-    } else {
-      const updated = [...communityComments, comment];
-      setCommunityComments(updated);
-      localStorage.setItem('amps_comments', JSON.stringify(updated));
-    }
+    const updated = [...communityComments, comment];
+    setCommunityComments(updated);
+    localStorage.setItem('amps_comments', JSON.stringify(updated));
   };
 
   const likePhoto = (photoId: string) => {
@@ -399,22 +387,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const likeComment = (commentId: string) => {
     if (!user) return;
-    const updateComments = (comments: CommunityComment[]): CommunityComment[] => {
-      return comments.map(c => {
-        if (c.id === commentId) {
-          const alreadyLiked = c.likedBy.includes(user.id);
-          return {
-            ...c,
-            likes: alreadyLiked ? c.likes - 1 : c.likes + 1,
-            likedBy: alreadyLiked 
-              ? c.likedBy.filter(id => id !== user.id)
-              : [...c.likedBy, user.id],
-          };
-        }
-        return { ...c, replies: updateComments(c.replies) };
-      });
-    };
-    const updated = updateComments(communityComments);
+    const updated = communityComments.map(c => {
+      if (c.id === commentId) {
+        const alreadyLiked = c.likedBy.includes(user.id);
+        return {
+          ...c,
+          likes: alreadyLiked ? c.likes - 1 : c.likes + 1,
+          likedBy: alreadyLiked 
+            ? c.likedBy.filter(id => id !== user.id)
+            : [...c.likedBy, user.id],
+          isLiked: !alreadyLiked,
+        };
+      }
+      return c;
+    });
     setCommunityComments(updated);
     localStorage.setItem('amps_comments', JSON.stringify(updated));
   };
