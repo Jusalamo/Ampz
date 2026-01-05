@@ -1,14 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, SlidersHorizontal, Plus, MapPin, X, Users, Calendar, DollarSign } from 'lucide-react';
+import { Search, SlidersHorizontal, Plus, MapPin, X, Users, Calendar, Clock } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { EventCard } from './EventCard';
 import { Input } from './ui/input';
+import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Button } from './ui/button';
-import { Event } from '@/lib/types';
 
 const MAPBOX_TOKEN = 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg';
 
@@ -20,30 +19,35 @@ interface MapDrawerProps {
 type DrawerPosition = 'minimum' | 'half' | 'full';
 
 const SNAP_POSITIONS = {
-  full: 0,       // 0% - Map completely hidden (shows drawer handle only)
-  half: 0.5,     // 50% - Half map, half events
-  minimum: 0.85, // 15% - Mostly map, small events bar
+  full: 0.95,    // 5% visible (just handlebar)
+  half: 0.5,     // 50% visible
+  minimum: 0.25  // 25% visible (maximum map visible)
 };
+
+interface SelectedEvent {
+  event: any;
+  showCard: boolean;
+  coordinates: { lng: number; lat: number };
+}
 
 export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const navigate = useNavigate();
-  const { events, user } = useApp();
+  const { events, theme, user } = useApp();
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [drawerPosition, setDrawerPosition] = useState<DrawerPosition>('half');
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const [showEventCard, setShowEventCard] = useState(false);
-  const [userLocation, setUserLocation] = useState<[number, number]>([17.0658, -22.5609]);
+  const [selectedEvent, setSelectedEvent] = useState<SelectedEvent | null>(null);
   
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
-  const eventCardRef = useRef<HTMLDivElement>(null);
-  const markersRef = useRef<mapboxgl.Marker[]>([]);
   const dragStartY = useRef(0);
   const currentTranslate = useRef(0);
+  const markers = useRef<mapboxgl.Marker[]>([]);
+  const popups = useRef<mapboxgl.Popup[]>([]);
+  const geofenceCircles = useRef<string[]>([]);
 
   const categories = ['All', 'Music', 'Tech', 'Party', 'Art', 'Food', 'Sports'];
 
@@ -55,7 +59,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     return matchesSearch && matchesCategory;
   });
 
-  // Initialize map with better styling
+  // Initialize map with 3D view
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
@@ -63,139 +67,229 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12', // Regular colored map
+      style: 'mapbox://styles/mapbox/streets-v12', // Regular colors, not dark
       center: [17.0658, -22.5609], // Windhoek
-      zoom: 11,
-      pitch: 45,
-      bearing: -17.6,
+      zoom: 12,
+      pitch: 60, // 3D tilt
+      bearing: -20, // Rotation
       antialias: true,
-      interactive: true,
     });
 
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
-    map.current.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+    // Add 3D terrain (if available)
+    map.current.on('load', () => {
+      // Add navigation controls
+      map.current?.addControl(new mapboxgl.NavigationControl({
+        showCompass: true,
+        showZoom: true,
+        visualizePitch: true
+      }), 'top-right');
 
-    // Add geolocate control
-    const geolocate = new mapboxgl.GeolocateControl({
-      positionOptions: {
-        enableHighAccuracy: true,
-      },
-      trackUserLocation: true,
-      showUserLocation: true,
-    });
-    
-    map.current.addControl(geolocate, 'top-right');
-
-    geolocate.on('geolocate', (e: any) => {
-      setUserLocation([e.coords.longitude, e.coords.latitude]);
-    });
-
-    // Try to get user location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { longitude, latitude } = position.coords;
-          setUserLocation([longitude, latitude]);
-          map.current?.flyTo({
-            center: [longitude, latitude],
-            zoom: 13,
-            duration: 2000,
-          });
-        },
-        () => {
-          console.log('Using default location');
-        }
+      // Add geolocate control
+      map.current?.addControl(
+        new mapboxgl.GeolocateControl({
+          positionOptions: { enableHighAccuracy: true },
+          trackUserLocation: true,
+          showUserLocation: true,
+          showAccuracyCircle: true,
+        }),
+        'top-right'
       );
-    }
+
+      // Add fullscreen control
+      map.current?.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+
+      // Add event markers
+      addEventMarkers();
+
+      // User location marker
+      const userMarker = document.createElement('div');
+      userMarker.innerHTML = `
+        <div class="relative">
+          <div class="w-6 h-6 rounded-full bg-brand-green border-3 border-white shadow-lg animate-pulse"></div>
+          <div class="absolute -inset-3 rounded-full bg-brand-green/20 animate-ping"></div>
+        </div>
+      `;
+      new mapboxgl.Marker(userMarker)
+        .setLngLat([17.0658, -22.5609])
+        .addTo(map.current);
+    });
 
     return () => {
-      markersRef.current.forEach(marker => marker.remove());
-      markersRef.current = [];
+      markers.current.forEach(marker => marker.remove());
+      popups.current.forEach(popup => popup.remove());
+      geofenceCircles.current.forEach(sourceId => {
+        if (map.current?.getSource(sourceId)) {
+          map.current?.removeSource(sourceId);
+        }
+      });
       map.current?.remove();
       map.current = null;
     };
   }, []);
 
-  // Add event markers with click handlers
-  useEffect(() => {
+  // Add event markers with geofence circles
+  const addEventMarkers = () => {
     if (!map.current) return;
 
     // Clear existing markers
-    markersRef.current.forEach(marker => marker.remove());
-    markersRef.current = [];
+    markers.current.forEach(marker => marker.remove());
+    popups.current.forEach(popup => popup.remove());
+    geofenceCircles.current.forEach(sourceId => {
+      if (map.current?.getSource(sourceId)) {
+        map.current?.removeSource(sourceId);
+      }
+    });
 
-    // Add markers for filtered events
-    filteredEvents.forEach((event) => {
-      const markerElement = document.createElement('div');
-      markerElement.className = 'event-marker cursor-pointer group';
-      markerElement.innerHTML = `
+    markers.current = [];
+    popups.current = [];
+    geofenceCircles.current = [];
+
+    events.forEach((event) => {
+      // Create custom marker element
+      const el = document.createElement('div');
+      el.className = 'event-marker cursor-pointer transition-all hover:scale-125';
+      el.innerHTML = `
         <div class="relative">
-          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-200 border-2 border-white">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-            </svg>
+          <div class="w-10 h-10 rounded-full bg-white shadow-xl flex items-center justify-center border-2 border-primary">
+            <div class="w-6 h-6 rounded-full" style="background-color: ${event.customTheme || '#8B5CF6'}"></div>
           </div>
-          <div class="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full border border-gray-300 flex items-center justify-center text-[10px] font-bold text-gray-700">
-            ${event.attendees > 99 ? '99+' : event.attendees}
+          <div class="absolute -inset-2 rounded-full bg-primary/10 animate-ping"></div>
+        </div>
+      `;
+
+      // Create event card for popup
+      const eventCardEl = document.createElement('div');
+      eventCardEl.className = 'event-popup-card bg-background rounded-xl shadow-2xl overflow-hidden min-w-[280px] border border-border';
+      eventCardEl.innerHTML = `
+        <div class="relative">
+          <img 
+            src="${event.coverImage}" 
+            alt="${event.name}"
+            class="w-full h-32 object-cover"
+          />
+          <div class="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center">
+            <X class="w-4 h-4 text-white" />
+          </div>
+          <div class="p-4">
+            <div class="flex justify-between items-start mb-2">
+              <h3 class="font-bold text-lg truncate">${event.name}</h3>
+              <span class="px-2 py-1 text-xs rounded-full" style="background-color: ${event.customTheme || '#8B5CF6'}20; color: ${event.customTheme || '#8B5CF6'}">
+                ${event.category}
+              </span>
+            </div>
+            
+            <div class="space-y-2 mb-3">
+              <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                <MapPin class="w-4 h-4" />
+                <span class="truncate">${event.location}</span>
+              </div>
+              <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar class="w-4 h-4" />
+                <span>${event.date}</span>
+              </div>
+              <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock class="w-4 h-4" />
+                <span>${event.time}</span>
+              </div>
+              <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                <Users class="w-4 h-4" />
+                <span>${event.attendees} attending</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-sm">
+              <span class="font-semibold">${event.price === 0 ? 'FREE' : `N$${event.price}`}</span>
+              <div class="flex items-center gap-2">
+                <span class="text-xs px-2 py-1 rounded-full bg-card">${event.geofenceRadius}m radius</span>
+                <button class="view-details-btn px-3 py-1.5 rounded-lg text-sm font-medium" style="background-color: ${event.customTheme || '#8B5CF6'}">
+                  View Details
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       `;
 
-      const marker = new mapboxgl.Marker({
-        element: markerElement,
-        anchor: 'center',
-      })
+      // Add click handler for view details button
+      setTimeout(() => {
+        const viewDetailsBtn = eventCardEl.querySelector('.view-details-btn');
+        if (viewDetailsBtn) {
+          viewDetailsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            navigate(`/event/${event.id}`);
+          });
+        }
+
+        const closeBtn = eventCardEl.querySelector('.absolute.top-2.right-2');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (popupRef.isOpen()) {
+              popupRef.remove();
+            }
+          });
+        }
+      }, 0);
+
+      // Create popup
+      const popupRef = new mapboxgl.Popup({
+        offset: 25,
+        closeButton: false,
+        closeOnClick: false,
+        maxWidth: '300px'
+      }).setDOMContent(eventCardEl);
+
+      // Create marker
+      const marker = new mapboxgl.Marker({ element: el })
         .setLngLat([event.coordinates.lng, event.coordinates.lat])
+        .setPopup(popupRef)
         .addTo(map.current!);
 
-      // Add geofence circle for this event
-      addGeofenceCircle(event);
-
-      markerElement.addEventListener('click', (e) => {
+      // Add click handler to marker
+      el.addEventListener('click', (e) => {
         e.stopPropagation();
-        setSelectedEvent(event);
-        setShowEventCard(true);
         
         // Fly to event location
         map.current?.flyTo({
           center: [event.coordinates.lng, event.coordinates.lat],
           zoom: 14,
           pitch: 60,
-          bearing: 40,
-          duration: 1500,
+          bearing: -20,
+          duration: 1000,
         });
+
+        // Show event card
+        setSelectedEvent({
+          event,
+          showCard: true,
+          coordinates: { lng: event.coordinates.lng, lat: event.coordinates.lat }
+        });
+
+        // Add geofence circle
+        addGeofenceCircle(event);
       });
 
-      markersRef.current.push(marker);
+      markers.current.push(marker);
+      popups.current.push(popupRef);
     });
+  };
 
-    // Add user location marker
-    const userMarkerElement = document.createElement('div');
-    userMarkerElement.className = 'user-marker';
-    userMarkerElement.innerHTML = `
-      <div class="relative">
-        <div class="w-6 h-6 rounded-full bg-brand-green animate-pulse"></div>
-        <div class="absolute inset-0 rounded-full bg-brand-green/30 animate-ping"></div>
-      </div>
-    `;
-
-    const userMarker = new mapboxgl.Marker({
-      element: userMarkerElement,
-      anchor: 'center',
-    })
-      .setLngLat(userLocation)
-      .addTo(map.current!);
-
-    markersRef.current.push(userMarker);
-
-  }, [filteredEvents, userLocation]);
-
-  const addGeofenceCircle = (event: Event) => {
-    if (!map.current || !map.current.isStyleLoaded()) return;
+  // Add geofence circle to map
+  const addGeofenceCircle = (event: any) => {
+    if (!map.current) return;
 
     const { lat, lng } = event.coordinates;
     const radiusInKm = event.geofenceRadius / 1000;
-    
+    const sourceId = `geofence-${event.id}`;
+
+    // Remove existing circle
+    if (geofenceCircles.current.includes(sourceId)) {
+      if (map.current.getSource(sourceId)) {
+        map.current.removeSource(sourceId);
+      }
+      geofenceCircles.current = geofenceCircles.current.filter(id => id !== sourceId);
+    }
+
     // Generate circle coordinates
     const points = 64;
     const coords: [number, number][] = [];
@@ -207,16 +301,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     }
     coords.push(coords[0]); // Close the circle
 
-    const sourceId = `geofence-${event.id}`;
-    const fillLayerId = `geofence-fill-${event.id}`;
-    const lineLayerId = `geofence-line-${event.id}`;
-
-    // Remove existing layers if they exist
-    if (map.current.getLayer(fillLayerId)) map.current.removeLayer(fillLayerId);
-    if (map.current.getLayer(lineLayerId)) map.current.removeLayer(lineLayerId);
-    if (map.current.getSource(sourceId)) map.current.removeSource(sourceId);
-
-    // Add new source and layers
+    // Add circle source and layers
     map.current.addSource(sourceId, {
       type: 'geojson',
       data: {
@@ -227,27 +312,73 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     });
 
     map.current.addLayer({
-      id: fillLayerId,
+      id: `${sourceId}-fill`,
       type: 'fill',
       source: sourceId,
       paint: {
         'fill-color': event.customTheme || '#8B5CF6',
-        'fill-opacity': ['case', ['==', ['get', 'id'], event.id], 0.15, 0.05],
+        'fill-opacity': 0.15,
       },
     });
 
     map.current.addLayer({
-      id: lineLayerId,
+      id: `${sourceId}-line`,
       type: 'line',
       source: sourceId,
       paint: {
         'line-color': event.customTheme || '#8B5CF6',
-        'line-width': ['case', ['==', ['get', 'id'], event.id], 3, 1],
-        'line-opacity': ['case', ['==', ['get', 'id'], event.id], 0.8, 0.3],
-        'line-dasharray': [2, 2],
+        'line-width': 2,
+        'line-dasharray': [2, 1],
       },
     });
+
+    geofenceCircles.current.push(sourceId);
   };
+
+  // Remove all geofence circles
+  const removeGeofenceCircles = () => {
+    if (!map.current) return;
+
+    geofenceCircles.current.forEach(sourceId => {
+      if (map.current?.getSource(sourceId)) {
+        // Remove layers
+        if (map.current.getLayer(`${sourceId}-fill`)) {
+          map.current.removeLayer(`${sourceId}-fill`);
+        }
+        if (map.current.getLayer(`${sourceId}-line`)) {
+          map.current.removeLayer(`${sourceId}-line`);
+        }
+        // Remove source
+        map.current.removeSource(sourceId);
+      }
+    });
+    geofenceCircles.current = [];
+  };
+
+  // Close event card
+  const closeEventCard = () => {
+    setSelectedEvent(null);
+    removeGeofenceCircles();
+  };
+
+  // Re-add markers when events change
+  useEffect(() => {
+    if (map.current?.isStyleLoaded()) {
+      addEventMarkers();
+    }
+  }, [events]);
+
+  // Update map style on theme change
+  useEffect(() => {
+    if (map.current) {
+      // Keep streets style for both themes (not dark)
+      map.current.setStyle('mapbox://styles/mapbox/streets-v12');
+      // Re-add markers after style change
+      setTimeout(() => {
+        addEventMarkers();
+      }, 500);
+    }
+  }, [theme]);
 
   const getDrawerHeight = () => {
     if (typeof window === 'undefined') return 500;
@@ -255,9 +386,9 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   };
 
   const snapToPosition = useCallback((percentage: number): DrawerPosition => {
-    if (percentage > 0.7) return 'minimum';
-    if (percentage > 0.3) return 'half';
-    return 'full';
+    if (percentage < 0.3) return 'full';
+    if (percentage < 0.625) return 'half';
+    return 'minimum';
   }, []);
 
   const handleDragStart = (clientY: number) => {
@@ -270,7 +401,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     if (!isDragging) return;
     
     const deltaY = clientY - dragStartY.current;
-    const newTranslate = Math.max(0, Math.min(getDrawerHeight() * 0.9, currentTranslate.current + deltaY));
+    const newTranslate = Math.max(0, Math.min(getDrawerHeight() * 0.95, currentTranslate.current + deltaY));
     setDragOffset(newTranslate - currentTranslate.current);
   };
 
@@ -331,136 +462,84 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     return `translateY(${totalTranslate}px)`;
   };
 
-  const handleEventCardClick = (event: Event) => {
-    navigate(`/event/${event.id}`);
-  };
-
-  const handleCloseEventCard = () => {
-    setShowEventCard(false);
-    setSelectedEvent(null);
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (eventCardRef.current && !eventCardRef.current.contains(event.target as Node)) {
-        handleCloseEventCard();
-      }
-    };
-
-    if (showEventCard) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showEventCard]);
-
   return (
     <div className="relative h-full">
-      {/* Mapbox Map - Full screen */}
+      {/* Mapbox Map */}
       <div 
         ref={mapContainer} 
         className="absolute inset-0 z-0"
         style={{ top: 0, bottom: 65 }}
       />
 
-      {/* Event Card Overlay - Shows when pin is clicked */}
-      {showEventCard && selectedEvent && (
-        <div className="absolute inset-0 z-20 flex items-end justify-center p-4 pointer-events-none">
-          <div 
-            ref={eventCardRef}
-            className="w-full max-w-md bg-background rounded-2xl shadow-2xl border border-border overflow-hidden pointer-events-auto animate-slide-up"
-            onClick={() => handleEventCardClick(selectedEvent)}
-          >
+      {/* Selected Event Card Overlay */}
+      {selectedEvent?.showCard && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30 max-w-md w-[90%]">
+          <div className="bg-background rounded-2xl shadow-2xl border border-border overflow-hidden">
             <div className="relative">
-              {/* Event Image */}
-              <div className="h-48 w-full relative overflow-hidden">
-                <img
-                  src={selectedEvent.coverImage}
-                  alt={selectedEvent.name}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                
-                {/* Close Button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCloseEventCard();
+              <img 
+                src={selectedEvent.event.coverImage} 
+                alt={selectedEvent.event.name}
+                className="w-full h-40 object-cover"
+              />
+              <button 
+                onClick={closeEventCard}
+                className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center hover:bg-black/80 transition-colors"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+            
+            <div className="p-4">
+              <div className="flex justify-between items-start mb-3">
+                <h3 className="font-bold text-xl truncate pr-2">{selectedEvent.event.name}</h3>
+                <span 
+                  className="px-3 py-1 text-sm rounded-full shrink-0"
+                  style={{ 
+                    backgroundColor: `${selectedEvent.event.customTheme || '#8B5CF6'}20`, 
+                    color: selectedEvent.event.customTheme || '#8B5CF6' 
                   }}
-                  className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center hover:bg-black/70 transition-colors"
                 >
-                  <X className="w-5 h-5 text-white" />
-                </button>
-
-                {/* Event Title */}
-                <div className="absolute bottom-4 left-4 right-4">
-                  <h3 className="text-xl font-bold text-white mb-1">{selectedEvent.name}</h3>
-                  <div className="flex items-center gap-2 text-white/90">
-                    <MapPin className="w-4 h-4" />
-                    <span className="text-sm">{selectedEvent.location}</span>
-                  </div>
+                  {selectedEvent.event.category}
+                </span>
+              </div>
+              
+              <div className="space-y-3 mb-4">
+                <div className="flex items-center gap-2 text-sm">
+                  <MapPin className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-foreground">{selectedEvent.event.location}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-foreground">{selectedEvent.event.date}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-foreground">{selectedEvent.event.time}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-foreground">{selectedEvent.event.attendees} attending</span>
                 </div>
               </div>
 
-              {/* Event Details */}
-              <div className="p-4 space-y-4">
-                {/* Category and Date */}
-                <div className="flex items-center justify-between">
-                  <span 
-                    className="px-3 py-1 rounded-full text-xs font-medium"
-                    style={{ 
-                      backgroundColor: `${selectedEvent.customTheme || '#8B5CF6'}20`,
-                      color: selectedEvent.customTheme || '#8B5CF6'
-                    }}
-                  >
-                    {selectedEvent.category}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-bold">
+                    {selectedEvent.event.price === 0 ? 'FREE' : `N$${selectedEvent.event.price}`}
                   </span>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="w-4 h-4" />
-                    <span>{selectedEvent.date} at {selectedEvent.time}</span>
-                  </div>
+                  <span className="text-sm px-3 py-1 rounded-full bg-card">
+                    {selectedEvent.event.geofenceRadius}m radius
+                  </span>
                 </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-card rounded-xl p-3 text-center">
-                    <Users className="w-5 h-5 text-primary mx-auto mb-1" />
-                    <p className="text-xs text-muted-foreground">Attending</p>
-                    <p className="text-lg font-bold">{selectedEvent.attendees}</p>
-                  </div>
-                  <div className="bg-card rounded-xl p-3 text-center">
-                    <MapPin className="w-5 h-5 text-green-500 mx-auto mb-1" />
-                    <p className="text-xs text-muted-foreground">Radius</p>
-                    <p className="text-lg font-bold">{selectedEvent.geofenceRadius}m</p>
-                  </div>
-                  <div className="bg-card rounded-xl p-3 text-center">
-                    <DollarSign className="w-5 h-5 text-yellow-500 mx-auto mb-1" />
-                    <p className="text-xs text-muted-foreground">Price</p>
-                    <p className="text-lg font-bold">
-                      {selectedEvent.price === 0 ? 'FREE' : `N$${selectedEvent.price}`}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Description */}
-                {selectedEvent.description && (
-                  <div className="pt-3 border-t border-border">
-                    <p className="text-sm text-muted-foreground mb-1">Description</p>
-                    <p className="text-sm line-clamp-2">{selectedEvent.description}</p>
-                  </div>
-                )}
-
-                {/* View Details Button */}
-                <Button 
-                  className="w-full gradient-pro glow-purple rounded-xl h-12 font-medium mt-2"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEventCardClick(selectedEvent);
+                <Button
+                  onClick={() => navigate(`/event/${selectedEvent.event.id}`)}
+                  className="rounded-xl font-medium"
+                  style={{ 
+                    backgroundColor: selectedEvent.event.customTheme || '#8B5CF6',
+                    borderColor: selectedEvent.event.customTheme || '#8B5CF6'
                   }}
                 >
-                  View Event Details
+                  View Details
                 </Button>
               </div>
             </div>
@@ -472,7 +551,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       <div
         ref={drawerRef}
         className={cn(
-          'absolute left-0 right-0 bg-background rounded-t-3xl z-10 shadow-2xl border-t border-border',
+          'absolute left-0 right-0 bg-background rounded-t-3xl z-20 shadow-2xl border-t border-x border-border',
           !isDragging && 'transition-transform duration-300 ease-out'
         )}
         style={{
@@ -483,22 +562,22 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       >
         {/* Drag Handle */}
         <div
-          className="flex justify-center py-4 cursor-grab active:cursor-grabbing touch-none"
+          className="flex justify-center py-3 cursor-grab active:cursor-grabbing touch-none border-b border-border"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onMouseDown={handleMouseDown}
         >
           <div className={cn(
-            'w-12 h-1.5 rounded-full transition-colors',
-            isDragging ? 'bg-primary' : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
+            'w-16 h-1.5 rounded-full transition-colors',
+            isDragging ? 'bg-primary' : 'bg-muted-foreground/40 hover:bg-primary/70'
           )} />
         </div>
 
         {/* Drawer Content */}
-        <div className="px-5 overflow-hidden h-full flex flex-col">
+        <div className="px-5 overflow-hidden h-full">
           {/* Search and Actions */}
-          <div className="flex gap-3 mb-4">
+          <div className="flex gap-3 mb-4 pt-4">
             <div className="flex-1 relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <Input
@@ -506,7 +585,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                 placeholder="Search events..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-12 pl-12 bg-card border-border rounded-xl"
+                className="h-12 pl-12 rounded-xl bg-card border-border"
               />
             </div>
             <button 
@@ -520,28 +599,28 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
           {/* Create Event Button */}
           <button
             onClick={onCreateEvent}
-            className="w-full mb-4 py-3 rounded-xl gradient-pro text-white font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity relative"
+            className="w-full mb-4 py-3.5 rounded-xl gradient-pro text-foreground font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity relative shadow-lg"
           >
             <Plus className="w-5 h-5" />
             Create Event
             {user?.subscription.tier === 'free' && (
-              <span className="absolute right-3 px-2 py-0.5 bg-white/20 text-xs rounded-full">
+              <span className="absolute right-4 px-3 py-1 bg-background/30 text-xs rounded-full backdrop-blur-sm">
                 PRO
               </span>
             )}
           </button>
 
           {/* Categories */}
-          <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5 mb-4">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5 mb-4 pb-1">
             {categories.map((category) => (
               <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
                 className={cn(
-                  'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all',
+                  'px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all border',
                   selectedCategory === category
-                    ? 'bg-primary text-primary-foreground shadow-md'
-                    : 'bg-card text-muted-foreground hover:text-foreground border border-border'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card text-muted-foreground hover:text-foreground border-border hover:border-primary'
                 )}
               >
                 {category}
@@ -551,50 +630,26 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
           {/* Events List */}
           <div 
-            className="flex-1 overflow-y-auto space-y-4 pb-4"
+            className="overflow-y-auto space-y-4 pb-24"
+            style={{ maxHeight: 'calc(100% - 180px)' }}
           >
             {filteredEvents.length > 0 ? (
               filteredEvents.map((event) => (
-                <div key={event.id} className="animate-fade-in">
-                  <EventCard
-                    event={event}
-                    onClick={() => navigate(`/event/${event.id}`)}
-                    onHover={() => {
-                      // Highlight the event on map when hovering over card
-                      map.current?.flyTo({
-                        center: [event.coordinates.lng, event.coordinates.lat],
-                        zoom: 13,
-                        duration: 800,
-                      });
-                    }}
-                  />
-                </div>
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  onClick={() => navigate(`/event/${event.id}`)}
+                />
               ))
             ) : (
               <div className="text-center py-12">
-                <MapPin className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No events found</h3>
-                <p className="text-muted-foreground mb-6">
-                  {search ? 'Try a different search' : 'Be the first to create an event!'}
-                </p>
-                <Button
-                  onClick={onCreateEvent}
-                  className="rounded-xl"
-                  variant={user?.subscription.tier === 'free' ? 'outline' : 'default'}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Your First Event
-                </Button>
+                <MapPin className="w-14 h-14 text-muted-foreground mx-auto mb-4 opacity-50" />
+                <p className="text-muted-foreground font-medium">No events found</p>
+                <p className="text-sm text-muted-foreground mt-1">Try changing your search or filters</p>
               </div>
             )}
           </div>
         </div>
-      </div>
-
-      {/* Drawer Position Indicator */}
-      <div className="absolute top-4 right-4 z-20 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5 text-white text-xs font-medium">
-        {drawerPosition === 'full' ? 'Events' : 
-         drawerPosition === 'half' ? 'Half Map' : 'Full Map'}
       </div>
     </div>
   );
