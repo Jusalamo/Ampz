@@ -1,5 +1,6 @@
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Users, Calendar, MapPin, QrCode, MessageCircle, ChevronRight } from 'lucide-react';
+import { Zap, Users, Calendar, MapPin, QrCode, MessageCircle, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ColorBends from '@/components/ColorBends';
 import { useApp } from '@/contexts/AppContext';
@@ -10,6 +11,8 @@ export default function Landing() {
   const navigate = useNavigate();
   const { events } = useApp();
   const { scrollDirection, scrollY } = useScrollDirection();
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
 
   const featuredEvents = events.filter(e => e.isFeatured).slice(0, 4);
   const isHeaderSolid = scrollY > 50;
@@ -21,6 +24,35 @@ export default function Landing() {
     { icon: MapPin, label: 'Nearby', description: 'See who\'s going and what\'s happening' },
     { icon: QrCode, label: 'Instant Check-in', description: 'Scan to check in instantly' },
   ];
+
+  // Grid layout for features (1-2-2 pattern)
+  const gridFeatures = [
+    features.slice(0, 4), // First 4 items in 2x2 grid
+    features[4] // Last item centered below
+  ];
+
+  // Carousel autoplay
+  useEffect(() => {
+    if (!isAutoPlaying || featuredEvents.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % featuredEvents.length);
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [isAutoPlaying, featuredEvents.length]);
+
+  const nextSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev + 1) % featuredEvents.length);
+  }, [featuredEvents.length]);
+
+  const prevSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev - 1 + featuredEvents.length) % featuredEvents.length);
+  }, [featuredEvents.length]);
+
+  const goToSlide = useCallback((index: number) => {
+    setCurrentSlide(index);
+  }, []);
 
   return (
     <div className="min-h-screen bg-black relative overflow-x-hidden">
@@ -50,25 +82,25 @@ export default function Landing() {
           isHeaderSolid ? 'bg-black/90 backdrop-blur-xl border-b border-white/10' : 'bg-transparent'
         )}
       >
-        <div className="max-w-app mx-auto flex items-center justify-between px-5 h-16 pt-safe">
+        <div className="max-w-app mx-auto flex items-center justify-between px-4 sm:px-5 h-16 pt-safe">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl gradient-pro flex items-center justify-center">
-              <Zap className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl gradient-pro flex items-center justify-center">
+              <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
-            <span className="text-xl font-extrabold text-white">Amps</span>
+            <span className="text-lg sm:text-xl font-extrabold text-white">Amps</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Button
               variant="ghost"
               onClick={() => navigate('/auth?mode=login')}
-              className="text-white/80 hover:text-white hover:bg-white/10"
+              className="text-white/80 hover:text-white hover:bg-white/10 text-sm sm:text-base"
             >
               Log In
             </Button>
             <Button
               onClick={() => navigate('/auth')}
               size="sm"
-              className="gradient-pro text-white font-semibold"
+              className="gradient-pro text-white font-semibold text-sm sm:text-base"
             >
               Sign Up
             </Button>
@@ -77,87 +109,94 @@ export default function Landing() {
       </header>
 
       {/* Main Content */}
-      <div className="relative z-10 pt-16"> {/* Added pt-16 for fixed header space */}
-        {/* Hero Section - Reduced spacing from header */}
-        <section className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center px-6">
-          <div className="text-center max-w-[400px]">
-            <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-5 tracking-tight text-white">
+      <div className="relative z-10">
+        {/* Hero Section - Reduced spacing from navbar */}
+        <section className="min-h-[90vh] sm:min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 pt-16 pb-8 sm:pb-12">
+          <div className="text-center max-w-[90%] sm:max-w-[400px]">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight mb-4 sm:mb-5 tracking-tight text-white">
               Real events.
               <br />
               <span className="gradient-text">Real connections.</span>
             </h1>
-            <p className="text-white/70 text-lg mb-10 leading-relaxed">
+            <p className="text-white/70 text-base sm:text-lg mb-8 sm:mb-10 leading-relaxed">
               Discover events near you. Meet people. Connect instantly.
             </p>
 
             {/* CTA Buttons */}
-            <div className="space-y-3 mb-12">
+            <div className="space-y-3 mb-8 sm:mb-12">
               <Button
                 onClick={() => navigate('/auth')}
-                className="w-full h-14 text-lg font-semibold gradient-pro glow-purple hover:opacity-90 transition-all"
+                className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold gradient-pro glow-purple hover:opacity-90 transition-all"
               >
                 Get Started
               </Button>
               <Button
                 onClick={() => navigate('/auth?mode=login')}
                 variant="outline"
-                className="w-full h-14 text-lg font-semibold border-white/30 bg-white/5 backdrop-blur-sm text-white hover:bg-white/10 hover:border-primary transition-all"
+                className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold border-white/30 bg-white/5 backdrop-blur-sm text-white hover:bg-white/10 hover:border-primary transition-all"
               >
                 I already have an account
               </Button>
             </div>
           </div>
-
-          {/* Scroll Indicator */}
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-            <div className="w-6 h-10 rounded-full border-2 border-white/30 flex items-start justify-center p-2">
-              <div className="w-1.5 h-3 rounded-full bg-white/50 animate-pulse" />
-            </div>
-          </div>
         </section>
 
-        {/* How Amps Works - Changed to Grid Format */}
-        <section className="py-12 px-6"> {/* Reduced py-16 to py-12 */}
-          <div className="max-w-app mx-auto">
-            <h2 className="text-2xl font-bold text-white text-center mb-6">How Amps Works</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              {features.slice(0, 4).map(({ icon: Icon, label, description }, index) => (
-                <div
-                  key={label}
-                  className={cn(
-                    'glass-card p-5 flex flex-col items-center gap-3 hover:border-primary transition-all text-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl h-full',
-                    index % 2 === 0 ? 'sm:col-start-1' : 'sm:col-start-2'
-                  )}
-                >
-                  <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center">
-                    <Icon className="w-7 h-7 text-primary" />
+        {/* How Amps Works - Reduced spacing */}
+        <section className="py-12 sm:py-16 px-4 sm:px-6">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-xl sm:text-2xl font-bold text-white text-center mb-6 sm:mb-8">How Amps Works</h2>
+            
+            {/* Grid Layout for Features */}
+            <div className="max-w-3xl mx-auto">
+              {/* First 4 features in 2x2 grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+                {gridFeatures[0].map(({ icon: Icon, label, description }, index) => (
+                  <div
+                    key={label}
+                    className={cn(
+                      'glass-card p-4 sm:p-5 flex flex-col gap-3 hover:border-primary transition-all text-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl sm:rounded-2xl',
+                      index === 0 && 'sm:rounded-tl-2xl',
+                      index === 1 && 'sm:rounded-tr-2xl',
+                      index === 2 && 'sm:rounded-bl-2xl',
+                      index === 3 && 'sm:rounded-br-2xl'
+                    )}
+                  >
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-primary/20 flex items-center justify-center mx-auto">
+                      <Icon className="w-6 h-6 sm:w-7 sm:h-7 text-primary" />
+                    </div>
+                    <span className="text-base sm:text-lg font-bold text-white">{label}</span>
+                    <span className="text-xs sm:text-sm text-white/60 leading-relaxed">{description}</span>
                   </div>
-                  <span className="text-sm font-bold text-white">{label}</span>
-                  <span className="text-xs text-white/60 leading-relaxed">{description}</span>
-                </div>
-              ))}
-              
-              {/* Fifth feature centered in last row */}
-              <div className="col-span-full lg:col-span-5 lg:col-start-3 flex justify-center">
-                <div className="glass-card p-5 flex flex-col items-center gap-3 hover:border-primary transition-all text-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl max-w-[280px] w-full">
-                  <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center">
-                    <QrCode className="w-7 h-7 text-primary" />
-                  </div>
-                  <span className="text-sm font-bold text-white">{features[4].label}</span>
-                  <span className="text-xs text-white/60 leading-relaxed">{features[4].description}</span>
-                </div>
+                ))}
               </div>
+              
+              {/* Last feature centered below */}
+              {gridFeatures[1] && (
+                <div className="flex justify-center">
+                  <div className="max-w-md mx-auto w-full">
+                    <div className="glass-card p-4 sm:p-5 flex flex-col items-center gap-3 hover:border-primary transition-all text-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl sm:rounded-2xl">
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-primary/20 flex items-center justify-center">
+                        <gridFeatures[1].icon className="w-6 h-6 sm:w-7 sm:h-7 text-primary" />
+                      </div>
+                      <span className="text-base sm:text-lg font-bold text-white">{gridFeatures[1].label}</span>
+                      <span className="text-xs sm:text-sm text-white/60 leading-relaxed max-w-xs mx-auto">
+                        {gridFeatures[1].description}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </section>
 
-        {/* Featured Events - Changed to Carousel Format */}
+        {/* Featured Events Carousel */}
         {featuredEvents.length > 0 && (
-          <section className="py-12 px-6"> {/* Reduced py-16 to py-12 */}
-            <div className="max-w-app mx-auto">
+          <section className="py-12 sm:py-16 px-4 sm:px-6">
+            <div className="max-w-4xl mx-auto">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">Featured Events</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold text-white">Featured Events</h2>
                   <p className="text-white/60 text-sm mt-1">Discover what's happening</p>
                 </div>
                 <button 
@@ -170,93 +209,168 @@ export default function Landing() {
               
               {/* Carousel Container */}
               <div className="relative">
-                <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-6 px-6 pb-4 gap-4">
-                  {featuredEvents.map((event) => (
-                    <div
-                      key={event.id}
-                      className="flex-shrink-0 w-[85vw] max-w-[320px] snap-center"
+                {/* Carousel Navigation - Mobile only */}
+                {featuredEvents.length > 1 && (
+                  <>
+                    <button
+                      onClick={prevSlide}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition-all md:hidden"
+                      aria-label="Previous slide"
                     >
-                      <button
-                        onClick={() => navigate(`/event/${event.id}`)}
-                        className="relative overflow-hidden rounded-2xl aspect-[16/10] group text-left w-full"
-                      >
-                        <img
-                          src={event.coverImage}
-                          alt={event.name}
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
-                        <div className="absolute top-3 left-3">
-                          <span className="px-2 py-1 bg-primary/90 text-white text-xs font-semibold rounded-full">
-                            Featured
-                          </span>
-                        </div>
-                        <div className="absolute bottom-0 left-0 right-0 p-4">
-                          <h3 className="text-white font-bold text-lg mb-1 line-clamp-1">{event.name}</h3>
-                          <div className="flex items-center gap-3 text-white/80 text-sm">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              {new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <MapPin className="w-4 h-4" />
-                              {event.location.split(',')[0]}
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={nextSlide}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition-all md:hidden"
+                      aria-label="Next slide"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
+                
+                {/* Carousel Slides */}
+                <div 
+                  className="overflow-hidden rounded-2xl"
+                  onMouseEnter={() => setIsAutoPlaying(false)}
+                  onMouseLeave={() => setIsAutoPlaying(true)}
+                >
+                  <div className="flex transition-transform duration-500 ease-in-out"
+                       style={{ transform: `translateX(-${currentSlide * 100}%)` }}>
+                    {featuredEvents.map((event, index) => (
+                      <div key={event.id} className="w-full flex-shrink-0">
+                        <button
+                          onClick={() => navigate(`/event/${event.id}`)}
+                          className="relative overflow-hidden rounded-2xl aspect-[16/9] sm:aspect-[21/9] w-full group text-left"
+                        >
+                          <img
+                            src={event.coverImage}
+                            alt={event.name}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+                          <div className="absolute top-4 left-4">
+                            <span className="px-3 py-1.5 bg-primary/90 text-white text-sm font-semibold rounded-full">
+                              Featured
                             </span>
                           </div>
-                        </div>
-                      </button>
-                    </div>
-                  ))}
+                          <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
+                            <h3 className="text-white font-bold text-lg sm:text-2xl mb-2 line-clamp-1">{event.name}</h3>
+                            <div className="flex flex-wrap items-center gap-3 text-white/80 text-sm sm:text-base">
+                              <span className="flex items-center gap-2">
+                                <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
+                                {new Date(event.date).toLocaleDateString('en-US', { 
+                                  month: 'short', 
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })}
+                              </span>
+                              <span className="flex items-center gap-2">
+                                <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
+                                <span className="max-w-[150px] sm:max-w-xs truncate">{event.location.split(',')[0]}</span>
+                              </span>
+                            </div>
+                            {event.description && (
+                              <p className="text-white/70 text-sm mt-3 line-clamp-2 hidden sm:block">
+                                {event.description}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 
-                {/* Carousel Indicators */}
-                <div className="flex justify-center gap-2 mt-4">
-                  {featuredEvents.map((_, index) => (
-                    <div
-                      key={index}
-                      className="w-2 h-2 rounded-full bg-white/30"
-                    />
+                {/* Carousel Dots - Always visible */}
+                {featuredEvents.length > 1 && (
+                  <div className="flex justify-center gap-2 mt-6">
+                    {featuredEvents.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => goToSlide(index)}
+                        className={cn(
+                          'w-2 h-2 rounded-full transition-all duration-300',
+                          index === currentSlide 
+                            ? 'bg-primary w-6' 
+                            : 'bg-white/30 hover:bg-white/50'
+                        )}
+                        aria-label={`Go to slide ${index + 1}`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Grid View for Desktop */}
+              {featuredEvents.length > 1 && (
+                <div className="hidden md:grid md:grid-cols-2 gap-4 mt-8">
+                  {featuredEvents.slice(1).map((event) => (
+                    <button
+                      key={event.id}
+                      onClick={() => navigate(`/event/${event.id}`)}
+                      className="relative overflow-hidden rounded-2xl aspect-[16/10] group text-left"
+                    >
+                      <img
+                        src={event.coverImage}
+                        alt={event.name}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <h3 className="text-white font-bold text-lg mb-1 line-clamp-1">{event.name}</h3>
+                        <div className="flex items-center gap-3 text-white/80 text-sm">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            {new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-4 h-4" />
+                            {event.location.split(',')[0]}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
                   ))}
                 </div>
-              </div>
+              )}
             </div>
           </section>
         )}
 
-        {/* Footer CTA - Proper Footer Styling */}
-        <section className="py-16 px-6 text-center border-t border-white/10 mt-8"> {/* Added border and mt-8 */}
+        {/* Footer CTA */}
+        <section className="py-16 sm:py-20 px-4 sm:px-6 text-center">
           <div className="max-w-app mx-auto">
-            <h2 className="text-2xl font-bold text-white mb-4">Ready to connect?</h2>
-            <p className="text-white/60 mb-6">Join 10,000+ people connecting at events</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">Ready to connect?</h2>
+            <p className="text-white/60 mb-6 sm:mb-8 text-sm sm:text-base">
+              Join 10,000+ people connecting at events
+            </p>
             <Button
               onClick={() => navigate('/auth')}
-              className="h-14 px-10 text-lg font-semibold gradient-pro glow-purple mb-6"
+              className="h-12 sm:h-14 px-8 sm:px-10 text-base sm:text-lg font-semibold gradient-pro glow-purple"
             >
               Get Started Free
             </Button>
-            
-            {/* Footer Content */}
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg gradient-pro flex items-center justify-center">
-                <Zap className="w-4 h-4 text-white" />
-              </div>
-              <span className="text-lg font-bold text-white">Amps</span>
-            </div>
-            
-            {/* Removed floating mouse button CTA - now proper footer */}
-            <div className="space-y-2">
-              <p className="text-xs text-white/40">
-                By continuing, you agree to our{' '}
-                <button className="hover:text-white/60 underline">Terms of Service</button>
-                {' '}and{' '}
-                <button className="hover:text-white/60 underline">Privacy Policy</button>
-              </p>
-              <p className="text-xs text-white/30">
-                © 2025 Amps. All rights reserved. Made with ❤️ in Namibia
-              </p>
-            </div>
           </div>
         </section>
+
+        {/* Footer - Removed bouncing mouse */}
+        <footer className="py-8 sm:py-10 px-4 sm:px-6 border-t border-white/10">
+          <div className="max-w-app mx-auto">
+            <div className="flex items-center justify-center gap-2 mb-4 sm:mb-6">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg gradient-pro flex items-center justify-center">
+                <Zap className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
+              </div>
+              <span className="text-base sm:text-lg font-bold text-white">Amps</span>
+            </div>
+            <p className="text-center text-xs text-white/40 mb-3 sm:mb-4 px-4">
+              By continuing, you agree to our Terms of Service and Privacy Policy
+            </p>
+            <p className="text-center text-xs text-white/30">
+              © 2025 Amps. All rights reserved. Made with ❤️ in Namibia
+            </p>
+          </div>
+        </footer>
       </div>
     </div>
   );
