@@ -1,5 +1,5 @@
- import { useState, useRef, useEffect } from 'react';
-import { X, ArrowRight, ArrowLeft, MapPin, Check, QrCode, Copy, Download } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { X, ArrowRight, ArrowLeft, MapPin, Check, QrCode, Copy, Download, Upload, Image, Video, Map } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ interface EventWizardModalProps {
 const categories = ['Music', 'Tech', 'Party', 'Art', 'Food', 'Sports', 'Other'];
 
 export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
-  const { addEvent, user, theme } = useApp();
+  const { addEvent, user } = useApp();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [eventData, setEventData] = useState({
@@ -33,15 +33,23 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     time: '',
     location: '',
     address: '',
+    streetName: '',
     coordinates: { lat: -22.5609, lng: 17.0658 },
     geofenceRadius: 200,
+    images: [] as string[],
+    videos: [] as string[],
+    themeColor: '#8B5CF6',
   });
   const [createdEvent, setCreatedEvent] = useState<Event | null>(null);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [videoFiles, setVideoFiles] = useState<File[]>([]);
 
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
   const geofenceCircle = useRef<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -55,9 +63,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         time: '',
         location: '',
         address: '',
+        streetName: '',
         coordinates: { lat: -22.5609, lng: 17.0658 },
         geofenceRadius: 200,
+        images: [],
+        videos: [],
+        themeColor: '#8B5CF6',
       });
+      setImageFiles([]);
+      setVideoFiles([]);
       setCreatedEvent(null);
     }
   }, [isOpen]);
@@ -69,7 +83,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
-        style: theme === 'dark' ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11',
+        style: 'mapbox://styles/mapbox/streets-v12', // Changed from dark theme to regular streets
         center: [eventData.coordinates.lng, eventData.coordinates.lat],
         zoom: 13,
       });
@@ -104,7 +118,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     if (marker.current) {
       marker.current.setLngLat([lng, lat]);
     } else {
-      marker.current = new mapboxgl.Marker({ color: '#8B5CF6' })
+      marker.current = new mapboxgl.Marker({ color: eventData.themeColor })
         .setLngLat([lng, lat])
         .addTo(map.current);
     }
@@ -152,8 +166,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         type: 'fill',
         source: sourceId,
         paint: {
-          'fill-color': '#8B5CF6',
-          'fill-opacity': 0.2,
+          'fill-color': eventData.themeColor,
+          'fill-opacity': 0.15,
         },
       });
 
@@ -162,8 +176,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         type: 'line',
         source: sourceId,
         paint: {
-          'line-color': '#8B5CF6',
-          'line-width': 2,
+          'line-color': eventData.themeColor,
+          'line-width': 3,
+          'line-dasharray': [2, 2],
         },
       });
     }
@@ -177,10 +192,13 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       const data = await response.json();
       if (data.features && data.features.length > 0) {
         const place = data.features[0];
+        // Extract street name from place properties
+        const streetName = place.properties?.address || place.text || '';
         setEventData(prev => ({
           ...prev,
           location: place.text || '',
           address: place.place_name || '',
+          streetName: streetName,
         }));
       }
     } catch (error) {
@@ -192,23 +210,71 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     if (!query) return;
     try {
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=NA`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=NA&types=address`
       );
       const data = await response.json();
       if (data.features && data.features.length > 0) {
         const place = data.features[0];
         const [lng, lat] = place.center;
+        const streetName = place.properties?.address || place.text || '';
         setEventData(prev => ({
           ...prev,
           coordinates: { lat, lng },
           location: place.text || query,
           address: place.place_name || '',
+          streetName: streetName,
         }));
         updateMarker(lng, lat);
       }
     } catch (error) {
       console.error('Search error:', error);
     }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      const newImages = Array.from(files);
+      setImageFiles(prev => [...prev, ...newImages]);
+      
+      // Create preview URLs
+      const imageUrls = newImages.map(file => URL.createObjectURL(file));
+      setEventData(prev => ({
+        ...prev,
+        images: [...prev.images, ...imageUrls]
+      }));
+    }
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      const newVideos = Array.from(files);
+      setVideoFiles(prev => [...prev, ...newVideos]);
+      
+      // Create preview URLs
+      const videoUrls = newVideos.map(file => URL.createObjectURL(file));
+      setEventData(prev => ({
+        ...prev,
+        videos: [...prev.videos, ...videoUrls]
+      }));
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setEventData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeVideo = (index: number) => {
+    setEventData(prev => ({
+      ...prev,
+      videos: prev.videos.filter((_, i) => i !== index)
+    }));
+    setVideoFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handlePublish = () => {
@@ -231,15 +297,17 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       organizerId: user?.id || '',
       qrCode,
       geofenceRadius: eventData.geofenceRadius,
-      customTheme: '#8B5CF6',
-      coverImage: `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800`,
+      customTheme: eventData.themeColor,
+      coverImage: eventData.images[0] || `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800`,
+      images: eventData.images,
+      videos: eventData.videos,
       tags: [eventData.category],
       isFeatured: user?.subscription.tier === 'max',
     };
 
     addEvent(newEvent);
     setCreatedEvent(newEvent);
-    setStep(5);
+    setStep(6);
   };
 
   const copyCode = () => {
@@ -260,13 +328,13 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center gap-4">
           <h2 className="text-lg font-bold">Create Event</h2>
-          {step < 5 && (
+          {step < 6 && (
             <div className="flex gap-1">
-              {[1, 2, 3, 4].map((s) => (
+              {[1, 2, 3, 4, 5].map((s) => (
                 <div
                   key={s}
                   className={cn(
-                    'w-8 h-1 rounded-full transition-colors',
+                    'w-6 h-1.5 rounded-full transition-colors',
                     s <= step ? 'bg-primary' : 'bg-muted'
                   )}
                 />
@@ -280,7 +348,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="flex-1 overflow-y-auto p-5 pb-24">
         {/* Step 1: Basic Info */}
         {step === 1 && (
           <div className="space-y-6 animate-fade-in">
@@ -296,7 +364,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   value={eventData.name}
                   onChange={(e) => setEventData({ ...eventData, name: e.target.value })}
                   placeholder="e.g., Summer Music Festival"
-                  className="h-12"
+                  className="h-12 rounded-lg border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                 />
               </div>
 
@@ -307,6 +375,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   onChange={(e) => setEventData({ ...eventData, description: e.target.value })}
                   placeholder="Tell attendees what to expect..."
                   rows={4}
+                  className="rounded-lg border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                 />
               </div>
 
@@ -318,10 +387,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       key={cat}
                       onClick={() => setEventData({ ...eventData, category: cat })}
                       className={cn(
-                        'px-4 py-2 rounded-full text-sm font-medium transition-all',
+                        'px-4 py-2 rounded-lg text-sm font-medium transition-all border-2',
                         eventData.category === cat
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-card border border-border hover:border-primary'
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-card border-border hover:border-primary hover:bg-primary/5'
                       )}
                     >
                       {cat}
@@ -337,7 +406,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     type="date"
                     value={eventData.date}
                     onChange={(e) => setEventData({ ...eventData, date: e.target.value })}
-                    className="h-12"
+                    className="h-12 rounded-lg border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                   />
                 </div>
                 <div>
@@ -346,7 +415,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     type="time"
                     value={eventData.time}
                     onChange={(e) => setEventData({ ...eventData, time: e.target.value })}
-                    className="h-12"
+                    className="h-12 rounded-lg border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                   />
                 </div>
               </div>
@@ -358,17 +427,140 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   value={eventData.price}
                   onChange={(e) => setEventData({ ...eventData, price: Number(e.target.value) })}
                   placeholder="0 for free events"
-                  className="h-12"
+                  className="h-12 rounded-lg border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                   min={0}
                 />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Theme Color</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={eventData.themeColor}
+                    onChange={(e) => setEventData({ ...eventData, themeColor: e.target.value })}
+                    className="w-12 h-12 cursor-pointer rounded-lg border-2 border-border"
+                  />
+                  <span className="text-sm font-medium">{eventData.themeColor}</span>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Step 2: Location */}
+        {/* Step 2: Media Upload */}
         {step === 2 && (
-          <div className="space-y-4 animate-fade-in">
+          <div className="space-y-6 animate-fade-in">
+            <div>
+              <h3 className="text-xl font-bold mb-2">Event Media</h3>
+              <p className="text-muted-foreground text-sm">Add photos and videos for your event</p>
+            </div>
+
+            {/* Images Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Photos</label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-lg"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Add Photos
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {eventData.images.map((image, index) => (
+                  <div key={index} className="relative group">
+                    <img
+                      src={image}
+                      alt={`Event ${index + 1}`}
+                      className="w-full h-32 object-cover rounded-lg border-2 border-border"
+                    />
+                    <button
+                      onClick={() => removeImage(index)}
+                      className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                {eventData.images.length === 0 && (
+                  <div className="col-span-3 flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
+                    <Image className="w-12 h-12 text-muted-foreground mb-3" />
+                    <p className="text-sm text-muted-foreground">No photos added yet</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Videos Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Videos</label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => videoInputRef.current?.click()}
+                  className="rounded-lg"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Add Videos
+                </Button>
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  multiple
+                  onChange={handleVideoUpload}
+                  className="hidden"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {eventData.videos.map((video, index) => (
+                  <div key={index} className="relative group">
+                    <video
+                      src={video}
+                      className="w-full h-32 object-cover rounded-lg border-2 border-border"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Video className="w-8 h-8 text-white/80" />
+                    </div>
+                    <button
+                      onClick={() => removeVideo(index)}
+                      className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                {eventData.videos.length === 0 && (
+                  <div className="col-span-2 flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
+                    <Video className="w-12 h-12 text-muted-foreground mb-3" />
+                    <p className="text-sm text-muted-foreground">No videos added yet</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Location */}
+        {step === 3 && (
+          <div className="space-y-4 animate-fade-in h-full">
             <div>
               <h3 className="text-xl font-bold mb-2">Event Location</h3>
               <p className="text-muted-foreground text-sm">Search or click the map to set location</p>
@@ -381,9 +573,16 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 onChange={(e) => setEventData({ ...eventData, location: e.target.value })}
                 onKeyDown={(e) => e.key === 'Enter' && searchLocation(eventData.location)}
                 placeholder="Search for a location..."
-                className="h-12 pl-12"
+                className="h-12 pl-12 rounded-lg border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
               />
             </div>
+
+            {eventData.streetName && (
+              <div className="glass-card p-4 rounded-lg">
+                <p className="text-sm font-medium">Street Name:</p>
+                <p className="text-sm text-muted-foreground">{eventData.streetName}</p>
+              </div>
+            )}
 
             {eventData.address && (
               <p className="text-sm text-muted-foreground">{eventData.address}</p>
@@ -391,18 +590,18 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
             <div
               ref={mapContainer}
-              className="w-full h-[300px] rounded-xl overflow-hidden border border-border"
+              className="w-full h-[calc(100%-180px)] rounded-xl overflow-hidden border-2 border-border"
             />
 
             <p className="text-xs text-muted-foreground text-center">
-              Tap on the map to place your event pin
+              Tap on the map to place your event pin • Coordinates: {eventData.coordinates.lat.toFixed(4)}, {eventData.coordinates.lng.toFixed(4)}
             </p>
           </div>
         )}
 
-        {/* Step 3: Geofence */}
-        {step === 3 && (
-          <div className="space-y-6 animate-fade-in">
+        {/* Step 4: Geofence */}
+        {step === 4 && (
+          <div className="space-y-6 animate-fade-in h-full">
             <div>
               <h3 className="text-xl font-bold mb-2">Check-in Radius</h3>
               <p className="text-muted-foreground text-sm">
@@ -410,49 +609,62 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               </p>
             </div>
 
-            <div className="glass-card p-6 text-center">
-              <p className="text-4xl font-bold text-primary mb-2">
+            <div className="glass-card p-6 text-center rounded-lg">
+              <p className="text-4xl font-bold" style={{ color: eventData.themeColor }}>
                 {eventData.geofenceRadius}m
               </p>
               <p className="text-muted-foreground text-sm">Check-in radius</p>
             </div>
 
-            <Slider
-              value={[eventData.geofenceRadius]}
-              onValueChange={(value) => setEventData({ ...eventData, geofenceRadius: value[0] })}
-              min={50}
-              max={500}
-              step={50}
-              className="my-6"
-            />
+            <div className="space-y-4">
+              <Slider
+                value={[eventData.geofenceRadius]}
+                onValueChange={(value) => setEventData({ ...eventData, geofenceRadius: value[0] })}
+                min={10}
+                max={500}
+                step={10}
+                className="my-6"
+              />
 
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>50m</span>
-              <span>500m</span>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>10m</span>
+                <span>250m</span>
+                <span>500m</span>
+              </div>
             </div>
 
-            <div
-              ref={mapContainer}
-              className="w-full h-[250px] rounded-xl overflow-hidden border border-border"
-            />
+            {/* Map preview with radius */}
+            <div className="relative rounded-xl overflow-hidden border-2 border-border">
+              <div
+                ref={mapContainer}
+                className="w-full h-[250px]"
+              />
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-4 py-2 rounded-lg">
+                <Map className="w-4 h-4 inline mr-2" />
+                Radius: {eventData.geofenceRadius}m
+              </div>
+            </div>
 
-            <div className="glass-card p-4">
+            <div className="glass-card p-4 rounded-lg">
               <p className="text-sm text-muted-foreground">
-                💡 Larger radius = easier check-in. Smaller radius = more precise location verification.
+                💡 <span className="font-medium">Radius Guide:</span><br/>
+                • 10-50m: High security, precise check-in<br/>
+                • 50-200m: Standard events, good balance<br/>
+                • 200-500m: Large venues, easier check-in
               </p>
             </div>
           </div>
         )}
 
-        {/* Step 4: Review */}
-        {step === 4 && (
+        {/* Step 5: Review */}
+        {step === 5 && (
           <div className="space-y-6 animate-fade-in">
             <div>
               <h3 className="text-xl font-bold mb-2">Review Your Event</h3>
               <p className="text-muted-foreground text-sm">Make sure everything looks good</p>
             </div>
 
-            <div className="glass-card p-6 space-y-4">
+            <div className="glass-card p-6 space-y-4 rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Name</span>
                 <span className="font-semibold">{eventData.name}</span>
@@ -460,7 +672,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               <div className="border-t border-border" />
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Category</span>
-                <span className="px-3 py-1 bg-primary/20 text-primary rounded-full text-sm">
+                <span 
+                  className="px-3 py-1 rounded-lg text-sm font-medium"
+                  style={{ backgroundColor: `${eventData.themeColor}20`, color: eventData.themeColor }}
+                >
                   {eventData.category}
                 </span>
               </div>
@@ -475,7 +690,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Location</span>
                 <span className="font-semibold text-right max-w-[200px] truncate">
-                  {eventData.location}
+                  {eventData.streetName || eventData.location}
                 </span>
               </div>
               <div className="border-t border-border" />
@@ -490,42 +705,65 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 <span className="text-muted-foreground">Check-in Radius</span>
                 <span className="font-semibold">{eventData.geofenceRadius}m</span>
               </div>
+              <div className="border-t border-border" />
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Media</span>
+                <span className="font-semibold">
+                  {eventData.images.length} photos, {eventData.videos.length} videos
+                </span>
+              </div>
             </div>
 
             {eventData.description && (
-              <div className="glass-card p-4">
-                <p className="text-sm text-muted-foreground mb-2">Description</p>
-                <p className="text-sm">{eventData.description}</p>
+              <div className="glass-card p-4 rounded-lg">
+                <p className="text-sm font-medium mb-2">Description</p>
+                <p className="text-sm text-muted-foreground">{eventData.description}</p>
               </div>
             )}
           </div>
         )}
 
-        {/* Step 5: Success */}
-        {step === 5 && createdEvent && (
+        {/* Step 6: Success */}
+        {step === 6 && createdEvent && (
           <div className="flex flex-col items-center justify-center py-8 animate-fade-in">
-            <div className="w-20 h-20 rounded-full bg-brand-green/20 flex items-center justify-center mb-6">
-              <Check className="w-10 h-10 text-brand-green" />
+            <div 
+              className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
+              style={{ backgroundColor: `${eventData.themeColor}20` }}
+            >
+              <Check className="w-10 h-10" style={{ color: eventData.themeColor }} />
             </div>
             <h3 className="text-2xl font-bold mb-2">Event Created!</h3>
-            <p className="text-muted-foreground text-center mb-8">
-              Share the code below so attendees can check in
+            <p className="text-muted-foreground text-center mb-8 max-w-md">
+              Your event "{createdEvent.name}" is now live! Share the code below so attendees can check in.
             </p>
 
-            <div className="w-48 h-48 bg-card rounded-2xl flex items-center justify-center mb-4 border border-border">
-              <QrCode className="w-32 h-32 text-primary" />
+            <div className="w-64 h-64 bg-white rounded-2xl flex flex-col items-center justify-center mb-6 border-2 border-border p-4">
+              <div className="text-center mb-4">
+                <p className="text-sm font-medium mb-1" style={{ color: eventData.themeColor }}>
+                  Check-in Code
+                </p>
+                <p className="text-3xl font-mono font-bold tracking-widest">
+                  {createdEvent.qrCode}
+                </p>
+              </div>
+              <div className="w-48 h-48 bg-white flex items-center justify-center">
+                <QrCode className="w-40 h-40 text-gray-800" />
+              </div>
             </div>
 
-            <p className="text-2xl font-mono font-bold tracking-widest mb-6">
-              {createdEvent.qrCode}
-            </p>
-
             <div className="flex gap-3 w-full max-w-xs">
-              <Button variant="outline" className="flex-1" onClick={copyCode}>
+              <Button 
+                variant="outline" 
+                className="flex-1 rounded-lg"
+                onClick={copyCode}
+              >
                 <Copy className="w-4 h-4 mr-2" />
                 Copy Code
               </Button>
-              <Button variant="outline" className="flex-1">
+              <Button 
+                variant="outline" 
+                className="flex-1 rounded-lg"
+              >
                 <Download className="w-4 h-4 mr-2" />
                 Save QR
               </Button>
@@ -534,43 +772,74 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         )}
       </div>
 
-      {/* Footer */}
-      {step < 5 && (
-        <div className="p-4 border-t border-border flex gap-3">
-          {step > 1 && (
-            <Button variant="outline" className="flex-1" onClick={() => setStep(step - 1)}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
-          )}
-          {step < 4 ? (
-            <Button
-              className="flex-1 gradient-pro glow-purple"
-              onClick={() => setStep(step + 1)}
-              disabled={(step === 1 && !isStep1Valid) || (step === 2 && !isStep2Valid)}
-            >
-              Next
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          ) : (
-            <Button
-              className="flex-1 gradient-pro glow-purple"
-              onClick={handlePublish}
-            >
-              Publish Event
-              <Check className="w-4 h-4 ml-2" />
-            </Button>
-          )}
+      {/* Footer - Now positioned at 25% from bottom */}
+      {step < 6 && (
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border bg-background/95 backdrop-blur-sm" 
+             style={{ height: '25%', display: 'flex', flexDirection: 'column' }}>
+          <div className="flex-1"></div>
+          <div className="flex gap-3 w-full">
+            {step > 1 && (
+              <Button 
+                variant="outline" 
+                className="flex-1 rounded-lg h-12"
+                onClick={() => setStep(step - 1)}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+            )}
+            {step < 5 ? (
+              <Button
+                className="flex-1 rounded-lg h-12 gradient-pro glow-purple"
+                onClick={() => setStep(step + 1)}
+                disabled={(step === 1 && !isStep1Valid) || (step === 3 && !isStep2Valid)}
+                style={{ 
+                  backgroundColor: eventData.themeColor,
+                  borderColor: eventData.themeColor 
+                }}
+              >
+                Next
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            ) : (
+              <Button
+                className="flex-1 rounded-lg h-12 gradient-pro glow-purple"
+                onClick={handlePublish}
+                style={{ 
+                  backgroundColor: eventData.themeColor,
+                  borderColor: eventData.themeColor 
+                }}
+              >
+                Publish Event
+                <Check className="w-4 h-4 ml-2" />
+              </Button>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground text-center mt-4">
+            Step {step} of 5 • Event creation wizard
+          </div>
         </div>
       )}
 
-      {step === 5 && (
-        <div className="p-4 border-t border-border">
-          <Button className="w-full gradient-pro glow-purple" onClick={onClose}>
-            Done
+      {step === 6 && (
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border bg-background/95 backdrop-blur-sm"
+             style={{ height: '25%', display: 'flex', flexDirection: 'column' }}>
+          <div className="flex-1"></div>
+          <Button 
+            className="w-full rounded-lg h-12 gradient-pro glow-purple" 
+            onClick={onClose}
+            style={{ 
+              backgroundColor: eventData.themeColor,
+              borderColor: eventData.themeColor 
+            }}
+          >
+            Done • Go to Event Dashboard
           </Button>
+          <div className="text-xs text-muted-foreground text-center mt-4">
+            Event created successfully! Manage it from your dashboard.
+          </div>
         </div>
       )}
     </div>
   );      
-} 
+}
