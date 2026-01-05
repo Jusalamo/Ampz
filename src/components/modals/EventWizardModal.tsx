@@ -43,11 +43,11 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const [createdEvent, setCreatedEvent] = useState<Event | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [videoFiles, setVideoFiles] = useState<File[]>([]);
+  const [mapInitialized, setMapInitialized] = useState(false);
 
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
-  const geofenceCircle = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,19 +73,33 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       setImageFiles([]);
       setVideoFiles([]);
       setCreatedEvent(null);
+      setMapInitialized(false);
     }
   }, [isOpen]);
 
-  // Initialize map on step 2
+  // Initialize map on step 3 (Location)
   useEffect(() => {
-    if (step === 2 && mapContainer.current && !map.current) {
+    if (step === 3 && mapContainer.current && !map.current && !mapInitialized) {
       mapboxgl.accessToken = MAPBOX_TOKEN;
       
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/streets-v12', // Changed from dark theme to regular streets
+        style: 'mapbox://styles/mapbox/streets-v12',
         center: [eventData.coordinates.lng, eventData.coordinates.lat],
         zoom: 13,
+        attributionControl: false
+      });
+
+      // Add navigation controls
+      map.current.addControl(new mapboxgl.NavigationControl());
+      
+      // Add marker
+      marker.current = new mapboxgl.Marker({ color: eventData.themeColor })
+        .setLngLat([eventData.coordinates.lng, eventData.coordinates.lat])
+        .addTo(map.current);
+
+      map.current.on('load', () => {
+        setMapInitialized(true);
       });
 
       map.current.on('click', (e) => {
@@ -96,33 +110,41 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       });
     }
 
+    // Handle step 4 (Geofence) - reuse existing map
+    if (step === 4 && map.current && !mapInitialized) {
+      setMapInitialized(true);
+      updateGeofenceCircle();
+    }
+
+    // Cleanup when leaving location/geofence steps
+    if (step !== 3 && step !== 4 && map.current) {
+      mapInitialized && setMapInitialized(false);
+    }
+
     return () => {
-      if (step !== 2 && step !== 3 && map.current) {
+      // Only remove map when completely closing the wizard
+      if (!isOpen && map.current) {
         map.current.remove();
         map.current = null;
         marker.current = null;
+        setMapInitialized(false);
       }
     };
-  }, [step]);
+  }, [step, isOpen, mapInitialized]);
 
-  // Update geofence circle on step 3
+  // Update geofence circle on step 4
   useEffect(() => {
-    if (step === 3 && map.current) {
+    if (step === 4 && map.current && mapInitialized) {
       updateGeofenceCircle();
     }
-  }, [step, eventData.geofenceRadius, eventData.coordinates]);
+  }, [step, eventData.geofenceRadius, eventData.coordinates, mapInitialized]);
 
   const updateMarker = (lng: number, lat: number) => {
-    if (!map.current) return;
+    if (!map.current || !marker.current) return;
 
-    if (marker.current) {
-      marker.current.setLngLat([lng, lat]);
-    } else {
-      marker.current = new mapboxgl.Marker({ color: eventData.themeColor })
-        .setLngLat([lng, lat])
-        .addTo(map.current);
-    }
-
+    marker.current.setLngLat([lng, lat]);
+    marker.current.setPopup(new mapboxgl.Popup().setText('Event Location'));
+    
     map.current.flyTo({ center: [lng, lat], zoom: 14 });
   };
 
@@ -161,26 +183,30 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         },
       });
 
-      map.current.addLayer({
-        id: 'geofence-fill',
-        type: 'fill',
-        source: sourceId,
-        paint: {
-          'fill-color': eventData.themeColor,
-          'fill-opacity': 0.15,
-        },
-      });
+      if (!map.current.getLayer('geofence-fill')) {
+        map.current.addLayer({
+          id: 'geofence-fill',
+          type: 'fill',
+          source: sourceId,
+          paint: {
+            'fill-color': eventData.themeColor,
+            'fill-opacity': 0.15,
+          },
+        });
+      }
 
-      map.current.addLayer({
-        id: 'geofence-line',
-        type: 'line',
-        source: sourceId,
-        paint: {
-          'line-color': eventData.themeColor,
-          'line-width': 3,
-          'line-dasharray': [2, 2],
-        },
-      });
+      if (!map.current.getLayer('geofence-line')) {
+        map.current.addLayer({
+          id: 'geofence-line',
+          type: 'line',
+          source: sourceId,
+          paint: {
+            'line-color': eventData.themeColor,
+            'line-width': 3,
+            'line-dasharray': [2, 2],
+          },
+        });
+      }
     }
   };
 
@@ -262,6 +288,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   };
 
   const removeImage = (index: number) => {
+    URL.revokeObjectURL(eventData.images[index]);
     setEventData(prev => ({
       ...prev,
       images: prev.images.filter((_, i) => i !== index)
@@ -270,6 +297,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   };
 
   const removeVideo = (index: number) => {
+    URL.revokeObjectURL(eventData.videos[index]);
     setEventData(prev => ({
       ...prev,
       videos: prev.videos.filter((_, i) => i !== index)
@@ -318,14 +346,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   };
 
   const isStep1Valid = eventData.name && eventData.category && eventData.date && eventData.time;
-  const isStep2Valid = eventData.coordinates.lat !== 0 && eventData.location;
+  const isStep2Valid = eventData.images.length > 0 || eventData.videos.length > 0;
+  const isStep3Valid = eventData.coordinates.lat !== 0 && eventData.location;
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-background z-50 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
+      <div className="flex items-center justify-between p-4 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="flex items-center gap-4">
           <h2 className="text-lg font-bold">Create Event</h2>
           {step < 6 && (
@@ -342,13 +371,13 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             </div>
           )}
         </div>
-        <button onClick={onClose} className="w-10 h-10 rounded-full bg-card flex items-center justify-center">
+        <button onClick={onClose} className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors">
           <X className="w-5 h-5" />
         </button>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-5 pb-24">
+      {/* Content with bottom padding for footer */}
+      <div className="flex-1 overflow-y-auto p-5" style={{ paddingBottom: '140px' }}>
         {/* Step 1: Basic Info */}
         {step === 1 && (
           <div className="space-y-6 animate-fade-in">
@@ -490,7 +519,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     />
                     <button
                       onClick={() => removeImage(index)}
-                      className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -500,6 +529,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   <div className="col-span-3 flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
                     <Image className="w-12 h-12 text-muted-foreground mb-3" />
                     <p className="text-sm text-muted-foreground">No photos added yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">Add at least one photo</p>
                   </div>
                 )}
               </div>
@@ -536,12 +566,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       src={video}
                       className="w-full h-32 object-cover rounded-lg border-2 border-border"
                     />
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                       <Video className="w-8 h-8 text-white/80" />
                     </div>
                     <button
                       onClick={() => removeVideo(index)}
-                      className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -551,6 +581,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   <div className="col-span-2 flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-lg">
                     <Video className="w-12 h-12 text-muted-foreground mb-3" />
                     <p className="text-sm text-muted-foreground">No videos added yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">Optional</p>
                   </div>
                 )}
               </div>
@@ -590,8 +621,17 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
             <div
               ref={mapContainer}
-              className="w-full h-[calc(100%-180px)] rounded-xl overflow-hidden border-2 border-border"
-            />
+              className="w-full h-[calc(100vh-280px)] min-h-[300px] rounded-xl overflow-hidden border-2 border-border bg-gray-100"
+            >
+              {!mapInitialized && (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-3"></div>
+                    <p className="text-sm text-muted-foreground">Loading map...</p>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <p className="text-xs text-muted-foreground text-center">
               Tap on the map to place your event pin • Coordinates: {eventData.coordinates.lat.toFixed(4)}, {eventData.coordinates.lng.toFixed(4)}
@@ -634,12 +674,21 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             </div>
 
             {/* Map preview with radius */}
-            <div className="relative rounded-xl overflow-hidden border-2 border-border">
+            <div className="relative rounded-xl overflow-hidden border-2 border-border bg-gray-100">
               <div
                 ref={mapContainer}
                 className="w-full h-[250px]"
-              />
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-4 py-2 rounded-lg">
+              >
+                {!mapInitialized && (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-2"></div>
+                      <p className="text-xs text-muted-foreground">Loading map...</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-lg text-sm">
                 <Map className="w-4 h-4 inline mr-2" />
                 Radius: {eventData.geofenceRadius}m
               </div>
@@ -772,11 +821,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         )}
       </div>
 
-      {/* Footer - Now positioned at 25% from bottom */}
+      {/* Footer - Slim fixed footer */}
       {step < 6 && (
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border bg-background/95 backdrop-blur-sm" 
-             style={{ height: '25%', display: 'flex', flexDirection: 'column' }}>
-          <div className="flex-1"></div>
+        <div className="fixed bottom-0 left-0 right-0 p-4 border-t border-border bg-background/95 backdrop-blur-sm shadow-lg">
           <div className="flex gap-3 w-full">
             {step > 1 && (
               <Button 
@@ -790,9 +837,13 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             )}
             {step < 5 ? (
               <Button
-                className="flex-1 rounded-lg h-12 gradient-pro glow-purple"
+                className="flex-1 rounded-lg h-12"
                 onClick={() => setStep(step + 1)}
-                disabled={(step === 1 && !isStep1Valid) || (step === 3 && !isStep2Valid)}
+                disabled={
+                  (step === 1 && !isStep1Valid) || 
+                  (step === 2 && !isStep2Valid) || 
+                  (step === 3 && !isStep3Valid)
+                }
                 style={{ 
                   backgroundColor: eventData.themeColor,
                   borderColor: eventData.themeColor 
@@ -803,7 +854,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               </Button>
             ) : (
               <Button
-                className="flex-1 rounded-lg h-12 gradient-pro glow-purple"
+                className="flex-1 rounded-lg h-12"
                 onClick={handlePublish}
                 style={{ 
                   backgroundColor: eventData.themeColor,
@@ -815,18 +866,16 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               </Button>
             )}
           </div>
-          <div className="text-xs text-muted-foreground text-center mt-4">
-            Step {step} of 5 • Event creation wizard
+          <div className="text-xs text-muted-foreground text-center mt-2">
+            Step {step} of 5
           </div>
         </div>
       )}
 
       {step === 6 && (
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border bg-background/95 backdrop-blur-sm"
-             style={{ height: '25%', display: 'flex', flexDirection: 'column' }}>
-          <div className="flex-1"></div>
+        <div className="fixed bottom-0 left-0 right-0 p-4 border-t border-border bg-background/95 backdrop-blur-sm shadow-lg">
           <Button 
-            className="w-full rounded-lg h-12 gradient-pro glow-purple" 
+            className="w-full rounded-lg h-12" 
             onClick={onClose}
             style={{ 
               backgroundColor: eventData.themeColor,
@@ -835,7 +884,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           >
             Done • Go to Event Dashboard
           </Button>
-          <div className="text-xs text-muted-foreground text-center mt-4">
+          <div className="text-xs text-muted-foreground text-center mt-2">
             Event created successfully! Manage it from your dashboard.
           </div>
         </div>
