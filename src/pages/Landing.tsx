@@ -77,9 +77,9 @@ export default function Landing() {
       </header>
 
       {/* Main Content */}
-      <div className="relative z-10">
-        {/* Hero Section - Full Viewport */}
-        <section className="min-h-screen flex flex-col items-center justify-center px-6 pt-20 pb-12">
+      <div className="relative z-10 pt-16"> {/* Added pt-16 for fixed header space */}
+        {/* Hero Section - Reduced spacing from header */}
+        <section className="min-h-[calc(100vh-64px)] flex flex-col items-center justify-center px-6">
           <div className="text-center max-w-[400px]">
             <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-5 tracking-tight text-white">
               Real events.
@@ -116,15 +116,18 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* How Amps Works */}
-        <section className="py-16 px-6">
+        {/* How Amps Works - Changed to Grid Format */}
+        <section className="py-12 px-6"> {/* Reduced py-16 to py-12 */}
           <div className="max-w-app mx-auto">
-            <h2 className="text-2xl font-bold text-white text-center mb-8">How Amps Works</h2>
-            <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-6 px-6 pb-4 snap-x snap-mandatory">
-              {features.map(({ icon: Icon, label, description }) => (
+            <h2 className="text-2xl font-bold text-white text-center mb-6">How Amps Works</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              {features.slice(0, 4).map(({ icon: Icon, label, description }, index) => (
                 <div
                   key={label}
-                  className="flex-shrink-0 w-[160px] snap-center glass-card p-5 flex flex-col items-center gap-3 hover:border-primary transition-all text-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl"
+                  className={cn(
+                    'glass-card p-5 flex flex-col items-center gap-3 hover:border-primary transition-all text-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl h-full',
+                    index % 2 === 0 ? 'sm:col-start-1' : 'sm:col-start-2'
+                  )}
                 >
                   <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center">
                     <Icon className="w-7 h-7 text-primary" />
@@ -133,13 +136,24 @@ export default function Landing() {
                   <span className="text-xs text-white/60 leading-relaxed">{description}</span>
                 </div>
               ))}
+              
+              {/* Fifth feature centered in last row */}
+              <div className="col-span-full lg:col-span-5 lg:col-start-3 flex justify-center">
+                <div className="glass-card p-5 flex flex-col items-center gap-3 hover:border-primary transition-all text-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl max-w-[280px] w-full">
+                  <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center">
+                    <QrCode className="w-7 h-7 text-primary" />
+                  </div>
+                  <span className="text-sm font-bold text-white">{features[4].label}</span>
+                  <span className="text-xs text-white/60 leading-relaxed">{features[4].description}</span>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Featured Events */}
+        {/* Featured Events - Changed to Carousel Format */}
         {featuredEvents.length > 0 && (
-          <section className="py-16 px-6">
+          <section className="py-12 px-6"> {/* Reduced py-16 to py-12 */}
             <div className="max-w-app mx-auto">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -153,75 +167,96 @@ export default function Landing() {
                   See All <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {featuredEvents.map((event) => (
-                  <button
-                    key={event.id}
-                    onClick={() => navigate(`/event/${event.id}`)}
-                    className="relative overflow-hidden rounded-2xl aspect-[16/10] group text-left"
-                  >
-                    <img
-                      src={event.coverImage}
-                      alt={event.name}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              
+              {/* Carousel Container */}
+              <div className="relative">
+                <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-6 px-6 pb-4 gap-4">
+                  {featuredEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      className="flex-shrink-0 w-[85vw] max-w-[320px] snap-center"
+                    >
+                      <button
+                        onClick={() => navigate(`/event/${event.id}`)}
+                        className="relative overflow-hidden rounded-2xl aspect-[16/10] group text-left w-full"
+                      >
+                        <img
+                          src={event.coverImage}
+                          alt={event.name}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+                        <div className="absolute top-3 left-3">
+                          <span className="px-2 py-1 bg-primary/90 text-white text-xs font-semibold rounded-full">
+                            Featured
+                          </span>
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 p-4">
+                          <h3 className="text-white font-bold text-lg mb-1 line-clamp-1">{event.name}</h3>
+                          <div className="flex items-center gap-3 text-white/80 text-sm">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              {new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-4 h-4" />
+                              {event.location.split(',')[0]}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Carousel Indicators */}
+                <div className="flex justify-center gap-2 mt-4">
+                  {featuredEvents.map((_, index) => (
+                    <div
+                      key={index}
+                      className="w-2 h-2 rounded-full bg-white/30"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
-                    <div className="absolute top-3 left-3">
-                      <span className="px-2 py-1 bg-primary/90 text-white text-xs font-semibold rounded-full">
-                        Featured
-                      </span>
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 p-4">
-                      <h3 className="text-white font-bold text-lg mb-1 line-clamp-1">{event.name}</h3>
-                      <div className="flex items-center gap-3 text-white/80 text-sm">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          {new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-4 h-4" />
-                          {event.location.split(',')[0]}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
           </section>
         )}
 
-        {/* Footer CTA */}
-        <section className="py-20 px-6 text-center">
+        {/* Footer CTA - Proper Footer Styling */}
+        <section className="py-16 px-6 text-center border-t border-white/10 mt-8"> {/* Added border and mt-8 */}
           <div className="max-w-app mx-auto">
-            <h2 className="text-3xl font-bold text-white mb-4">Ready to connect?</h2>
-            <p className="text-white/60 mb-8">Join 10,000+ people connecting at events</p>
+            <h2 className="text-2xl font-bold text-white mb-4">Ready to connect?</h2>
+            <p className="text-white/60 mb-6">Join 10,000+ people connecting at events</p>
             <Button
               onClick={() => navigate('/auth')}
-              className="h-14 px-10 text-lg font-semibold gradient-pro glow-purple"
+              className="h-14 px-10 text-lg font-semibold gradient-pro glow-purple mb-6"
             >
               Get Started Free
             </Button>
-          </div>
-        </section>
-
-        {/* Footer */}
-        <footer className="py-10 px-6 border-t border-white/10">
-          <div className="max-w-app mx-auto">
-            <div className="flex items-center justify-center gap-2 mb-6">
+            
+            {/* Footer Content */}
+            <div className="flex items-center justify-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-lg gradient-pro flex items-center justify-center">
                 <Zap className="w-4 h-4 text-white" />
               </div>
               <span className="text-lg font-bold text-white">Amps</span>
             </div>
-            <p className="text-center text-xs text-white/40 mb-4">
-              By continuing, you agree to our Terms of Service and Privacy Policy
-            </p>
-            <p className="text-center text-xs text-white/30">
-              © 2025 Amps. All rights reserved. Made with ❤️ in Namibia
-            </p>
+            
+            {/* Removed floating mouse button CTA - now proper footer */}
+            <div className="space-y-2">
+              <p className="text-xs text-white/40">
+                By continuing, you agree to our{' '}
+                <button className="hover:text-white/60 underline">Terms of Service</button>
+                {' '}and{' '}
+                <button className="hover:text-white/60 underline">Privacy Policy</button>
+              </p>
+              <p className="text-xs text-white/30">
+                © 2025 Amps. All rights reserved. Made with ❤️ in Namibia
+              </p>
+            </div>
           </div>
-        </footer>
+        </section>
       </div>
     </div>
   );
