@@ -1,8 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { 
-  X, ArrowRight, ArrowLeft, MapPin, Check, QrCode, 
-  Copy, Download, Upload, Image as ImageIcon, Video 
-} from 'lucide-react';
+ import { useState, useRef, useEffect } from 'react';
+import { X, ArrowRight, ArrowLeft, MapPin, Check, QrCode, Copy, Download } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -24,7 +21,7 @@ interface EventWizardModalProps {
 const categories = ['Music', 'Tech', 'Party', 'Art', 'Food', 'Sports', 'Other'];
 
 export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
-  const { addEvent, user } = useApp();
+  const { addEvent, user, theme } = useApp();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [eventData, setEventData] = useState({
@@ -36,11 +33,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     time: '',
     location: '',
     address: '',
-    streetName: '',
     coordinates: { lat: -22.5609, lng: 17.0658 },
     geofenceRadius: 200,
-    images: [] as string[],
-    videos: [] as string[],
   });
   const [createdEvent, setCreatedEvent] = useState<Event | null>(null);
 
@@ -61,11 +55,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         time: '',
         location: '',
         address: '',
-        streetName: '',
         coordinates: { lat: -22.5609, lng: 17.0658 },
         geofenceRadius: 200,
-        images: [],
-        videos: [],
       });
       setCreatedEvent(null);
     }
@@ -78,11 +69,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/light-v11', // Changed to light theme
+        style: theme === 'dark' ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11',
         center: [eventData.coordinates.lng, eventData.coordinates.lat],
         zoom: 13,
-        pitch: 0,
-        bearing: 0,
       });
 
       map.current.on('click', (e) => {
@@ -94,7 +83,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
 
     return () => {
-      if (step !== 2 && step !== 3 && step !== 5 && map.current) {
+      if (step !== 2 && step !== 3 && map.current) {
         map.current.remove();
         map.current = null;
         marker.current = null;
@@ -115,21 +104,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     if (marker.current) {
       marker.current.setLngLat([lng, lat]);
     } else {
-      marker.current = new mapboxgl.Marker({ 
-        color: '#8B5CF6',
-        draggable: true 
-      })
+      marker.current = new mapboxgl.Marker({ color: '#8B5CF6' })
         .setLngLat([lng, lat])
         .addTo(map.current);
-
-      marker.current.on('dragend', () => {
-        const newLngLat = marker.current!.getLngLat();
-        setEventData(prev => ({ 
-          ...prev, 
-          coordinates: { lat: newLngLat.lat, lng: newLngLat.lng } 
-        }));
-        reverseGeocode(newLngLat.lng, newLngLat.lat);
-      });
     }
 
     map.current.flyTo({ center: [lng, lat], zoom: 14 });
@@ -141,6 +118,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     const { lat, lng } = eventData.coordinates;
     const radiusInKm = eventData.geofenceRadius / 1000;
     
+    // Generate circle coordinates
     const points = 64;
     const coords: [number, number][] = [];
     for (let i = 0; i < points; i++) {
@@ -149,7 +127,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       const dy = radiusInKm * Math.sin(angle) / (111.32 * Math.cos(lat * Math.PI / 180));
       coords.push([lng + dy, lat + dx]);
     }
-    coords.push(coords[0]);
+    coords.push(coords[0]); // Close the circle
 
     const sourceId = 'geofence-circle';
     
@@ -175,7 +153,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         source: sourceId,
         paint: {
           'fill-color': '#8B5CF6',
-          'fill-opacity': 0.1,
+          'fill-opacity': 0.2,
         },
       });
 
@@ -186,7 +164,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         paint: {
           'line-color': '#8B5CF6',
           'line-width': 2,
-          'line-dasharray': [2, 1],
         },
       });
     }
@@ -195,27 +172,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const reverseGeocode = async (lng: number, lat: number) => {
     try {
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&types=address`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}`
       );
       const data = await response.json();
-      
       if (data.features && data.features.length > 0) {
-        // Get street name from address features
-        const addressFeature = data.features.find((f: any) => f.place_type.includes('address'));
-        const streetName = addressFeature ? addressFeature.text : '';
-        
-        // Get full place name
-        const placeFeature = data.features.find((f: any) => f.place_type.includes('place'));
-        const placeName = placeFeature ? placeFeature.text : '';
-        
-        // Get full address
-        const fullAddress = data.features[0]?.place_name || '';
-        
+        const place = data.features[0];
         setEventData(prev => ({
           ...prev,
-          location: placeName || streetName,
-          streetName: streetName || placeName,
-          address: fullAddress,
+          location: place.text || '',
+          address: place.place_name || '',
         }));
       }
     } catch (error) {
@@ -227,7 +192,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     if (!query) return;
     try {
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=NA&types=address,poi,place`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=NA`
       );
       const data = await response.json();
       if (data.features && data.features.length > 0) {
@@ -237,7 +202,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           ...prev,
           coordinates: { lat, lng },
           location: place.text || query,
-          streetName: place.properties?.address || place.text,
           address: place.place_name || '',
         }));
         updateMarker(lng, lat);
@@ -247,71 +211,16 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      const newImages = Array.from(files).map(file => URL.createObjectURL(file));
-      setEventData(prev => ({
-        ...prev,
-        images: [...prev.images, ...newImages]
-      }));
-    }
-  };
-
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      const newVideos = Array.from(files).map(file => URL.createObjectURL(file));
-      setEventData(prev => ({
-        ...prev,
-        videos: [...prev.videos, ...newVideos]
-      }));
-    }
-  };
-
-  const generateQrCodeDataUrl = (text: string): string => {
-    // Simple QR code generation using canvas (fallback)
-    // In production, you might want to use a proper QR code library
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    
-    if (ctx) {
-      // Create a simple QR-like pattern (basic placeholder)
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, 256, 256);
-      
-      ctx.fillStyle = '#000000';
-      ctx.font = '16px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('QR Code', 128, 128);
-      
-      // Add small border
-      ctx.strokeStyle = '#8B5CF6';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(8, 8, 240, 240);
-    }
-    
-    return canvas.toDataURL();
-  };
-
   const handlePublish = () => {
-    const eventId = crypto.randomUUID();
-    const qrData = `${eventId}-${eventData.name.replace(/\s+/g, '-').toUpperCase()}`;
-    
-    // Generate simple QR code (fallback without library)
-    const qrDataUrl = generateQrCodeDataUrl(qrData);
+    const qrCode = `${eventData.name.replace(/\s+/g, '-').toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
     
     const newEvent: Event = {
-      id: eventId,
+      id: crypto.randomUUID(),
       name: eventData.name,
       description: eventData.description,
       category: eventData.category,
       location: eventData.location,
       address: eventData.address,
-      streetName: eventData.streetName,
       coordinates: eventData.coordinates,
       date: eventData.date,
       time: eventData.time,
@@ -320,13 +229,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       maxAttendees: 500,
       attendees: 0,
       organizerId: user?.id || '',
-      qrCode: qrData,
-      qrCodeUrl: qrDataUrl,
+      qrCode,
       geofenceRadius: eventData.geofenceRadius,
-      images: eventData.images,
-      videos: eventData.videos,
       customTheme: '#8B5CF6',
-      coverImage: eventData.images[0] || `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800`,
+      coverImage: `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800`,
       tags: [eventData.category],
       isFeatured: user?.subscription.tier === 'max',
     };
@@ -339,26 +245,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const copyCode = () => {
     if (createdEvent) {
       navigator.clipboard.writeText(createdEvent.qrCode);
-      toast({ 
-        title: 'Code copied!', 
-        description: 'Share this code with your attendees' 
-      });
-    }
-  };
-
-  const saveQRCode = () => {
-    if (createdEvent?.qrCodeUrl) {
-      const link = document.createElement('a');
-      link.href = createdEvent.qrCodeUrl;
-      link.download = `event-qr-${createdEvent.qrCode}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      toast({
-        title: 'QR Code saved!',
-        description: 'QR code has been downloaded to your device'
-      });
+      toast({ title: 'Code copied!', description: 'Share this code with your attendees' });
     }
   };
 
@@ -387,10 +274,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             </div>
           )}
         </div>
-        <button 
-          onClick={onClose} 
-          className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-accent transition-colors"
-        >
+        <button onClick={onClose} className="w-10 h-10 rounded-full bg-card flex items-center justify-center">
           <X className="w-5 h-5" />
         </button>
       </div>
@@ -412,7 +296,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   value={eventData.name}
                   onChange={(e) => setEventData({ ...eventData, name: e.target.value })}
                   placeholder="e.g., Summer Music Festival"
-                  className="h-12 rounded-lg"
+                  className="h-12"
                 />
               </div>
 
@@ -423,7 +307,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   onChange={(e) => setEventData({ ...eventData, description: e.target.value })}
                   placeholder="Tell attendees what to expect..."
                   rows={4}
-                  className="rounded-lg"
                 />
               </div>
 
@@ -435,10 +318,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       key={cat}
                       onClick={() => setEventData({ ...eventData, category: cat })}
                       className={cn(
-                        'px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                        'px-4 py-2 rounded-full text-sm font-medium transition-all',
                         eventData.category === cat
                           ? 'bg-primary text-primary-foreground'
-                          : 'bg-card border border-border hover:border-primary hover:bg-accent'
+                          : 'bg-card border border-border hover:border-primary'
                       )}
                     >
                       {cat}
@@ -454,7 +337,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     type="date"
                     value={eventData.date}
                     onChange={(e) => setEventData({ ...eventData, date: e.target.value })}
-                    className="h-12 rounded-lg"
+                    className="h-12"
                   />
                 </div>
                 <div>
@@ -463,7 +346,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     type="time"
                     value={eventData.time}
                     onChange={(e) => setEventData({ ...eventData, time: e.target.value })}
-                    className="h-12 rounded-lg"
+                    className="h-12"
                   />
                 </div>
               </div>
@@ -475,7 +358,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   value={eventData.price}
                   onChange={(e) => setEventData({ ...eventData, price: Number(e.target.value) })}
                   placeholder="0 for free events"
-                  className="h-12 rounded-lg"
+                  className="h-12"
                   min={0}
                 />
               </div>
@@ -498,16 +381,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 onChange={(e) => setEventData({ ...eventData, location: e.target.value })}
                 onKeyDown={(e) => e.key === 'Enter' && searchLocation(eventData.location)}
                 placeholder="Search for a location..."
-                className="h-12 pl-12 rounded-lg"
+                className="h-12 pl-12"
               />
             </div>
-
-            {eventData.streetName && (
-              <div className="flex items-center gap-2 p-3 bg-accent rounded-lg">
-                <MapPin className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium">{eventData.streetName}</span>
-              </div>
-            )}
 
             {eventData.address && (
               <p className="text-sm text-muted-foreground">{eventData.address}</p>
@@ -515,135 +391,55 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
             <div
               ref={mapContainer}
-              className="w-full h-[300px] rounded-xl overflow-hidden border border-border mt-4"
+              className="w-full h-[300px] rounded-xl overflow-hidden border border-border"
             />
 
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              Click on the map to place your event pin, or drag the marker
+            <p className="text-xs text-muted-foreground text-center">
+              Tap on the map to place your event pin
             </p>
           </div>
         )}
 
-        {/* Step 3: Media & Radius */}
+        {/* Step 3: Geofence */}
         {step === 3 && (
           <div className="space-y-6 animate-fade-in">
             <div>
-              <h3 className="text-xl font-bold mb-2">Media & Check-in Settings</h3>
-              <p className="text-muted-foreground text-sm">Add photos/videos and set check-in radius</p>
+              <h3 className="text-xl font-bold mb-2">Check-in Radius</h3>
+              <p className="text-muted-foreground text-sm">
+                Set how close attendees need to be to check in
+              </p>
             </div>
 
-            {/* Media Upload Section */}
-            <div className="space-y-4">
-              <h4 className="font-semibold">Event Media</h4>
-              
-              {/* Image Upload */}
-              <div>
-                <label className="text-sm font-medium mb-2 block">Upload Images</label>
-                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
-                  <input
-                    type="file"
-                    id="image-upload"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                  <label htmlFor="image-upload" className="cursor-pointer">
-                    <ImageIcon className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                    <p className="text-sm font-medium mb-1">Click to upload images</p>
-                    <p className="text-xs text-muted-foreground">PNG, JPG, GIF up to 5MB</p>
-                  </label>
-                </div>
-                
-                {eventData.images.length > 0 && (
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    {eventData.images.map((img, index) => (
-                      <div key={index} className="relative aspect-square rounded-lg overflow-hidden">
-                        <img 
-                          src={img} 
-                          alt={`Event ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+            <div className="glass-card p-6 text-center">
+              <p className="text-4xl font-bold text-primary mb-2">
+                {eventData.geofenceRadius}m
+              </p>
+              <p className="text-muted-foreground text-sm">Check-in radius</p>
+            </div>
 
-              {/* Video Upload */}
-              <div>
-                <label className="text-sm font-medium mb-2 block">Upload Videos</label>
-                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors">
-                  <input
-                    type="file"
-                    id="video-upload"
-                    accept="video/*"
-                    multiple
-                    onChange={handleVideoUpload}
-                    className="hidden"
-                  />
-                  <label htmlFor="video-upload" className="cursor-pointer">
-                    <Video className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                    <p className="text-sm font-medium mb-1">Click to upload videos</p>
-                    <p className="text-xs text-muted-foreground">MP4, MOV up to 50MB</p>
-                  </label>
-                </div>
-                
-                {eventData.videos.length > 0 && (
-                  <div className="mt-3">
-                    {eventData.videos.map((video, index) => (
-                      <div key={index} className="flex items-center gap-2 p-2 bg-accent rounded-lg mb-2">
-                        <Video className="w-4 h-4 text-primary" />
-                        <span className="text-sm truncate">Video {index + 1}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+            <Slider
+              value={[eventData.geofenceRadius]}
+              onValueChange={(value) => setEventData({ ...eventData, geofenceRadius: value[0] })}
+              min={50}
+              max={500}
+              step={50}
+              className="my-6"
+            />
 
-              {/* Radius Slider */}
-              <div className="pt-4 border-t border-border">
-                <div className="flex justify-between items-center mb-2">
-                  <h4 className="font-semibold">Check-in Radius</h4>
-                  <span className="text-2xl font-bold text-primary">
-                    {eventData.geofenceRadius}m
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Set how close attendees need to be to check in (10-500 meters)
-                </p>
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>50m</span>
+              <span>500m</span>
+            </div>
 
-                <Slider
-                  value={[eventData.geofenceRadius]}
-                  onValueChange={(value) => setEventData({ ...eventData, geofenceRadius: value[0] })}
-                  min={10}
-                  max={500}
-                  step={10}
-                  className="my-6"
-                />
+            <div
+              ref={mapContainer}
+              className="w-full h-[250px] rounded-xl overflow-hidden border border-border"
+            />
 
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>10m</span>
-                  <span>250m</span>
-                  <span>500m</span>
-                </div>
-
-                {/* Map Preview with Radius */}
-                <div className="mt-6">
-                  <p className="text-sm font-medium mb-2">Radius Preview</p>
-                  <div
-                    ref={mapContainer}
-                    className="w-full h-[250px] rounded-xl overflow-hidden border border-border"
-                  />
-                </div>
-
-                <div className="mt-4 p-4 bg-accent rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    💡 <span className="font-medium">Tip:</span> Larger radius = easier check-in. 
-                    Smaller radius = more precise location verification.
-                  </p>
-                </div>
-              </div>
+            <div className="glass-card p-4">
+              <p className="text-sm text-muted-foreground">
+                💡 Larger radius = easier check-in. Smaller radius = more precise location verification.
+              </p>
             </div>
           </div>
         )}
@@ -656,15 +452,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               <p className="text-muted-foreground text-sm">Make sure everything looks good</p>
             </div>
 
-            <div className="glass-card p-6 space-y-4 rounded-lg">
+            <div className="glass-card p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Name</span>
-                <span className="font-semibold text-right">{eventData.name}</span>
+                <span className="font-semibold">{eventData.name}</span>
               </div>
               <div className="border-t border-border" />
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Category</span>
-                <span className="px-3 py-1 bg-primary/20 text-primary rounded-lg text-sm">
+                <span className="px-3 py-1 bg-primary/20 text-primary rounded-full text-sm">
                   {eventData.category}
                 </span>
               </div>
@@ -679,7 +475,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Location</span>
                 <span className="font-semibold text-right max-w-[200px] truncate">
-                  {eventData.streetName || eventData.location}
+                  {eventData.location}
                 </span>
               </div>
               <div className="border-t border-border" />
@@ -694,45 +490,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 <span className="text-muted-foreground">Check-in Radius</span>
                 <span className="font-semibold">{eventData.geofenceRadius}m</span>
               </div>
-              <div className="border-t border-border" />
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Media</span>
-                <span className="font-semibold">
-                  {eventData.images.length} images, {eventData.videos.length} videos
-                </span>
-              </div>
             </div>
 
             {eventData.description && (
-              <div className="glass-card p-4 rounded-lg">
+              <div className="glass-card p-4">
                 <p className="text-sm text-muted-foreground mb-2">Description</p>
                 <p className="text-sm">{eventData.description}</p>
-              </div>
-            )}
-
-            {/* Media Preview */}
-            {(eventData.images.length > 0 || eventData.videos.length > 0) && (
-              <div className="glass-card p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-3">Media Preview</p>
-                {eventData.images.length > 0 && (
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    {eventData.images.slice(0, 2).map((img, index) => (
-                      <div key={index} className="aspect-video rounded-lg overflow-hidden">
-                        <img 
-                          src={img} 
-                          alt={`Preview ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {eventData.videos.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Video className="w-4 h-4 text-primary" />
-                    <span className="text-sm">{eventData.videos.length} video(s) uploaded</span>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -741,88 +504,48 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         {/* Step 5: Success */}
         {step === 5 && createdEvent && (
           <div className="flex flex-col items-center justify-center py-8 animate-fade-in">
-            <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-6">
-              <Check className="w-10 h-10 text-green-600" />
+            <div className="w-20 h-20 rounded-full bg-brand-green/20 flex items-center justify-center mb-6">
+              <Check className="w-10 h-10 text-brand-green" />
             </div>
-            <h3 className="text-2xl font-bold mb-2 text-center">Event Created Successfully!</h3>
-            <p className="text-muted-foreground text-center mb-8 max-w-sm">
-              Share the QR code below so attendees can check in at your event location
+            <h3 className="text-2xl font-bold mb-2">Event Created!</h3>
+            <p className="text-muted-foreground text-center mb-8">
+              Share the code below so attendees can check in
             </p>
 
-            {/* QR Code Display */}
-            <div className="w-64 h-64 bg-white p-4 rounded-2xl flex items-center justify-center mb-6 border border-border shadow-lg">
-              {createdEvent.qrCodeUrl ? (
-                <img 
-                  src={createdEvent.qrCodeUrl} 
-                  alt="Event QR Code" 
-                  className="w-full h-full object-contain"
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center">
-                  <QrCode className="w-32 h-32 text-gray-300 mb-4" />
-                  <p className="text-sm text-muted-foreground">Event Code</p>
-                  <p className="font-mono font-bold">{createdEvent.qrCode}</p>
-                </div>
-              )}
+            <div className="w-48 h-48 bg-card rounded-2xl flex items-center justify-center mb-4 border border-border">
+              <QrCode className="w-32 h-32 text-primary" />
             </div>
 
-            {/* Event Code */}
-            <div className="mb-8 text-center">
-              <p className="text-sm text-muted-foreground mb-2">Event Code</p>
-              <p className="text-2xl font-mono font-bold tracking-wider bg-accent px-4 py-2 rounded-lg">
-                {createdEvent.qrCode}
-              </p>
-            </div>
+            <p className="text-2xl font-mono font-bold tracking-widest mb-6">
+              {createdEvent.qrCode}
+            </p>
 
-            {/* Action Buttons */}
             <div className="flex gap-3 w-full max-w-xs">
-              <Button 
-                variant="outline" 
-                className="flex-1 h-12 rounded-lg"
-                onClick={copyCode}
-              >
+              <Button variant="outline" className="flex-1" onClick={copyCode}>
                 <Copy className="w-4 h-4 mr-2" />
                 Copy Code
               </Button>
-              <Button 
-                variant="outline" 
-                className="flex-1 h-12 rounded-lg"
-                onClick={saveQRCode}
-              >
+              <Button variant="outline" className="flex-1">
                 <Download className="w-4 h-4 mr-2" />
                 Save QR
               </Button>
-            </div>
-
-            {/* Additional Info */}
-            <div className="mt-8 p-4 bg-accent rounded-lg w-full max-w-sm">
-              <p className="text-sm text-muted-foreground text-center">
-                📍 <span className="font-medium">Location:</span> {createdEvent.streetName || createdEvent.location}
-              </p>
-              <p className="text-sm text-muted-foreground text-center mt-1">
-                🎯 <span className="font-medium">Check-in Radius:</span> {createdEvent.geofenceRadius}m
-              </p>
             </div>
           </div>
         )}
       </div>
 
-      {/* Footer - Fixed with proper spacing */}
+      {/* Footer */}
       {step < 5 && (
-        <div className="p-4 border-t border-border flex gap-3 mt-auto">
+        <div className="p-4 border-t border-border flex gap-3">
           {step > 1 && (
-            <Button 
-              variant="outline" 
-              className="flex-1 h-12 rounded-lg"
-              onClick={() => setStep(step - 1)}
-            >
+            <Button variant="outline" className="flex-1" onClick={() => setStep(step - 1)}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
           )}
           {step < 4 ? (
             <Button
-              className="flex-1 h-12 gradient-pro glow-purple rounded-lg"
+              className="flex-1 gradient-pro glow-purple"
               onClick={() => setStep(step + 1)}
               disabled={(step === 1 && !isStep1Valid) || (step === 2 && !isStep2Valid)}
             >
@@ -831,7 +554,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             </Button>
           ) : (
             <Button
-              className="flex-1 h-12 gradient-pro glow-purple rounded-lg"
+              className="flex-1 gradient-pro glow-purple"
               onClick={handlePublish}
             >
               Publish Event
@@ -842,18 +565,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       )}
 
       {step === 5 && (
-        <div className="p-4 border-t border-border mt-auto">
-          <Button 
-            className="w-full h-12 gradient-pro glow-purple rounded-lg mb-4"
-            onClick={onClose}
-          >
+        <div className="p-4 border-t border-border">
+          <Button className="w-full gradient-pro glow-purple" onClick={onClose}>
             Done
           </Button>
-          <p className="text-xs text-center text-muted-foreground">
-            You can manage this event from the "My Events" section
-          </p>
         </div>
       )}
     </div>
-  );
-}
+  );      
+} 
