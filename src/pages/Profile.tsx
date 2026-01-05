@@ -9,9 +9,9 @@ import {
   LogOut,
   CreditCard,
   Shield,
-  Bell,
   Moon,
   Sun,
+  BarChart3,
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
@@ -29,13 +29,26 @@ export default function Profile() {
 
   const menuItems = [
     {
+      icon: Edit3,
+      label: 'Edit Profile',
+      onClick: () => navigate('/settings/edit-profile'),
+    },
+    {
       icon: CreditCard,
       label: 'Subscription',
       value: user?.subscription.tier?.toUpperCase(),
       gradient: user?.subscription.tier === 'pro' ? 'gradient-pro' : user?.subscription.tier === 'max' ? 'gradient-max' : '',
     },
-    { icon: Shield, label: 'Privacy Settings', onClick: () => navigate('/settings/privacy') },
-    { icon: Bell, label: 'Notifications' },
+    { 
+      icon: Shield, 
+      label: 'Privacy Settings', 
+      onClick: () => navigate('/settings/privacy') 
+    },
+    ...(user?.subscription.tier !== 'free' ? [{
+      icon: BarChart3,
+      label: 'Analytics',
+      onClick: () => {},
+    }] : []),
   ];
 
   const handleLogout = () => {
@@ -49,7 +62,10 @@ export default function Profile() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Profile</h1>
-          <button className="w-10 h-10 rounded-full bg-card flex items-center justify-center border border-border hover:border-primary transition-colors">
+          <button 
+            onClick={() => navigate('/settings')}
+            className="w-10 h-10 rounded-full bg-card flex items-center justify-center border border-border hover:border-primary transition-colors"
+          >
             <Settings className="w-5 h-5" />
           </button>
         </div>
@@ -65,13 +81,16 @@ export default function Profile() {
                   alt={user?.profile.name}
                   className="w-20 h-20 rounded-full object-cover border-2 border-primary"
                 />
-                <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                <button 
+                  onClick={() => navigate('/settings/edit-profile')}
+                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center hover:bg-primary/90 transition-colors"
+                >
                   <Edit3 className="w-4 h-4 text-primary-foreground" />
                 </button>
               </div>
-              <div>
-                <h2 className="text-xl font-bold">{user?.profile.name}</h2>
-                <p className="text-muted-foreground text-sm">{user?.profile.location}</p>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold truncate">{user?.profile.name}</h2>
+                <p className="text-muted-foreground text-sm truncate">{user?.profile.location}</p>
                 {user?.subscription.tier !== 'free' && (
                   <span className={`inline-block mt-1 px-3 py-0.5 text-xs font-semibold rounded-full ${
                     user?.subscription.tier === 'pro' ? 'gradient-pro' : 'gradient-max'
@@ -81,7 +100,9 @@ export default function Profile() {
                 )}
               </div>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">{user?.profile.bio}</p>
+            {user?.profile.bio && (
+              <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{user?.profile.bio}</p>
+            )}
             <div className="flex flex-wrap gap-2">
               {user?.profile.interests.slice(0, 5).map((interest) => (
                 <span

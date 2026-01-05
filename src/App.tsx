@@ -12,6 +12,10 @@ import Connect from "./pages/Connect";
 import Matches from "./pages/Matches";
 import Profile from "./pages/Profile";
 import EventDetail from "./pages/EventDetail";
+import Settings from "./pages/Settings";
+import EditProfile from "./pages/EditProfile";
+import PrivacySettings from "./pages/PrivacySettings";
+import Social from "./pages/Social";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,14 +30,26 @@ function AppRoutes() {
 
   return (
     <Routes>
+      {/* Public Routes */}
       <Route path="/" element={isAuthenticated ? <Navigate to="/home" replace /> : <Landing />} />
+      <Route path="/landing" element={<Landing />} />
       <Route path="/auth" element={isAuthenticated ? <Navigate to="/home" replace /> : <Auth />} />
+      
+      {/* Protected Routes */}
       <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
       <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
       <Route path="/connect" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
       <Route path="/matches" element={<ProtectedRoute><Matches /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/event/:id" element={<ProtectedRoute><EventDetail /></ProtectedRoute>} />
+      <Route path="/social" element={<ProtectedRoute><Social /></ProtectedRoute>} />
+      
+      {/* Settings Routes */}
+      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+      <Route path="/settings/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
+      <Route path="/settings/privacy" element={<ProtectedRoute><PrivacySettings /></ProtectedRoute>} />
+      
+      {/* Fallback */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

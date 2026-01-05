@@ -1,22 +1,27 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, MapPin, Users, Clock, Share2, Bookmark, Ticket } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, Calendar, MapPin, Users, Clock, Share2, Bookmark, Ticket, ExternalLink } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { CommunityPhotos } from '@/components/CommunityPhotos';
 import { CommunityComments } from '@/components/CommunityComments';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useScrollDirection } from '@/hooks/useScrollDirection';
 
 export default function EventDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { events, user, bookmarkEvent, communityPhotos, communityComments } = useApp();
+  const { events, user, bookmarkEvent, communityPhotos, communityComments, tickets } = useApp();
   const { toast } = useToast();
+  const { scrollY } = useScrollDirection();
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
   const event = events.find((e) => e.id === id);
   const isBookmarked = user?.bookmarkedEvents.includes(id ?? '');
   const eventPhotos = communityPhotos.filter((p) => p.eventId === id);
   const eventComments = communityComments.filter((c) => c.eventId === id);
+  const hasTicket = tickets.some(t => t.eventId === id && t.status === 'active');
 
   const handleShare = async () => {
     const shareData = {
@@ -48,29 +53,52 @@ export default function EventDetail() {
     );
   }
 
+  const isLive = new Date(event.date) <= new Date();
+  const descriptionTruncated = event.description.length > 200;
+
+  // Determine CTA based on context
+  const getCTAText = () => {
+    if (!user) return 'Buy Ticket';
+    if (hasTicket && isLive) return 'Check In Now';
+    if (hasTicket) return 'View Ticket';
+    return event.price === 0 ? 'Register Free' : 'Buy Ticket';
+  };
+
   return (
     <div className="app-container min-h-screen bg-background">
-      {/* Hero Image */}
-      <div className="relative h-[280px]">
-        <img
-          src={event.coverImage}
-          alt={event.name}
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
-        
-        {/* Header */}
-        <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between pt-safe">
+      {/* Persistent Back Button - Always visible */}
+      <div 
+        className={cn(
+          'fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-app z-50 transition-all duration-300',
+          scrollY > 200 ? 'bg-background/95 backdrop-blur-xl border-b border-border' : 'bg-transparent'
+        )}
+      >
+        <div className="flex items-center justify-between px-4 h-14 pt-safe">
           <button
             onClick={() => navigate(-1)}
-            className="w-10 h-10 rounded-full bg-background/50 backdrop-blur-sm flex items-center justify-center hover:bg-background/70 transition-colors"
+            className={cn(
+              'w-10 h-10 rounded-full flex items-center justify-center transition-colors',
+              scrollY > 200 
+                ? 'bg-card border border-border hover:border-primary' 
+                : 'bg-black/30 backdrop-blur-sm hover:bg-black/50'
+            )}
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
+          
+          {scrollY > 200 && (
+            <h1 className="text-sm font-semibold truncate max-w-[200px]">{event.name}</h1>
+          )}
+          
           <div className="flex gap-2">
             <button 
               onClick={handleShare}
-              className="w-10 h-10 rounded-full bg-background/50 backdrop-blur-sm flex items-center justify-center hover:bg-background/70 transition-colors"
+              className={cn(
+                'w-10 h-10 rounded-full flex items-center justify-center transition-colors',
+                scrollY > 200 
+                  ? 'bg-card border border-border hover:border-primary' 
+                  : 'bg-black/30 backdrop-blur-sm hover:bg-black/50'
+              )}
             >
               <Share2 className="w-5 h-5" />
             </button>
@@ -78,7 +106,11 @@ export default function EventDetail() {
               onClick={() => bookmarkEvent(event.id)}
               className={cn(
                 'w-10 h-10 rounded-full flex items-center justify-center transition-all',
-                isBookmarked ? 'bg-primary text-primary-foreground' : 'bg-background/50 backdrop-blur-sm hover:bg-background/70'
+                isBookmarked 
+                  ? 'bg-primary text-primary-foreground' 
+                  : scrollY > 200 
+                    ? 'bg-card border border-border hover:border-primary'
+                    : 'bg-black/30 backdrop-blur-sm hover:bg-black/50'
               )}
             >
               <Bookmark className={cn('w-5 h-5', isBookmarked && 'fill-current')} />
@@ -87,8 +119,33 @@ export default function EventDetail() {
         </div>
       </div>
 
+      {/* Hero Image with Parallax Effect */}
+      <div className="relative h-[320px] overflow-hidden">
+        <div 
+          className="absolute inset-0 transition-transform duration-100"
+          style={{ transform: `translateY(${Math.min(scrollY * 0.3, 50)}px) scale(${1 + scrollY * 0.0005})` }}
+        >
+          <img
+            src={event.coverImage}
+            alt={event.name}
+            className="w-full h-full object-cover"
+          />
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
+        
+        {/* Status Badge */}
+        <div className="absolute top-20 left-5">
+          <span className={cn(
+            'px-3 py-1.5 text-xs font-semibold rounded-full',
+            isLive ? 'bg-brand-green text-white animate-pulse' : 'bg-card text-foreground'
+          )}>
+            {isLive ? '🔴 LIVE' : 'Upcoming'}
+          </span>
+        </div>
+      </div>
+
       {/* Content */}
-      <div className="px-5 -mt-14 relative z-10 pb-32">
+      <div className="px-5 -mt-20 relative z-10 pb-32">
         {/* Tags */}
         <div className="flex gap-2 mb-4 flex-wrap">
           {event.isFeatured && (
@@ -96,21 +153,21 @@ export default function EventDetail() {
               FEATURED
             </span>
           )}
-          <span className="px-3 py-1 bg-card text-foreground text-xs font-semibold rounded-full">
+          <span className="px-3 py-1 bg-card text-foreground text-xs font-semibold rounded-full border border-border">
             {event.category}
           </span>
         </div>
 
         {/* Title */}
-        <h1 className="text-2xl font-bold mb-4 leading-tight">{event.name}</h1>
+        <h1 className="text-2xl font-bold mb-5 leading-tight">{event.name}</h1>
 
-        {/* Info Cards */}
+        {/* Info Grid - No Overflow */}
         <div className="grid grid-cols-2 gap-3 mb-6">
-          <div className="glass-card p-3 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+          <div className="glass-card p-4 flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
               <Calendar className="w-5 h-5 text-primary" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">Date</p>
               <p className="text-sm font-semibold truncate">
                 {new Date(event.date).toLocaleDateString('en-US', {
@@ -121,24 +178,29 @@ export default function EventDetail() {
               </p>
             </div>
           </div>
-          <div className="glass-card p-3 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+          
+          <div className="glass-card p-4 flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
               <Clock className="w-5 h-5 text-primary" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">Time</p>
               <p className="text-sm font-semibold truncate">{event.time}</p>
             </div>
           </div>
-          <div className="glass-card p-3 flex items-center gap-3 col-span-2">
-            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+          
+          <div className="glass-card p-4 flex items-center gap-3 col-span-2">
+            <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
               <MapPin className="w-5 h-5 text-primary" />
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 mr-2">
               <p className="text-xs text-muted-foreground">Location</p>
               <p className="text-sm font-semibold truncate">{event.location}</p>
               <p className="text-xs text-muted-foreground truncate">{event.address}</p>
             </div>
+            <button className="flex-shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary hover:bg-primary/20 transition-colors">
+              <ExternalLink className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
@@ -152,7 +214,7 @@ export default function EventDetail() {
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="w-8 h-8 rounded-full bg-card border-2 border-background overflow-hidden"
+                className="w-9 h-9 rounded-full bg-card border-2 border-background overflow-hidden"
               >
                 <img
                   src={`https://i.pravatar.cc/100?img=${i + 10}`}
@@ -161,7 +223,7 @@ export default function EventDetail() {
                 />
               </div>
             ))}
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center border-2 border-background text-xs font-semibold">
+            <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center border-2 border-background text-xs font-semibold">
               +{Math.max(0, event.attendees - 4)}
             </div>
           </div>
@@ -169,8 +231,20 @@ export default function EventDetail() {
 
         {/* Description */}
         <div className="mb-6">
-          <h2 className="text-lg font-bold mb-3">About</h2>
-          <p className="text-muted-foreground leading-relaxed text-sm">{event.description}</p>
+          <h2 className="text-lg font-bold mb-3">About This Event</h2>
+          <p className="text-muted-foreground leading-relaxed text-sm">
+            {showFullDescription || !descriptionTruncated 
+              ? event.description 
+              : `${event.description.slice(0, 200)}...`}
+          </p>
+          {descriptionTruncated && (
+            <button 
+              onClick={() => setShowFullDescription(!showFullDescription)}
+              className="text-primary text-sm font-medium mt-2 hover:underline"
+            >
+              {showFullDescription ? 'Show less' : 'Read more'}
+            </button>
+          )}
         </div>
 
         {/* Tags */}
@@ -192,8 +266,8 @@ export default function EventDetail() {
         <CommunityComments eventId={event.id} comments={eventComments} />
       </div>
 
-      {/* Bottom CTA */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app bg-background/95 backdrop-blur-xl border-t border-border p-4 pb-safe z-20">
+      {/* Sticky Bottom CTA */}
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app bg-background/95 backdrop-blur-xl border-t border-border p-4 pb-safe z-30">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-2xl font-bold">
@@ -201,9 +275,16 @@ export default function EventDetail() {
             </p>
             <p className="text-xs text-muted-foreground">per person</p>
           </div>
-          <Button className="flex-1 h-14 text-lg font-semibold gradient-pro glow-purple">
+          <Button 
+            className={cn(
+              'flex-1 h-14 text-lg font-semibold',
+              hasTicket && isLive 
+                ? 'bg-brand-green hover:bg-brand-green/90 text-white animate-pulse' 
+                : 'gradient-pro glow-purple'
+            )}
+          >
             <Ticket className="w-5 h-5 mr-2" />
-            Get Ticket
+            {getCTAText()}
           </Button>
         </div>
       </div>
