@@ -34,11 +34,13 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const [dragOffset, setDragOffset] = useState(0);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [showEventCard, setShowEventCard] = useState(false);
+  const [cardPosition, setCardPosition] = useState({ x: 0, y: 0 });
   
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const popupRef = useRef<mapboxgl.Popup | null>(null);
   const dragStartY = useRef(0);
   const currentTranslate = useRef(0);
 
@@ -104,10 +106,10 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
           'sky-atmosphere-sun-intensity': 15,
         },
       });
-    });
 
-    // Add event markers
-    updateEventMarkers();
+      // Update event markers after map loads
+      updateEventMarkers();
+    });
 
     // User location marker
     const userMarker = document.createElement('div');
@@ -124,9 +126,42 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
     markersRef.current.push(userMapMarker);
 
+    // Handle map click to close popup
+    map.current.on('click', (e) => {
+      if (popupRef.current) {
+        popupRef.current.remove();
+        popupRef.current = null;
+        removeGeofenceCircle();
+      }
+    });
+
+    // Handle map move to update popup position
+    map.current.on('move', () => {
+      if (popupRef.current && selectedEvent) {
+        const coordinates = [selectedEvent.coordinates.lng, selectedEvent.coordinates.lat];
+        const pixelPosition = map.current!.project(coordinates);
+        
+        // Update custom card position if needed
+        if (document.getElementById('custom-event-card')) {
+          const card = document.getElementById('custom-event-card');
+          if (card) {
+            const rect = card.getBoundingClientRect();
+            const newX = pixelPosition.x - rect.width / 2;
+            const newY = pixelPosition.y - rect.height - 40; // Position above marker
+            card.style.left = `${newX}px`;
+            card.style.top = `${newY}px`;
+          }
+        }
+      }
+    });
+
     return () => {
       markersRef.current.forEach(marker => marker.remove());
       markersRef.current = [];
+      if (popupRef.current) {
+        popupRef.current.remove();
+        popupRef.current = null;
+      }
       map.current?.remove();
       map.current = null;
     };
@@ -170,8 +205,26 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       // Add click handler to marker
       markerEl.addEventListener('click', (e) => {
         e.stopPropagation();
-        setSelectedEvent(event);
-        setShowEventCard(true);
+        
+        // Remove existing popup
+        if (popupRef.current) {
+          popupRef.current.remove();
+        }
+        
+        // Create and show new popup
+        const popup = new mapboxgl.Popup({
+          offset: [0, -40], // Position above marker
+          closeButton: false,
+          closeOnClick: false,
+          maxWidth: '300px',
+          anchor: 'bottom',
+          className: 'event-popup',
+        })
+          .setLngLat([event.coordinates.lng, event.coordinates.lat])
+          .setHTML(createPopupHTML(event))
+          .addTo(map.current!);
+
+        popupRef.current = popup;
         
         // Add geofence circle for this event
         addGeofenceCircle(event);
@@ -188,6 +241,78 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
       markersRef.current.push(marker);
     });
+  };
+
+  const createPopupHTML = (event: any) => {
+    return `
+      <div class="bg-background rounded-xl shadow-2xl border border-border overflow-hidden w-[280px]">
+        <div class="p-4 border-b border-border flex justify-between items-center">
+          <div class="flex items-center gap-3">
+            <div class="w-3 h-3 rounded-full" style="background-color: ${event.customTheme || '#8B5CF6'}"></div>
+            <span class="text-xs font-medium px-2 py-1 rounded-md bg-primary/10 text-primary">
+              ${event.category}
+            </span>
+          </div>
+          <button onclick="window.dispatchEvent(new CustomEvent('closePopup'))" class="w-8 h-8 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="p-4">
+          <div class="flex items-start justify-between mb-3">
+            <div class="flex-1">
+              <h3 class="font-bold text-lg mb-1">${event.name}</h3>
+              <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <span>${event.location}</span>
+              </div>
+            </div>
+            <div class="text-xs font-bold px-2 py-1 rounded-md ml-2" 
+                 style="background-color: ${event.customTheme || '#8B5CF6'}20; color: ${event.customTheme || '#8B5CF6'}">
+              ${event.geofenceRadius}m radius
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="flex items-center gap-2 text-sm">
+              <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              </svg>
+              <span>${event.date}</span>
+            </div>
+            <div class="flex items-center gap-2 text-sm">
+              <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span>${event.time}</span>
+            </div>
+            <div class="flex items-center gap-2 text-sm">
+              <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+              </svg>
+              <span>${event.attendees} attending</span>
+            </div>
+            <div class="flex items-center gap-2 text-sm">
+              <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span>${event.price === 0 ? 'FREE' : `N$${event.price}`}</span>
+            </div>
+          </div>
+
+          <button onclick="window.dispatchEvent(new CustomEvent('viewEventDetails', { detail: '${event.id}' }))" 
+                  class="w-full py-3 rounded-xl font-medium text-white text-sm"
+                  style="background-color: ${event.customTheme || '#8B5CF6'}; border-color: ${event.customTheme || '#8B5CF6'}">
+            View Event Details
+          </button>
+        </div>
+      </div>
+    `;
   };
 
   const addGeofenceCircle = (event: any) => {
@@ -210,11 +335,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     const sourceId = `geofence-${event.id}`;
     
     // Remove existing geofence if any
-    if (map.current.getSource(sourceId)) {
-      map.current.removeLayer(`${sourceId}-fill`);
-      map.current.removeLayer(`${sourceId}-line`);
-      map.current.removeSource(sourceId);
-    }
+    removeGeofenceCircle();
 
     // Add new geofence
     map.current.addSource(sourceId, {
@@ -232,7 +353,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       source: sourceId,
       paint: {
         'fill-color': event.customTheme || '#8B5CF6',
-        'fill-opacity': 0.15,
+        'fill-opacity': 0.1,
       },
     });
 
@@ -242,26 +363,56 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       source: sourceId,
       paint: {
         'line-color': event.customTheme || '#8B5CF6',
-        'line-width': 3,
-        'line-dasharray': [2, 2],
+        'line-width': 2,
+        'line-dasharray': [2, 1],
       },
     });
+
+    // Store current event for cleanup
+    setSelectedEvent(event);
   };
 
-  const removeGeofenceCircle = (eventId: string) => {
+  const removeGeofenceCircle = () => {
     if (!map.current) return;
     
-    const sourceId = `geofence-${eventId}`;
-    if (map.current.getLayer(`${sourceId}-fill`)) {
-      map.current.removeLayer(`${sourceId}-fill`);
-    }
-    if (map.current.getLayer(`${sourceId}-line`)) {
-      map.current.removeLayer(`${sourceId}-line`);
-    }
-    if (map.current.getSource(sourceId)) {
-      map.current.removeSource(sourceId);
+    if (selectedEvent) {
+      const sourceId = `geofence-${selectedEvent.id}`;
+      if (map.current.getLayer(`${sourceId}-fill`)) {
+        map.current.removeLayer(`${sourceId}-fill`);
+      }
+      if (map.current.getLayer(`${sourceId}-line`)) {
+        map.current.removeLayer(`${sourceId}-line`);
+      }
+      if (map.current.getSource(sourceId)) {
+        map.current.removeSource(sourceId);
+      }
+      setSelectedEvent(null);
     }
   };
+
+  // Handle popup events from injected JavaScript
+  useEffect(() => {
+    const handleClosePopup = () => {
+      if (popupRef.current) {
+        popupRef.current.remove();
+        popupRef.current = null;
+      }
+      removeGeofenceCircle();
+    };
+
+    const handleViewEventDetails = (e: CustomEvent) => {
+      const eventId = e.detail;
+      navigate(`/event/${eventId}`);
+    };
+
+    window.addEventListener('closePopup', handleClosePopup as EventListener);
+    window.addEventListener('viewEventDetails', handleViewEventDetails as EventListener);
+
+    return () => {
+      window.removeEventListener('closePopup', handleClosePopup as EventListener);
+      window.removeEventListener('viewEventDetails', handleViewEventDetails as EventListener);
+    };
+  }, [navigate]);
 
   const getDrawerHeight = () => {
     if (typeof window === 'undefined') return 500;
@@ -345,17 +496,9 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     return `translateY(${totalTranslate}px)`;
   };
 
-  // Handle clicking on map background
-  const handleMapClick = () => {
-    if (selectedEvent) {
-      removeGeofenceCircle(selectedEvent.id);
-      setSelectedEvent(null);
-      setShowEventCard(false);
-    }
-  };
-
-  // Handle event card click to navigate to event details
+  // Handle event card click in drawer
   const handleEventCardClick = (event: any) => {
+    // Navigate directly to event details (NOT show pin card)
     navigate(`/event/${event.id}`);
   };
 
@@ -364,90 +507,8 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       {/* Mapbox Map - Full screen */}
       <div 
         ref={mapContainer} 
-        className="absolute inset-0 z-0 cursor-pointer"
-        onClick={handleMapClick}
+        className="absolute inset-0 z-0"
       />
-
-      {/* Event Popup Card */}
-      {showEventCard && selectedEvent && (
-        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-20 w-[90%] max-w-md">
-          <div className="bg-background rounded-2xl shadow-2xl border border-border overflow-hidden">
-            {/* Header with close button */}
-            <div className="p-4 border-b border-border flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div 
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: selectedEvent.customTheme || '#8B5CF6' }}
-                />
-                <span className="text-xs font-medium px-2 py-1 rounded-md bg-primary/10 text-primary">
-                  {selectedEvent.category}
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  setShowEventCard(false);
-                  removeGeofenceCircle(selectedEvent.id);
-                }}
-                className="w-8 h-8 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Event Preview */}
-            <div className="p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="font-bold text-lg mb-1">{selectedEvent.name}</h3>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="w-4 h-4" />
-                    <span>{selectedEvent.location}</span>
-                  </div>
-                </div>
-                <div 
-                  className="text-xs font-bold px-2 py-1 rounded-md"
-                  style={{ 
-                    backgroundColor: `${selectedEvent.customTheme || '#8B5CF6'}20`,
-                    color: selectedEvent.customTheme || '#8B5CF6'
-                  }}
-                >
-                  {selectedEvent.geofenceRadius}m radius
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <span>{selectedEvent.date}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <span>{selectedEvent.time}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Users className="w-4 h-4 text-muted-foreground" />
-                  <span>{selectedEvent.attendees} attending</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <DollarSign className="w-4 h-4 text-muted-foreground" />
-                  <span>{selectedEvent.price === 0 ? 'FREE' : `N$${selectedEvent.price}`}</span>
-                </div>
-              </div>
-
-              <Button
-                className="w-full rounded-xl h-12 font-medium"
-                onClick={() => handleEventCardClick(selectedEvent)}
-                style={{ 
-                  backgroundColor: selectedEvent.customTheme || '#8B5CF6',
-                  borderColor: selectedEvent.customTheme || '#8B5CF6'
-                }}
-              >
-                View Event Details
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Events Drawer */}
       <div
@@ -543,20 +604,8 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                   <EventCard
                     key={event.id}
                     event={event}
-                    onClick={() => {
-                      // Fly to event location
-                      map.current?.flyTo({
-                        center: [event.coordinates.lng, event.coordinates.lat],
-                        zoom: 15,
-                        pitch: 75,
-                        bearing: 0,
-                        duration: 1000,
-                      });
-                      // Show event card
-                      setSelectedEvent(event);
-                      setShowEventCard(true);
-                      addGeofenceCircle(event);
-                    }}
+                    onClick={() => handleEventCardClick(event)} // Direct navigation
+                    showPreview={false} // Don't show preview on hover
                   />
                 ))
               ) : (
