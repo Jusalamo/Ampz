@@ -2,23 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =========================================================
+   ROOT DESIGN TOKENS
+   ========================================================= */
 @layer base {
   :root {
     /* Brand Colors */
     --brand-purple: 263 70% 50%;
-    --brand-purple-light: 263 70% 60%;
-    --brand-purple-dark: 263 70% 40%;
     --brand-pink: 330 81% 60%;
+    --brand-orange: 25 95% 53%;
+
     --brand-blue: 217 91% 60%;
+    --brand-teal: 174 72% 40%;
     --brand-green: 160 84% 39%;
     --brand-yellow: 38 92% 50%;
-    --brand-orange: 25 95% 53%;
     --brand-red: 0 84% 60%;
-    --brand-teal: 174 72% 40%;
     --brand-gold: 36 77% 84%;
-    --brand-indigo: 239 84% 67%;
 
-    /* Dark Mode (Default) */
+    /* Dark Mode Default */
     --background: 0 0% 0%;
     --background-secondary: 0 0% 4%;
     --background-tertiary: 0 0% 9%;
@@ -26,46 +27,28 @@
 
     --card: 0 0% 12%;
     --card-foreground: 0 0% 100%;
-    --card-glass: 0 0% 100% / 0.05;
-
-    --popover: 0 0% 4%;
-    --popover-foreground: 0 0% 100%;
 
     --primary: 263 70% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 9%;
-    --secondary-foreground: 0 0% 100%;
-
     --muted: 0 0% 15%;
     --muted-foreground: 0 0% 56%;
 
-    --accent: 263 70% 50%;
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-
     --border: 0 0% 100% / 0.1;
-    --input: 0 0% 100% / 0.1;
     --ring: 263 70% 50%;
 
     --radius: 0.75rem;
 
-    /* Shadows */
-    --shadow-glow: 0 0 30px hsl(263 70% 50% / 0.4);
-    --shadow-glow-pink: 0 0 30px hsl(330 81% 60% / 0.3);
-    --shadow-glow-gold: 0 8px 24px hsl(36 77% 84% / 0.3);
-    --shadow-card: 0 20px 60px rgba(0, 0, 0, 0.4);
-
     /* Layout */
-    --max-width: 480px;
     --header-height: 64px;
     --nav-height: 72px;
+
+    /* Shadows */
+    --shadow-card: 0 20px 60px rgba(0, 0, 0, 0.45);
+    --shadow-glow: 0 0 30px hsl(var(--brand-purple) / 0.4);
   }
 
   .light {
-    /* Instagram-style light mode - clean whites, subtle shadows */
     --background: 0 0% 100%;
     --background-secondary: 0 0% 98%;
     --background-tertiary: 0 0% 96%;
@@ -73,222 +56,205 @@
 
     --card: 0 0% 100%;
     --card-foreground: 0 0% 9%;
-    --card-glass: 0 0% 0% / 0.02;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
-
-    --primary: 263 70% 50%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 20%;
-
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
-
-    --accent: 263 70% 50%;
-    --accent-foreground: 0 0% 100%;
 
     --border: 0 0% 88%;
-    --input: 0 0% 88%;
-    --ring: 263 70% 50%;
 
-    /* Subtle shadows for light mode */
-    --shadow-glow: 0 4px 20px hsl(263 70% 50% / 0.15);
-    --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.08);
+    --shadow-card: 0 4px 14px rgba(0, 0, 0, 0.08);
+    --shadow-glow: 0 4px 20px hsl(var(--brand-purple) / 0.15);
   }
 }
 
+/* =========================================================
+   GLOBAL RESET & SCROLL MODEL (FIXES iOS + CLIPPING)
+   ========================================================= */
 @layer base {
-  * {
-    @apply border-border;
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    height: 100%;
+    width: 100%;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, Oxygen, Ubuntu, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI',
+      Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-font-smoothing: antialiased;
   }
 
   html {
     scroll-behavior: smooth;
     -webkit-tap-highlight-color: transparent;
   }
+}
 
-  /* Prevent overscroll bounce on iOS */
-  html, body {
-    overscroll-behavior: none;
+/* =========================================================
+   APP SHELL (RESPONSIVE FOUNDATION)
+   ========================================================= */
+@layer components {
+  /* Full-width shell */
+  .app-shell {
+    width: 100%;
+    min-height: 100dvh;
+    display: flex;
+    justify-content: center;
+  }
+
+  /* Content containers */
+  .content-mobile {
+    width: 100%;
+    max-width: 480px;
+  }
+
+  .content-tablet {
+    width: 100%;
+    max-width: 900px;
+  }
+
+  .content-desktop {
+    width: 100%;
+    max-width: 1200px;
+  }
+
+  /* Adaptive container selector */
+  .content-container {
+    width: 100%;
+    padding-inline: 16px;
+  }
+
+  @media (min-width: 640px) {
+    .content-container {
+      max-width: 900px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .content-container {
+      max-width: 1200px;
+    }
   }
 }
 
+/* =========================================================
+   CARDS & SURFACES
+   ========================================================= */
 @layer components {
-  /* App Container - Centered max-width */
-  .app-container {
-    @apply max-w-[480px] mx-auto min-h-screen relative;
-  }
-
-  /* Glass Cards - Instagram-style subtle elevation */
   .glass-card {
-    @apply bg-card/70 backdrop-blur-xl border border-border rounded-2xl;
-  }
-
-  .light .glass-card {
-    @apply bg-card shadow-sm border-border/50;
-  }
-
-  /* Gradient Backgrounds */
-  .gradient-pro {
-    background: linear-gradient(135deg, hsl(var(--brand-purple)), hsl(var(--brand-pink)));
-  }
-
-  .gradient-max {
-    background: linear-gradient(135deg, hsl(var(--brand-gold)), hsl(var(--brand-orange)));
-  }
-
-  .gradient-demo {
-    background: linear-gradient(135deg, hsl(var(--brand-blue)), hsl(var(--brand-teal)));
-  }
-
-  .gradient-card {
-    background: linear-gradient(180deg, hsl(var(--background-secondary)), hsl(var(--background)));
-  }
-
-  /* Glow Effects */
-  .glow-purple {
-    box-shadow: var(--shadow-glow);
-  }
-
-  .glow-pink {
-    box-shadow: var(--shadow-glow-pink);
-  }
-
-  .glow-gold {
-    box-shadow: var(--shadow-glow-gold);
-  }
-
-  /* Safe Area Padding */
-  .pb-safe {
-    padding-bottom: max(env(safe-area-inset-bottom), 16px);
-  }
-
-  .pt-safe {
-    padding-top: max(env(safe-area-inset-top), 0px);
-  }
-
-  .pb-nav {
-    padding-bottom: calc(var(--nav-height) + max(env(safe-area-inset-bottom), 16px));
-  }
-
-  .h-header {
-    height: var(--header-height);
-  }
-
-  .h-nav {
-    height: var(--nav-height);
-  }
-
-  /* Swipe Card Styles */
-  .swipe-card {
-    @apply absolute w-full aspect-[3/4] rounded-2xl overflow-hidden cursor-grab active:cursor-grabbing;
+    background-color: hsl(var(--card) / 0.85);
+    backdrop-filter: blur(14px);
+    border: 1px solid hsl(var(--border));
+    border-radius: 1rem;
     box-shadow: var(--shadow-card);
   }
 
-  /* Action Button */
-  .action-btn {
-    @apply rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95;
-  }
-
-  /* Gradient Text */
-  .gradient-text {
-    @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, hsl(var(--brand-purple)), hsl(var(--brand-pink)));
-  }
-
-  /* Instagram-style dividers */
-  .divider {
-    @apply h-px bg-border;
+  .light .glass-card {
+    background-color: hsl(var(--card));
   }
 }
 
+/* =========================================================
+   BRAND GRADIENTS (FIXED AMPS IDENTITY)
+   ========================================================= */
+@layer components {
+  .gradient-amps {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--brand-purple)),
+      hsl(var(--brand-pink)),
+      hsl(var(--brand-orange))
+    );
+  }
+
+  .gradient-text {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--brand-purple)),
+      hsl(var(--brand-pink)),
+      hsl(var(--brand-orange))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* =========================================================
+   MAP LAYOUT (MOBILE → DESKTOP SAFE)
+   ========================================================= */
+@layer components {
+  .map-container {
+    width: 100%;
+    height: clamp(300px, 60vh, 800px);
+    position: relative;
+  }
+
+  @media (min-width: 1024px) {
+    .map-container {
+      height: calc(100vh - var(--header-height));
+    }
+  }
+}
+
+/* =========================================================
+   CHAT SCROLL REGION (ONLY PLACE WITH INTERNAL SCROLL)
+   ========================================================= */
+@layer components {
+  .chat-scroll {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+}
+
+/* =========================================================
+   SAFE AREA SUPPORT (iOS)
+   ========================================================= */
+@layer components {
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .pb-nav {
+    padding-bottom: calc(
+      var(--nav-height) + env(safe-area-inset-bottom)
+    );
+  }
+}
+
+/* =========================================================
+   UTILITIES
+   ========================================================= */
 @layer utilities {
-  /* Hide Scrollbar */
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
   .no-scrollbar {
-    -ms-overflow-style: none;
     scrollbar-width: none;
+    -ms-overflow-style: none;
   }
 
-  /* Minimum touch target */
   .touch-target {
     min-height: 44px;
     min-width: 44px;
   }
 
-  /* Animation Keyframes */
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
+  .divider {
+    height: 1px;
+    background-color: hsl(var(--border));
   }
 
-  @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 20px hsl(var(--brand-purple) / 0.4); }
-    50% { box-shadow: 0 0 40px hsl(var(--brand-purple) / 0.6); }
-  }
-
-  @keyframes slide-up {
-    from { transform: translateY(20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-  }
-
-  @keyframes slide-in-right {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-  }
-
-  @keyframes gradient-shift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-  }
-
-  @keyframes bounce-in {
-    0% { transform: scale(0.3); opacity: 0; }
-    50% { transform: scale(1.05); }
-    70% { transform: scale(0.9); }
-    100% { transform: scale(1); opacity: 1; }
-  }
-
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
-  }
-
-  .animate-pulse-glow {
-    animation: pulse-glow 2s ease-in-out infinite;
-  }
-
-  .animate-slide-up {
-    animation: slide-up 0.4s ease-out;
-  }
-
-  .animate-slide-in-right {
-    animation: slide-in-right 0.3s ease-out;
-  }
-
-  .animate-gradient {
-    background-size: 200% 200%;
-    animation: gradient-shift 3s ease infinite;
-  }
-
-  .animate-bounce-in {
-    animation: bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  }
-
-  /* Line clamp */
   .line-clamp-1 {
     display: -webkit-box;
     -webkit-line-clamp: 1;
