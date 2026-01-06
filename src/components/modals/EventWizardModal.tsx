@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { X, ArrowRight, ArrowLeft, MapPin, Check, QrCode, Copy, Download, Upload, Image, Video, Map, Loader2 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Input } from '@/components/ui/input';
@@ -44,6 +44,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [videoFiles, setVideoFiles] = useState<File[]>([]);
   const [isMapLoading, setIsMapLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const mapContainer1 = useRef<HTMLDivElement>(null);
   const mapContainer2 = useRef<HTMLDivElement>(null);
@@ -51,11 +52,19 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const map2 = useRef<mapboxgl.Map | null>(null);
   const marker1 = useRef<mapboxgl.Marker | null>(null);
   const marker2 = useRef<mapboxgl.Marker | null>(null);
-  const geofenceCircle = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
+  // Cleanup URLs when component unmounts or images/videos change
+  useEffect(() => {
+    return () => {
+      eventData.images.forEach(url => URL.revokeObjectURL(url));
+      eventData.videos.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, []);
+
+  // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
       setStep(1);
@@ -78,38 +87,43 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       setImageFiles([]);
       setVideoFiles([]);
       setCreatedEvent(null);
+      setIsSubmitting(false);
     }
   }, [isOpen]);
 
   // Cleanup maps when modal closes
   useEffect(() => {
-    return () => {
+    if (!isOpen) {
       if (map1.current) {
         map1.current.remove();
         map1.current = null;
+        marker1.current = null;
       }
       if (map2.current) {
         map2.current.remove();
         map2.current = null;
+        marker2.current = null;
       }
-    };
-  }, []);
+    }
+  }, [isOpen]);
 
   // Initialize map for step 3 (Location)
   useEffect(() => {
-    if (step === 3 && mapContainer1.current && !map1.current) {
+    if (step === 3 && isOpen && mapContainer1.current && !map1.current) {
       initializeMap(mapContainer1.current, 1);
     }
-  }, [step]);
+  }, [step, isOpen]);
 
   // Initialize map for step 4 (Radius)
   useEffect(() => {
-    if (step === 4 && mapContainer2.current && !map2.current) {
+    if (step === 4 && isOpen && mapContainer2.current && !map2.current) {
       initializeMap(mapContainer2.current, 2);
     }
-  }, [step]);
+  }, [step, isOpen]);
 
-  const initializeMap = (container: HTMLDivElement, mapNumber: 1 | 2) => {
+  const initializeMap = useCallback((container: HTMLDivElement, mapNumber: 1 | 2) => {
+    if (!container) return;
+    
     setIsMapLoading(true);
     
     try {
@@ -123,6 +137,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         pitch: 45,
         bearing: -17.6,
         antialias: true,
+        attributionControl: false,
       });
 
       mapInstance.on('load', () => {
@@ -175,22 +190,30 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             .setLngLat([eventData.coordinates.lng, eventData.coordinates.lat])
             .addTo(mapInstance);
 
-          // Add geofence circle to map 2
-          updateGeofenceCircle();
+          // Add geofence circle
+          updateGeofenceCircle(mapInstance);
         }
 
         // Add navigation controls
         mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
         
         // Add geolocate control
-        mapInstance.addControl(
-          new mapboxgl.GeolocateControl({
-            positionOptions: { enableHighAccuracy: true },
-            trackUserLocation: true,
-            showUserLocation: true,
-          }),
-          'top-right'
-        );
+        const geolocateControl = new mapboxgl.GeolocateControl({
+          positionOptions: { enableHighAccuracy: true },
+          trackUserLocation: true,
+          showUserLocation: true,
+        });
+        
+        geolocateControl.on('geolocate', (position: GeolocationPosition) => {
+          const { longitude, latitude } = position.coords;
+          setEventData(prev => ({
+            ...prev,
+            coordinates: { lat: latitude, lng: longitude }
+          }));
+          reverseGeocode(longitude, latitude);
+        });
+        
+        mapInstance.addControl(geolocateControl, 'top-right');
       });
 
       mapInstance.on('error', (e) => {
@@ -202,17 +225,17 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       console.error('Error initializing map:', error);
       setIsMapLoading(false);
     }
-  };
+  }, [eventData.themeColor, eventData.coordinates]);
 
   // Update geofence circle when radius changes
   useEffect(() => {
-    if (step === 4 && map2.current) {
-      updateGeofenceCircle();
+    if (step === 4 && map2.current && map2.current.isStyleLoaded()) {
+      updateGeofenceCircle(map2.current);
     }
   }, [eventData.geofenceRadius, eventData.coordinates, step]);
 
-  const updateGeofenceCircle = () => {
-    if (!map2.current || !map2.current.isStyleLoaded()) return;
+  const updateGeofenceCircle = useCallback((mapInstance: mapboxgl.Map) => {
+    if (!mapInstance.isStyleLoaded()) return;
 
     const { lat, lng } = eventData.coordinates;
     const radiusInKm = eventData.geofenceRadius / 1000;
@@ -229,15 +252,17 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     coords.push(coords[0]); // Close the circle
 
     const sourceId = 'geofence-circle';
+    const fillLayerId = 'geofence-fill';
+    const lineLayerId = 'geofence-line';
     
-    if (map2.current.getSource(sourceId)) {
-      (map2.current.getSource(sourceId) as mapboxgl.GeoJSONSource).setData({
+    if (mapInstance.getSource(sourceId)) {
+      (mapInstance.getSource(sourceId) as mapboxgl.GeoJSONSource).setData({
         type: 'Feature',
         properties: {},
         geometry: { type: 'Polygon', coordinates: [coords] },
       });
     } else {
-      map2.current.addSource(sourceId, {
+      mapInstance.addSource(sourceId, {
         type: 'geojson',
         data: {
           type: 'Feature',
@@ -246,8 +271,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         },
       });
 
-      map2.current.addLayer({
-        id: 'geofence-fill',
+      mapInstance.addLayer({
+        id: fillLayerId,
         type: 'fill',
         source: sourceId,
         paint: {
@@ -256,8 +281,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         },
       });
 
-      map2.current.addLayer({
-        id: 'geofence-line',
+      mapInstance.addLayer({
+        id: lineLayerId,
         type: 'line',
         source: sourceId,
         paint: {
@@ -268,13 +293,21 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       });
     }
 
+    // Update layer colors if theme changes
+    if (mapInstance.getLayer(fillLayerId)) {
+      mapInstance.setPaintProperty(fillLayerId, 'fill-color', eventData.themeColor);
+    }
+    if (mapInstance.getLayer(lineLayerId)) {
+      mapInstance.setPaintProperty(lineLayerId, 'line-color', eventData.themeColor);
+    }
+
     // Ensure map is centered on the marker
-    map2.current.flyTo({
+    mapInstance.flyTo({
       center: [lng, lat],
       zoom: 14,
       duration: 500
     });
-  };
+  }, [eventData.geofenceRadius, eventData.coordinates, eventData.themeColor]);
 
   const reverseGeocode = async (lng: number, lat: number) => {
     try {
@@ -299,7 +332,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   };
 
   const searchLocation = async (query: string) => {
-    if (!query) return;
+    if (!query.trim()) return;
     try {
       const response = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=NA&types=address`
@@ -329,7 +362,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           if (marker2.current) {
             marker2.current.setLngLat([lng, lat]);
           }
-          updateGeofenceCircle();
+          updateGeofenceCircle(map2.current);
         }
       }
     } catch (error) {
@@ -340,7 +373,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      const newImages = Array.from(files);
+      const newImages = Array.from(files).slice(0, 10 - imageFiles.length);
       setImageFiles(prev => [...prev, ...newImages]);
       
       // Create preview URLs
@@ -349,13 +382,16 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         ...prev,
         images: [...prev.images, ...imageUrls]
       }));
+      
+      // Reset file input
+      e.target.value = '';
     }
   };
 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      const newVideos = Array.from(files);
+      const newVideos = Array.from(files).slice(0, 3 - videoFiles.length);
       setVideoFiles(prev => [...prev, ...newVideos]);
       
       // Create preview URLs
@@ -364,10 +400,16 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         ...prev,
         videos: [...prev.videos, ...videoUrls]
       }));
+      
+      // Reset file input
+      e.target.value = '';
     }
   };
 
   const removeImage = (index: number) => {
+    // Revoke the object URL to prevent memory leaks
+    URL.revokeObjectURL(eventData.images[index]);
+    
     setEventData(prev => ({
       ...prev,
       images: prev.images.filter((_, i) => i !== index)
@@ -376,6 +418,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   };
 
   const removeVideo = (index: number) => {
+    // Revoke the object URL to prevent memory leaks
+    URL.revokeObjectURL(eventData.videos[index]);
+    
     setEventData(prev => ({
       ...prev,
       videos: prev.videos.filter((_, i) => i !== index)
@@ -383,56 +428,110 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     setVideoFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handlePublish = () => {
-    const qrCode = `${eventData.name.replace(/\s+/g, '-').toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
-    
-    const newEvent: Event = {
-      id: crypto.randomUUID(),
-      name: eventData.name,
-      description: eventData.description,
-      category: eventData.category,
-      location: eventData.location,
-      address: eventData.address,
-      coordinates: eventData.coordinates,
-      date: eventData.date,
-      time: eventData.time,
-      price: eventData.price,
-      currency: 'NAD',
-      maxAttendees: 500,
-      attendees: 0,
-      organizerId: user?.id || '',
-      qrCode,
-      geofenceRadius: eventData.geofenceRadius,
-      customTheme: eventData.themeColor,
-      coverImage: eventData.images[0] || `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800`,
-      images: eventData.images,
-      videos: eventData.videos,
-      tags: [eventData.category],
-      isFeatured: user?.subscription.tier === 'max',
-    };
+  const handlePublish = async () => {
+    if (!user) {
+      toast({
+        title: 'Error',
+        description: 'You must be logged in to create an event',
+        variant: 'destructive'
+      });
+      return;
+    }
 
-    addEvent(newEvent);
-    setCreatedEvent(newEvent);
-    setStep(6);
+    setIsSubmitting(true);
+    
+    try {
+      const qrCode = `${eventData.name.replace(/\s+/g, '-').toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
+      
+      // In a real app, you would upload files to a server here
+      // For now, we'll convert them to data URLs or use placeholder
+      const uploadedImages = await Promise.all(
+        imageFiles.map(async (file) => {
+          // Convert to data URL for demo purposes
+          return new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+
+      const newEvent: Event = {
+        id: crypto.randomUUID(),
+        name: eventData.name,
+        description: eventData.description,
+        category: eventData.category,
+        location: eventData.location,
+        address: eventData.address,
+        coordinates: eventData.coordinates,
+        date: eventData.date,
+        time: eventData.time,
+        price: eventData.price,
+        currency: 'NAD',
+        maxAttendees: 500,
+        attendees: 0,
+        organizerId: user.id,
+        organizerName: user.name || 'Unknown Organizer',
+        qrCode,
+        geofenceRadius: eventData.geofenceRadius,
+        customTheme: eventData.themeColor,
+        coverImage: uploadedImages[0] || eventData.images[0] || `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800&auto=format&fit=crop`,
+        images: uploadedImages,
+        videos: eventData.videos,
+        tags: [eventData.category],
+        isFeatured: user?.subscription?.tier === 'max',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        status: 'active' as const,
+      };
+
+      await addEvent(newEvent);
+      setCreatedEvent(newEvent);
+      setStep(6);
+      
+      toast({
+        title: 'Event created!',
+        description: 'Your event has been published successfully.',
+      });
+    } catch (error) {
+      console.error('Error creating event:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create event. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const copyCode = () => {
     if (createdEvent) {
       navigator.clipboard.writeText(createdEvent.qrCode);
-      toast({ title: 'Code copied!', description: 'Share this code with your attendees' });
+      toast({ 
+        title: 'Code copied!', 
+        description: 'Share this code with your attendees' 
+      });
     }
   };
 
-  const isStep1Valid = eventData.name && eventData.category && eventData.date && eventData.time;
-  const isStep3Valid = eventData.coordinates.lat !== 0 && eventData.location;
+  const handleDownloadQR = () => {
+    toast({
+      title: 'QR Code Download',
+      description: 'This feature would generate and download a QR code image.',
+    });
+  };
+
+  const isStep1Valid = eventData.name.trim() && eventData.category && eventData.date && eventData.time;
+  const isStep3Valid = eventData.coordinates.lat !== 0 && eventData.location.trim();
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div 
         ref={modalRef}
-        className="bg-background rounded-2xl flex flex-col w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl"
+        className="bg-background rounded-2xl flex flex-col w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl border border-border"
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border shrink-0">
@@ -454,7 +553,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           </div>
           <button 
             onClick={onClose} 
-            className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors"
+            className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors hover:scale-105 active:scale-95"
+            disabled={isSubmitting}
           >
             <X className="w-5 h-5" />
           </button>
@@ -479,6 +579,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       onChange={(e) => setEventData({ ...eventData, name: e.target.value })}
                       placeholder="e.g., Summer Music Festival"
                       className="h-12 rounded-xl border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                      disabled={isSubmitting}
                     />
                   </div>
 
@@ -490,6 +591,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       placeholder="Tell attendees what to expect..."
                       rows={4}
                       className="rounded-xl border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                      disabled={isSubmitting}
                     />
                   </div>
 
@@ -500,11 +602,13 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         <button
                           key={cat}
                           onClick={() => setEventData({ ...eventData, category: cat })}
+                          disabled={isSubmitting}
                           className={cn(
                             'px-4 py-3 rounded-xl text-sm font-medium transition-all border-2',
                             eventData.category === cat
                               ? 'bg-primary text-primary-foreground border-primary'
-                              : 'bg-card border-border hover:border-primary hover:bg-primary/5'
+                              : 'bg-card border-border hover:border-primary hover:bg-primary/5',
+                            isSubmitting && 'opacity-50 cursor-not-allowed'
                           )}
                         >
                           {cat}
@@ -521,6 +625,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         value={eventData.date}
                         onChange={(e) => setEventData({ ...eventData, date: e.target.value })}
                         className="h-12 rounded-xl border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                        disabled={isSubmitting}
                       />
                     </div>
                     <div>
@@ -530,6 +635,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         value={eventData.time}
                         onChange={(e) => setEventData({ ...eventData, time: e.target.value })}
                         className="h-12 rounded-xl border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                        disabled={isSubmitting}
                       />
                     </div>
                   </div>
@@ -539,10 +645,11 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     <Input
                       type="number"
                       value={eventData.price}
-                      onChange={(e) => setEventData({ ...eventData, price: Number(e.target.value) })}
+                      onChange={(e) => setEventData({ ...eventData, price: Math.max(0, Number(e.target.value)) })}
                       placeholder="0 for free events"
                       className="h-12 rounded-xl border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                       min={0}
+                      disabled={isSubmitting}
                     />
                   </div>
 
@@ -553,7 +660,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         type="color"
                         value={eventData.themeColor}
                         onChange={(e) => setEventData({ ...eventData, themeColor: e.target.value })}
-                        className="w-12 h-12 cursor-pointer rounded-xl border-2 border-border"
+                        className="w-12 h-12 cursor-pointer rounded-xl border-2 border-border disabled:cursor-not-allowed"
+                        disabled={isSubmitting}
                       />
                       <div className="flex-1">
                         <span className="text-sm font-medium">{eventData.themeColor}</span>
@@ -587,9 +695,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       variant="outline"
                       onClick={() => fileInputRef.current?.click()}
                       className="rounded-xl"
+                      disabled={isSubmitting || imageFiles.length >= 10}
                     >
                       <Upload className="w-4 h-4 mr-2" />
-                      Add Photos
+                      Add Photos ({imageFiles.length}/10)
                     </Button>
                     <input
                       ref={fileInputRef}
@@ -598,6 +707,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       multiple
                       onChange={handleImageUpload}
                       className="hidden"
+                      disabled={isSubmitting}
                     />
                   </div>
 
@@ -608,10 +718,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                           src={image}
                           alt={`Event ${index + 1}`}
                           className="w-full h-full object-cover rounded-xl border-2 border-border"
+                          loading="lazy"
                         />
                         <button
                           onClick={() => removeImage(index)}
-                          className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          disabled={isSubmitting}
+                          className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -641,9 +753,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       variant="outline"
                       onClick={() => videoInputRef.current?.click()}
                       className="rounded-xl"
+                      disabled={isSubmitting || videoFiles.length >= 3}
                     >
                       <Upload className="w-4 h-4 mr-2" />
-                      Add Videos
+                      Add Videos ({videoFiles.length}/3)
                     </Button>
                     <input
                       ref={videoInputRef}
@@ -652,6 +765,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       multiple
                       onChange={handleVideoUpload}
                       className="hidden"
+                      disabled={isSubmitting}
                     />
                   </div>
 
@@ -661,13 +775,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         <video
                           src={video}
                           className="w-full h-full object-cover rounded-xl border-2 border-border"
+                          controls
                         />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                          <Video className="w-10 h-10 text-white" />
-                        </div>
                         <button
                           onClick={() => removeVideo(index)}
-                          className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          disabled={isSubmitting}
+                          className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -703,6 +816,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     onKeyDown={(e) => e.key === 'Enter' && searchLocation(eventData.location)}
                     placeholder="Search for a location..."
                     className="h-12 pl-12 rounded-xl border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                    disabled={isSubmitting}
                   />
                 </div>
 
@@ -773,6 +887,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       max={500}
                       step={1}
                       className="w-full"
+                      disabled={isSubmitting}
                     />
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>10m</span>
@@ -884,7 +999,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             {step === 6 && createdEvent && (
               <div className="flex flex-col items-center justify-center py-8 animate-fade-in">
                 <div 
-                  className="w-24 h-24 rounded-full flex items-center justify-center mb-6"
+                  className="w-24 h-24 rounded-full flex items-center justify-center mb-6 animate-scale-in"
                   style={{ backgroundColor: `${eventData.themeColor}20` }}
                 >
                   <Check className="w-12 h-12" style={{ color: eventData.themeColor }} />
@@ -894,12 +1009,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   Your event "<span className="font-semibold">{createdEvent.name}</span>" is now live! Share the code below so attendees can check in.
                 </p>
 
-                <div className="w-full max-w-sm bg-white rounded-2xl flex flex-col items-center justify-center mb-6 border-2 border-border p-6">
+                <div className="w-full max-w-sm bg-card rounded-2xl flex flex-col items-center justify-center mb-6 border-2 border-border p-6">
                   <div className="text-center mb-6">
                     <p className="text-sm font-medium mb-2" style={{ color: eventData.themeColor }}>
                       Event Check-in Code
                     </p>
-                    <p className="text-3xl font-mono font-bold tracking-widest bg-card p-4 rounded-lg">
+                    <p className="text-3xl font-mono font-bold tracking-widest bg-background p-4 rounded-lg">
                       {createdEvent.qrCode}
                     </p>
                   </div>
@@ -913,7 +1028,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 <div className="flex gap-3 w-full max-w-sm">
                   <Button 
                     variant="outline" 
-                    className="flex-1 rounded-xl h-12"
+                    className="flex-1 rounded-xl h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
                     onClick={copyCode}
                   >
                     <Copy className="w-4 h-4 mr-2" />
@@ -921,7 +1036,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="flex-1 rounded-xl h-12"
+                    className="flex-1 rounded-xl h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                    onClick={handleDownloadQR}
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Save QR
@@ -934,13 +1050,14 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
         {/* CTA Buttons - Fixed at bottom of modal */}
         {step < 6 && (
-          <div className="border-t border-border bg-background p-6 shrink-0">
+          <div className="border-t border-border bg-background/95 backdrop-blur-sm p-6 shrink-0">
             <div className="flex gap-3 w-full">
               {step > 1 && (
                 <Button 
                   variant="outline" 
-                  className="flex-1 rounded-xl h-12"
+                  className="flex-1 rounded-xl h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
                   onClick={() => setStep(step - 1)}
+                  disabled={isSubmitting}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back
@@ -948,29 +1065,51 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               )}
               {step < 5 ? (
                 <Button
-                  className="flex-1 rounded-xl h-12 font-medium"
+                  className="flex-1 rounded-xl h-12 font-medium hover:scale-[1.02] active:scale-[0.98] transition-transform"
                   onClick={() => setStep(step + 1)}
-                  disabled={(step === 1 && !isStep1Valid) || (step === 3 && !isStep3Valid)}
+                  disabled={
+                    isSubmitting ||
+                    (step === 1 && !isStep1Valid) ||
+                    (step === 3 && !isStep3Valid)
+                  }
                   style={{ 
                     backgroundColor: eventData.themeColor,
                     borderColor: eventData.themeColor,
-                    opacity: ((step === 1 && !isStep1Valid) || (step === 3 && !isStep3Valid)) ? 0.5 : 1
                   }}
                 >
-                  {step === 4 ? 'Review Event' : 'Next'}
-                  <ArrowRight className="w-4 h-4 ml-2" />
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : step === 4 ? (
+                    'Review Event'
+                  ) : (
+                    'Next'
+                  )}
+                  {!isSubmitting && step !== 4 && <ArrowRight className="w-4 h-4 ml-2" />}
                 </Button>
               ) : (
                 <Button
-                  className="flex-1 rounded-xl h-12 font-medium"
+                  className="flex-1 rounded-xl h-12 font-medium hover:scale-[1.02] active:scale-[0.98] transition-transform"
                   onClick={handlePublish}
+                  disabled={isSubmitting}
                   style={{ 
                     backgroundColor: eventData.themeColor,
                     borderColor: eventData.themeColor 
                   }}
                 >
-                  <Check className="w-4 h-4 mr-2" />
-                  Publish Event
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Publishing...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Publish Event
+                    </>
+                  )}
                 </Button>
               )}
             </div>
@@ -981,9 +1120,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         )}
 
         {step === 6 && (
-          <div className="border-t border-border bg-background p-6 shrink-0">
+          <div className="border-t border-border bg-background/95 backdrop-blur-sm p-6 shrink-0">
             <Button 
-              className="w-full rounded-xl h-12 font-medium" 
+              className="w-full rounded-xl h-12 font-medium hover:scale-[1.02] active:scale-[0.98] transition-transform" 
               onClick={onClose}
               style={{ 
                 backgroundColor: eventData.themeColor,
