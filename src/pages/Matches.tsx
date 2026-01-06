@@ -9,34 +9,38 @@ import {
   Mic, 
   Video, 
   Phone, 
-  Info, 
   ArrowLeft,
   Camera,
   Paperclip,
   X,
   Check,
   CheckCheck,
-  Clock,
   UserPlus,
   Users,
   Filter,
   SortAsc,
-  Menu,
   Sparkles,
-  MapPin
+  MapPin,
+  Heart,
+  User,
+  Clock,
+  ChevronRight,
+  Plus
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
-import { Match, Message } from '@/lib/types';
+import { Match, Friend, Message } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { QuickAddModal } from '@/components/chats/QuickAddModal';
+import { FriendRequestsModal } from '@/components/chats/FriendRequestsModal';
 
-export default function Matches() {
-  const { matches } = useApp();
+export default function Chats() {
+  const { matches, friends } = useApp();
   const { toast } = useToast();
-  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<Match | Friend | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -65,35 +69,33 @@ export default function Matches() {
       read: true,
       type: 'text',
     },
-    {
-      id: '4',
-      chatId: 'match-1',
-      senderId: 'other',
-      text: 'Here\'s the venue location I was thinking about',
-      timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-      read: true,
-      type: 'location',
-    },
   ]);
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [activeTab, setActiveTab] = useState<'messages' | 'requests'>('messages');
+  const [activeTab, setActiveTab] = useState<'matches' | 'friends'>('matches');
   const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showFriendRequests, setShowFriendRequests] = useState(false);
+  const [friendRequestCount] = useState(3); // Mock data
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
-  const audioInputRef = useRef<HTMLInputElement>(null);
+  
+  // Filter based on active tab
+  const filteredItems = activeTab === 'matches' 
+    ? matches.filter(match =>
+        match.matchProfile.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        match.eventName.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : friends.filter(friend =>
+        friend.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        friend.bio?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
 
-  const filteredMatches = matches.filter(match =>
-    match.matchProfile.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    match.eventName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Simulate typing indicator
+  // Typing indicator simulation
   useEffect(() => {
-    if (selectedMatch && Math.random() > 0.7) {
+    if (selectedConversation && Math.random() > 0.7) {
       const typingTimeout = setTimeout(() => {
         setIsTyping(true);
         const stopTypingTimeout = setTimeout(() => {
@@ -103,9 +105,9 @@ export default function Matches() {
       }, 3000);
       return () => clearTimeout(typingTimeout);
     }
-  }, [selectedMatch, messages]);
+  }, [selectedConversation, messages]);
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -116,11 +118,11 @@ export default function Matches() {
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedMatch) return;
+    if (!newMessage.trim() || !selectedConversation) return;
 
     const message: Message = {
       id: crypto.randomUUID(),
-      chatId: selectedMatch.id,
+      chatId: selectedConversation.id,
       senderId: 'me',
       text: newMessage,
       timestamp: new Date().toISOString(),
@@ -131,19 +133,22 @@ export default function Matches() {
     setMessages([...messages, message]);
     setNewMessage('');
 
-    // Simulate reply after 2 seconds
+    // Simulate reply
     setTimeout(() => {
-      const replies = [
-        'That sounds great! 😊',
-        'Would love to catch up more!',
-        'What are you doing this weekend?',
-        'Same! It was such a vibe',
-        'Perfect timing!',
-        'Can\'t wait! 🎶',
-      ];
+      const replies = activeTab === 'matches' 
+        ? [
+            'That sounds great! 😊',
+            'Would love to catch up more!',
+            'What are you doing this weekend?',
+          ]
+        : [
+            'Hey! How was your day?',
+            'Did you check out the new event?',
+            'Want to meet up this weekend?',
+          ];
       const reply: Message = {
         id: crypto.randomUUID(),
-        chatId: selectedMatch.id,
+        chatId: selectedConversation.id,
         senderId: 'other',
         text: replies[Math.floor(Math.random() * replies.length)],
         timestamp: new Date().toISOString(),
@@ -158,11 +163,6 @@ export default function Matches() {
     if (e.key === 'Enter' && !e.shiftKey) {
       handleSendMessage(e);
     }
-  };
-
-  const handleFileUpload = (type: 'image' | 'video' | 'audio') => {
-    const input = type === 'image' ? fileInputRef : type === 'video' ? videoInputRef : audioInputRef;
-    input.current?.click();
   };
 
   const formatTime = (dateString: string) => {
@@ -180,28 +180,15 @@ export default function Matches() {
     return date.toLocaleDateString();
   };
 
-  const isToday = (dateString: string) => {
+  const getMessageDate = (dateString: string) => {
     const date = new Date(dateString);
     const today = new Date();
-    return date.getDate() === today.getDate() &&
-           date.getMonth() === today.getMonth() &&
-           date.getFullYear() === today.getFullYear();
-  };
-
-  const isYesterday = (dateString: string) => {
-    const date = new Date(dateString);
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    return date.getDate() === yesterday.getDate() &&
-           date.getMonth() === yesterday.getMonth() &&
-           date.getFullYear() === yesterday.getFullYear();
-  };
-
-  const getMessageDate = (dateString: string) => {
-    if (isToday(dateString)) return 'Today';
-    if (isYesterday(dateString)) return 'Yesterday';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', 'day': 'numeric' });
+    
+    if (date.toDateString() === today.toDateString()) return 'Today';
+    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   };
 
   // Group messages by date
@@ -215,7 +202,7 @@ export default function Matches() {
   }, {} as Record<string, Message[]>);
 
   const clearChat = () => {
-    if (selectedMatch && window.confirm('Are you sure you want to clear this chat?')) {
+    if (selectedConversation && window.confirm('Are you sure you want to clear this chat?')) {
       setMessages([]);
       toast({
         title: 'Chat cleared',
@@ -225,24 +212,33 @@ export default function Matches() {
     }
   };
 
-  const unmatchUser = () => {
-    if (selectedMatch && window.confirm(`Are you sure you want to unmatch with ${selectedMatch.matchProfile.name}?`)) {
+  const removeConnection = () => {
+    const name = 'matchProfile' in selectedConversation! 
+      ? selectedConversation.matchProfile.name 
+      : selectedConversation!.name;
+    const action = activeTab === 'matches' ? 'unmatch' : 'remove friend';
+    
+    if (selectedConversation && window.confirm(`Are you sure you want to ${action} with ${name}?`)) {
       toast({
-        title: 'Unmatched',
-        description: `You have unmatched with ${selectedMatch.matchProfile.name}`,
+        title: activeTab === 'matches' ? 'Unmatched' : 'Friend removed',
+        description: `You have ${action}ed with ${name}`,
       });
-      setSelectedMatch(null);
+      setSelectedConversation(null);
       setShowMoreOptions(false);
     }
   };
 
   const blockUser = () => {
-    if (selectedMatch && window.confirm(`Are you sure you want to block ${selectedMatch.matchProfile.name}?`)) {
+    const name = 'matchProfile' in selectedConversation! 
+      ? selectedConversation.matchProfile.name 
+      : selectedConversation!.name;
+    
+    if (selectedConversation && window.confirm(`Are you sure you want to block ${name}?`)) {
       toast({
         title: 'User blocked',
-        description: `${selectedMatch.matchProfile.name} has been blocked`,
+        description: `${name} has been blocked`,
       });
-      setSelectedMatch(null);
+      setSelectedConversation(null);
       setShowMoreOptions(false);
     }
   };
@@ -256,65 +252,88 @@ export default function Matches() {
     setShowMoreOptions(false);
   };
 
+  // Calculate unread counts
+  const unreadMatchesCount = matches.filter(m => m.unread).length;
+
   return (
     <div className="app-container min-h-screen bg-background pb-nav">
       {/* Main Layout */}
       <div className="flex h-[calc(100vh-80px)]">
-        {/* Matches List Sidebar */}
+        {/* Chats List Sidebar */}
         <div className={cn(
           "w-full md:w-96 border-r border-border bg-background transition-all duration-300",
-          selectedMatch ? "hidden md:block" : "block"
+          selectedConversation ? "hidden md:block" : "block"
         )}>
           {/* Header */}
           <div className="p-4 border-b border-border">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-bold">Messages</h1>
+              <h1 className="text-2xl font-bold">Chats</h1>
               <div className="flex items-center gap-2">
-                <button className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors">
+                <button 
+                  className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors"
+                  title="Filter conversations"
+                >
                   <Filter className="w-5 h-5" />
                 </button>
-                <button className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors">
+                <button 
+                  className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors"
+                  title="Sort conversations"
+                >
                   <SortAsc className="w-5 h-5" />
                 </button>
-                <button className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors">
-                  <UserPlus className="w-5 h-5 text-primary" />
-                </button>
+                {activeTab === 'friends' && (
+                  <button 
+                    onClick={() => setShowQuickAdd(true)}
+                    className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
+                    title="Quick Add"
+                  >
+                    <Plus className="w-5 h-5 text-primary" />
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 mb-4">
+            <div className="flex mb-4 border-b border-border">
               <button
-                onClick={() => setActiveTab('messages')}
+                onClick={() => setActiveTab('matches')}
                 className={cn(
-                  "flex-1 py-2 rounded-lg text-sm font-medium transition-all",
-                  activeTab === 'messages' 
-                    ? "bg-primary text-primary-foreground" 
-                    : "bg-card hover:bg-card/80"
+                  "flex-1 py-3 text-sm font-medium transition-all relative flex items-center justify-center gap-2",
+                  activeTab === 'matches' 
+                    ? "text-primary" 
+                    : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <div className="flex items-center justify-center">
-                  Messages
-                  {matches.filter(m => m.unread).length > 0 && (
-                    <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                      {matches.filter(m => m.unread).length}
-                    </span>
-                  )}
-                </div>
+                <Heart className={cn("w-4 h-4", activeTab === 'matches' && "fill-primary")} />
+                Matches
+                {unreadMatchesCount > 0 && (
+                  <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center">
+                    {unreadMatchesCount}
+                  </span>
+                )}
+                {activeTab === 'matches' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                )}
               </button>
               <button
-                onClick={() => setActiveTab('requests')}
+                onClick={() => setActiveTab('friends')}
                 className={cn(
-                  "flex-1 py-2 rounded-lg text-sm font-medium transition-all",
-                  activeTab === 'requests' 
-                    ? "bg-primary text-primary-foreground" 
-                    : "bg-card hover:bg-card/80"
+                  "flex-1 py-3 text-sm font-medium transition-all relative flex items-center justify-center gap-2",
+                  activeTab === 'friends' 
+                    ? "text-primary" 
+                    : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <div className="flex items-center justify-center">
-                  Requests
-                  <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">3</span>
-                </div>
+                <User className={cn("w-4 h-4", activeTab === 'friends' && "fill-primary")} />
+                Friends
+                {friendRequestCount > 0 && (
+                  <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center">
+                    {friendRequestCount}
+                  </span>
+                )}
+                {activeTab === 'friends' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                )}
               </button>
             </div>
 
@@ -323,100 +342,150 @@ export default function Matches() {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Search messages..."
+                placeholder={`Search ${activeTab}...`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-10 pl-10 bg-card border-border rounded-lg"
               />
             </div>
+
+            {/* Friend Requests Section (only in friends tab) */}
+            {activeTab === 'friends' && friendRequestCount > 0 && (
+              <div className="mt-4">
+                <button 
+                  onClick={() => setShowFriendRequests(true)}
+                  className="w-full p-3 bg-card hover:bg-card/80 rounded-xl flex items-center justify-between group transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                      <UserPlus className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-semibold text-sm">Friend Requests</h3>
+                      <p className="text-xs text-muted-foreground">
+                        {friendRequestCount} pending request{friendRequestCount !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Matches List */}
+          {/* Conversations List */}
           <div className="overflow-y-auto h-[calc(100vh-200px)]">
-            {activeTab === 'messages' ? (
-              <>
-                {filteredMatches.length > 0 ? (
-                  <div className="divide-y divide-border">
-                    {filteredMatches.map((match) => (
-                      <button
-                        key={match.id}
-                        onClick={() => setSelectedMatch(match)}
-                        className={cn(
-                          "w-full p-4 flex items-center gap-4 hover:bg-card/50 transition-all text-left",
-                          selectedMatch?.id === match.id && "bg-primary/5"
-                        )}
-                      >
-                        <div className="relative">
-                          <img
-                            src={match.matchProfile.photo}
-                            alt={match.matchProfile.name}
-                            className="w-12 h-12 rounded-full object-cover border-2 border-background"
-                          />
-                          {match.online && (
-                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-brand-green rounded-full border-2 border-background" />
+            {filteredItems.length > 0 ? (
+              <div className="divide-y divide-border">
+                {filteredItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setSelectedConversation(item)}
+                    className={cn(
+                      "w-full p-4 flex items-center gap-4 hover:bg-card/50 transition-all text-left",
+                      selectedConversation?.id === item.id && "bg-primary/5"
+                    )}
+                  >
+                    <div className="relative">
+                      <img
+                        src={'matchProfile' in item ? item.matchProfile.photo : item.photo}
+                        alt={'matchProfile' in item ? item.matchProfile.name : item.name}
+                        className="w-12 h-12 rounded-full object-cover border-2 border-background"
+                      />
+                      {item.online && (
+                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-brand-green rounded-full border-2 border-background" />
+                      )}
+                      {/* Event badge for matches */}
+                      {'eventName' in item && item.eventName && (
+                        <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-primary/90 border-2 border-background flex items-center justify-center">
+                          <span className="text-xs font-bold text-white">E</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="font-semibold text-sm">
+                          {'matchProfile' in item ? item.matchProfile.name : item.name}
+                        </h3>
+                        <span className="text-xs text-muted-foreground">
+                          {formatTime(item.lastMessageTime)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate mb-1">
+                        {item.lastMessage || 'Say hi 👋'}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        {activeTab === 'matches' && 'eventName' in item ? (
+                          <span className="text-xs text-primary px-2 py-0.5 bg-primary/10 rounded-full">
+                            {item.eventName}
+                          </span>
+                        ) : activeTab === 'friends' && 'mutualFriends' in item ? (
+                          <span className="text-xs text-muted-foreground">
+                            {item.mutualFriends} mutual friend{item.mutualFriends !== 1 ? 's' : ''}
+                          </span>
+                        ) : null}
+                        <div className="flex items-center gap-1">
+                          {item.unread && (
+                            <span className="w-2 h-2 rounded-full bg-primary" />
+                          )}
+                          {'read' in item && item.read && (
+                            <CheckCheck className="w-3 h-3 text-blue-500" />
                           )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <h3 className="font-semibold text-sm">{match.matchProfile.name}</h3>
-                            <span className="text-xs text-muted-foreground">
-                              {formatTime(match.lastMessageTime)}
-                            </span>
-                          </div>
-                          <p className="text-sm text-muted-foreground truncate mb-1">
-                            {match.lastMessage || 'Say hi 👋'}
-                          </p>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-primary px-2 py-0.5 bg-primary/10 rounded-full">
-                              {match.eventName}
-                            </span>
-                            {match.unread && (
-                              <span className="w-2 h-2 rounded-full bg-primary" />
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-16 px-4">
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16 px-4">
+                {activeTab === 'matches' ? (
+                  <>
                     <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                      <MessageCircle className="w-10 h-10 text-primary" />
+                      <Heart className="w-10 h-10 text-primary" />
                     </div>
                     <h3 className="text-xl font-bold mb-2">No Matches Yet</h3>
                     <p className="text-muted-foreground text-sm mb-6">
-                      Check in at events and start swiping to connect!
+                      Visit the Connect page to start meeting people at events!
+                      You'll see matches here once someone likes you back.
                     </p>
                     <Button className="gradient-pro glow-purple rounded-lg">
                       <Sparkles className="w-4 h-4 mr-2" />
-                      Browse Events
+                      Go to Connect
                     </Button>
-                  </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-20 h-20 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-4">
+                      <Users className="w-10 h-10 text-blue-500" />
+                    </div>
+                    <h3 className="text-xl font-bold mb-2">Build Your Network</h3>
+                    <p className="text-muted-foreground text-sm mb-6">
+                      Add friends to see their event plans, chat anytime,
+                      and make the most of your social experiences!
+                    </p>
+                    <Button 
+                      onClick={() => setShowQuickAdd(true)}
+                      className="gradient-pro glow-purple rounded-lg"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Quick Add Friends
+                    </Button>
+                  </>
                 )}
-              </>
-            ) : (
-              <div className="p-4">
-                <h3 className="font-semibold mb-4">Connection Requests</h3>
-                <div className="space-y-3">
-                  {/* Request items would go here */}
-                  <div className="text-center py-8">
-                    <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground">No pending requests</p>
-                  </div>
-                </div>
               </div>
             )}
           </div>
         </div>
 
         {/* Chat Area */}
-        {selectedMatch ? (
+        {selectedConversation ? (
           <div className="flex-1 flex flex-col bg-background">
             {/* Chat Header */}
             <div className="flex items-center justify-between p-4 border-b border-border">
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setSelectedMatch(null)}
+                  onClick={() => setSelectedConversation(null)}
                   className="md:hidden w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors"
                 >
                   <ArrowLeft className="w-5 h-5" />
@@ -424,18 +493,20 @@ export default function Matches() {
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <img
-                      src={selectedMatch.matchProfile.photo}
-                      alt={selectedMatch.matchProfile.name}
+                      src={'matchProfile' in selectedConversation ? selectedConversation.matchProfile.photo : selectedConversation.photo}
+                      alt={'matchProfile' in selectedConversation ? selectedConversation.matchProfile.name : selectedConversation.name}
                       className="w-10 h-10 rounded-full object-cover"
                     />
-                    {selectedMatch.online && (
+                    {selectedConversation.online && (
                       <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-brand-green rounded-full border-2 border-background" />
                     )}
                   </div>
                   <div>
-                    <h3 className="font-semibold">{selectedMatch.matchProfile.name}</h3>
+                    <h3 className="font-semibold">
+                      {'matchProfile' in selectedConversation ? selectedConversation.matchProfile.name : selectedConversation.name}
+                    </h3>
                     <p className="text-xs text-muted-foreground">
-                      {selectedMatch.online ? 'Online' : `Last seen ${formatTime(selectedMatch.lastMessageTime)}`}
+                      {selectedConversation.online ? 'Online' : `Active ${formatTime(selectedConversation.lastMessageTime)}`}
                     </p>
                   </div>
                 </div>
@@ -458,7 +529,24 @@ export default function Matches() {
                   
                   {/* More Options Dropdown */}
                   {showMoreOptions && (
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-card border border-border rounded-xl shadow-lg z-10 py-2">
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-card border border-border rounded-xl shadow-lg z-10 py-2">
+                      <button 
+                        onClick={() => {/* View Profile */}}
+                        className="w-full px-4 py-3 text-left hover:bg-card/50 text-sm flex items-center gap-3"
+                      >
+                        <User className="w-4 h-4" />
+                        View Profile
+                      </button>
+                      {activeTab === 'matches' && (
+                        <button 
+                          onClick={() => {/* Set custom name */}}
+                          className="w-full px-4 py-3 text-left hover:bg-card/50 text-sm flex items-center gap-3"
+                        >
+                          <span className="w-4 h-4 text-lg">🖊️</span>
+                          Nicknames
+                        </button>
+                      )}
+                      <div className="border-t border-border my-1" />
                       <button 
                         onClick={markAsRead}
                         className="w-full px-4 py-3 text-left hover:bg-card/50 text-sm flex items-center gap-3"
@@ -475,11 +563,11 @@ export default function Matches() {
                       </button>
                       <div className="border-t border-border my-1" />
                       <button 
-                        onClick={unmatchUser}
-                        className="w-full px-4 py-3 text-left hover:bg-card/50 text-sm flex items-center gap-3 text-red-500"
+                        onClick={removeConnection}
+                        className="w-full px-4 py-3 text-left hover:bg-card/50 text-sm flex items-center gap-3 text-amber-600"
                       >
                         <UserPlus className="w-4 h-4 rotate-45" />
-                        Unmatch
+                        {activeTab === 'matches' ? 'Unmatch' : 'Remove Friend'}
                       </button>
                       <button 
                         onClick={blockUser}
@@ -524,14 +612,7 @@ export default function Matches() {
                                 : 'bg-card rounded-bl-md'
                             )}
                           >
-                            {message.type === 'text' ? (
-                              <p className="text-sm whitespace-pre-wrap">{message.text}</p>
-                            ) : message.type === 'location' ? (
-                              <div className="flex items-center gap-2">
-                                <MapPin className="w-4 h-4" />
-                                <span className="text-sm">Venue Location</span>
-                              </div>
-                            ) : null}
+                            <p className="text-sm whitespace-pre-wrap">{message.text}</p>
                           </div>
                           
                           {/* Message Status and Time */}
@@ -558,13 +639,16 @@ export default function Matches() {
               ))}
 
               {/* Typing Indicator */}
-              {isTyping && selectedMatch && (
+              {isTyping && selectedConversation && (
                 <div className="flex justify-start">
                   <div className="bg-card rounded-2xl rounded-bl-md px-4 py-3">
-                    <div className="flex gap-1">
+                    <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse" />
                       <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse delay-150" />
                       <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse delay-300" />
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {'matchProfile' in selectedConversation ? selectedConversation.matchProfile.name : selectedConversation.name} is typing...
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -580,7 +664,7 @@ export default function Matches() {
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => handleFileUpload('image')}
+                    onClick={() => fileInputRef.current?.click()}
                     className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors"
                   >
                     <Paperclip className="w-5 h-5" />
@@ -588,14 +672,14 @@ export default function Matches() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/*"
                     multiple
                     className="hidden"
                     onChange={(e) => {
                       if (e.target.files?.length) {
                         toast({
-                          title: 'Image uploaded',
-                          description: 'Image ready to send',
+                          title: 'Media uploaded',
+                          description: 'Ready to send',
                         });
                       }
                     }}
@@ -664,10 +748,11 @@ export default function Matches() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => {/* Share event */}}
                   className="px-3 py-1.5 bg-card text-foreground rounded-full text-xs font-medium flex items-center gap-1 whitespace-nowrap"
                 >
-                  <Paperclip className="w-3 h-3" />
-                  File
+                  <Sparkles className="w-3 h-3" />
+                  Share Event
                 </button>
                 <button
                   type="button"
@@ -687,26 +772,42 @@ export default function Matches() {
             </div>
             <h3 className="text-2xl font-bold mb-2">Your Messages</h3>
             <p className="text-muted-foreground text-center mb-8 max-w-md">
-              Select a conversation from the list to start chatting, 
-              or connect with new people at events!
+              {activeTab === 'matches' 
+                ? 'Select a match to start chatting, or visit Connect to meet new people!'
+                : 'Select a friend to chat, or add new friends to grow your network!'}
             </p>
             <div className="flex gap-3">
               <Button className="rounded-lg bg-card hover:bg-card/80">
-                <Users className="w-4 h-4 mr-2" />
-                Browse Events
-              </Button>
-              <Button className="rounded-lg gradient-pro glow-purple">
                 <Sparkles className="w-4 h-4 mr-2" />
-                Find Matches
+                {activeTab === 'matches' ? 'Browse Events' : 'Find Friends'}
+              </Button>
+              <Button 
+                onClick={() => activeTab === 'friends' && setShowQuickAdd(true)}
+                className={cn(
+                  "rounded-lg",
+                  activeTab === 'matches' 
+                    ? "gradient-pro glow-purple" 
+                    : "bg-blue-500 hover:bg-blue-600"
+                )}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                {activeTab === 'matches' ? 'Find Matches' : 'Add Friend'}
               </Button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Hidden file inputs */}
-      <input ref={videoInputRef} type="file" accept="video/*" className="hidden" />
-      <input ref={audioInputRef} type="file" accept="audio/*" className="hidden" />
+      {/* Modals */}
+      <QuickAddModal 
+        isOpen={showQuickAdd}
+        onClose={() => setShowQuickAdd(false)}
+      />
+      <FriendRequestsModal 
+        isOpen={showFriendRequests}
+        onClose={() => setShowFriendRequests(false)}
+        requestCount={friendRequestCount}
+      />
 
       <BottomNav />
     </div>
