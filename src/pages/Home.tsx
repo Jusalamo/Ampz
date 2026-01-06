@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { QrCode, Map, Plus, Ticket, Calendar, Users, Heart, ChevronRight, ChevronLeft, Bell, Zap, Bookmark, Star } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
-import { EventCard } from '@/components/EventCard';
 import { CheckInModal } from '@/components/modals/CheckInModal';
 import { TicketsModal } from '@/components/modals/TicketsModal';
 import { EventWizardModal } from '@/components/modals/EventWizardModal';
@@ -26,7 +25,6 @@ export default function Home() {
   const [showSubscription, setShowSubscription] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const featuredRef = useRef<HTMLDivElement>(null);
-  const myEventsRef = useRef<HTMLDivElement>(null);
   const myEventsCarouselRef = useRef<HTMLDivElement>(null);
 
   // Get all user events (created + bookmarked)
@@ -372,7 +370,7 @@ export default function Home() {
 
         {/* Featured Events - Carousel */}
         {featuredEvents.length > 0 && (
-          <section className="mb-6"> {/* Reduced margin from bottom */}
+          <section className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <Star className="w-5 h-5 text-yellow-500" />
@@ -415,11 +413,11 @@ export default function Home() {
                           </div>
                         </div>
                         <div className="absolute bottom-3 left-3 bg-black/70 text-white text-sm px-3 py-1 rounded">
-                          {event.attendees} attendees
+                          {event.attendees} going
                         </div>
                       </div>
                       
-                      {/* Event Details */}
+                      {/* Event Details - Removed host info and check-in button */}
                       <div className="p-4">
                         <div className="flex items-start justify-between mb-2">
                           <h3 className="text-lg font-bold line-clamp-1">{event.name}</h3>
@@ -437,26 +435,16 @@ export default function Home() {
                           </span>
                         </div>
                         
-                        <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+                        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
                           {event.description || 'Join this amazing event!'}
                         </p>
                         
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full overflow-hidden">
-                              <img 
-                                src={event.organizerId === user?.id ? user.profile.profilePhoto : '/default-avatar.png'} 
-                                alt="Organizer"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                              {event.organizerId === user?.id ? 'You' : 'Host'} • {event.location}
-                            </span>
-                          </div>
-                          <button className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors">
-                            Check In
-                          </button>
+                        {/* Location only */}
+                        <div className="flex items-center gap-2 pt-3 border-t border-border">
+                          <Map className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground line-clamp-1">
+                            {event.location}
+                          </span>
                         </div>
                       </div>
                     </div>
