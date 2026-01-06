@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Search, SlidersHorizontal, Plus, MapPin, X, Calendar, Clock, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, SlidersHorizontal, Plus, MapPin, X, Calendar, Clock } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { EventCard } from './EventCard';
 import { Input } from './ui/input';
@@ -40,15 +40,12 @@ interface MapDrawerProps {
 
 type DrawerPosition = 'minimum' | 'half' | 'full';
 
-// Updated snap positions
+// Updated snap positions - drawer covers entire screen in full state
 const SNAP_POSITIONS = {
   minimum: 0.75,   // 25% from bottom - shows most of map
   half: 0.5,       // 50% visible
-  full: 0,         // FULL SCREEN - 0% from top
+  full: 0,         // Covers entire screen (handle at top)
 };
-
-// Bottom navbar height in percentage
-const BOTTOM_NAVBAR_HEIGHT = 0.08;
 
 export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const navigate = useNavigate();
@@ -62,6 +59,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const [searchSuggestions, setSearchSuggestions] = useState<Event[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+  const [eventCards3D, setEventCards3D] = useState<Map<string, HTMLDivElement>>(new Map());
   
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -71,8 +69,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const dragStartY = useRef(0);
   const currentTranslate = useRef(0);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
-  // Store card elements for 3D markers
-  const markerCardsRef = useRef<{ [key: string]: HTMLDivElement }>({});
+  const cardMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
 
   const categories = ['All', 'Music', 'Tech', 'Party', 'Art', 'Food', 'Sports'];
 
@@ -116,12 +113,11 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         style: 'mapbox://styles/mapbox/streets-v12',
         center: [17.0658, -22.5609], // Windhoek
         zoom: 12,
-        pitch: 60, // More 3D tilt
+        pitch: 45,
         bearing: -17.6,
         antialias: true,
         attributionControl: false,
         optimizeForTerrain: true,
-        interactive: true,
       });
 
       // Hide map loading tiles
@@ -149,20 +145,14 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         }, 1000);
 
         updateEventMarkers();
-        
-        // Listen for map movement to update 3D card positions
-        map.current!.on('move', updateCardPositions);
-        map.current!.on('zoom', updateCardPositions);
-        map.current!.on('pitch', updateCardPositions);
       });
 
-      // Handle map click to close popup
-      map.current.on('click', () => {
-        if (popupRef.current) {
-          popupRef.current.remove();
-          popupRef.current = null;
-          removeGeofenceCircle();
-          setSelectedEvent(null);
+      // Handle map click to clear selection
+      map.current.on('click', (e) => {
+        // Only clear if clicking on the map (not on markers)
+        const target = e.originalEvent.target as HTMLElement;
+        if (!target.closest('.event-marker') && !target.closest('.event-card-3d')) {
+          clearEventSelection();
         }
       });
 
@@ -200,22 +190,13 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       markersRef.current.forEach(marker => marker.remove());
       markersRef.current = [];
       
-      // Clean up card elements
-      Object.values(markerCardsRef.current).forEach(card => {
-        if (card.parentNode) {
-          card.parentNode.removeChild(card);
-        }
-      });
-      markerCardsRef.current = {};
+      // Clean up 3D card markers
+      cardMarkersRef.current.forEach(marker => marker.remove());
+      cardMarkersRef.current.clear();
       
       if (userMarkerRef.current) {
         userMarkerRef.current.remove();
         userMarkerRef.current = null;
-      }
-      
-      if (popupRef.current) {
-        popupRef.current.remove();
-        popupRef.current = null;
       }
       
       if (map.current) {
@@ -225,6 +206,16 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     };
   }, []);
 
+  // Clear event selection
+  const clearEventSelection = () => {
+    setSelectedEvent(null);
+    removeGeofenceCircle();
+    // Remove all 3D card markers
+    cardMarkersRef.current.forEach(marker => marker.remove());
+    cardMarkersRef.current.clear();
+    setEventCards3D(new Map());
+  };
+
   // Update event markers when events change
   useEffect(() => {
     if (map.current && mapReady) {
@@ -232,174 +223,154 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     }
   }, [events, selectedCategory, filteredEvents, mapReady]);
 
-  // Update card positions on map movement
-  const updateCardPositions = useCallback(() => {
-    if (!map.current || !mapReady) return;
-    
-    Object.entries(markerCardsRef.current).forEach(([eventId, cardElement]) => {
-      const event = events.find(e => e.id === eventId);
-      if (!event) return;
-      
-      const { lng, lat } = event.coordinates;
-      const point = map.current!.project([lng, lat]);
-      
-      // Position card above marker
-      cardElement.style.position = 'absolute';
-      cardElement.style.left = `${point.x}px`;
-      cardElement.style.top = `${point.y - 180}px`; // Position above marker
-      cardElement.style.transform = 'translateX(-50%)';
-      cardElement.style.zIndex = '1000';
-      cardElement.style.pointerEvents = 'auto';
-      
-      // Add 3D perspective based on map pitch
-      const pitch = map.current!.getPitch();
-      cardElement.style.transform += ` perspective(1000px) rotateX(${pitch * 0.2}deg)`;
-    });
-  }, [mapReady, events]);
-
   const updateEventMarkers = () => {
     if (!map.current || !mapReady) return;
     
-    // Clear existing markers and cards
+    // Clear existing markers (except user marker)
     markersRef.current.forEach(marker => {
       if (marker !== userMarkerRef.current) {
         marker.remove();
       }
     });
     markersRef.current = userMarkerRef.current ? [userMarkerRef.current] : [];
-    
-    // Clean up old cards
-    Object.values(markerCardsRef.current).forEach(card => {
-      if (card.parentNode === mapContainer.current) {
-        card.parentNode.removeChild(card);
-      }
-    });
-    markerCardsRef.current = {};
 
-    // Add markers and cards for filtered events
+    // Add markers for filtered events
     filteredEvents.forEach((event) => {
-      // Create marker element
       const markerEl = document.createElement('div');
       markerEl.className = 'event-marker cursor-pointer group';
       markerEl.innerHTML = `
-        <div class="relative transform transition-all duration-200 hover:scale-125 hover:z-50">
-          <div class="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 border-white/80 transition-all duration-200 hover:border-white hover:shadow-xl"
+        <div class="relative transform transition-transform duration-200 hover:scale-110">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 border-white"
                style="background-color: ${event.customTheme || '#8B5CF6'};">
             ${event.isFeatured ? 
               '<svg class="w-5 h-5 text-yellow-300" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>' : 
               '<div class="w-4 h-4 bg-white/40 rounded-full"></div>'}
           </div>
-          <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-3 h-3 rotate-45 border-t border-l border-white/30"
-               style="background-color: ${event.customTheme || '#8B5CF6'};"></div>
         </div>
       `;
 
-      // Create 3D card element
-      const cardElement = document.createElement('div');
-      cardElement.className = 'absolute hidden transition-all duration-300 opacity-0 scale-95';
-      cardElement.innerHTML = `
-        <div class="bg-background rounded-xl shadow-2xl border border-border overflow-hidden w-64 transform-gpu" 
-             style="border-color: ${event.customTheme || '#8B5CF6'}40;">
-          <div class="flex items-start gap-3 p-3">
-            <img src="${event.coverImage}" alt="${event.name}" 
-                 class="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
-            <div class="flex-1 min-w-0 py-1">
-              <h3 class="font-bold text-sm line-clamp-1">${event.name}</h3>
-              <div class="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                </svg>
-                <span>${event.date}</span>
-              </div>
-              <div class="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                </svg>
-                <span class="line-clamp-1">${event.location}</span>
-              </div>
-              <div class="flex items-center justify-between mt-2">
-                <span class="text-xs font-semibold" style="color: ${event.customTheme || '#8B5CF6'}">
-                  ${event.price === 0 ? 'FREE' : `N$${event.price}`}
-                </span>
-                <button class="h-6 px-2 text-xs rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
-                  View
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      // Add card to map container
-      if (mapContainer.current) {
-        mapContainer.current.appendChild(cardElement);
-        markerCardsRef.current[event.id] = cardElement;
-      }
-
-      const marker = new mapboxgl.Marker(markerEl)
+      const marker = new mapboxgl.Marker({
+        element: markerEl,
+        anchor: 'bottom'
+      })
         .setLngLat([event.coordinates.lng, event.coordinates.lat])
         .addTo(map.current!);
 
-      // Show/hide card on marker hover
-      markerEl.addEventListener('mouseenter', (e) => {
-        e.stopPropagation();
-        cardElement.classList.remove('hidden', 'opacity-0', 'scale-95');
-        cardElement.classList.add('opacity-100', 'scale-100');
-        updateCardPositions(); // Update position
-      });
-
-      markerEl.addEventListener('mouseleave', (e) => {
-        e.stopPropagation();
-        cardElement.classList.remove('opacity-100', 'scale-100');
-        cardElement.classList.add('opacity-0', 'scale-95');
-        setTimeout(() => {
-          if (!cardElement.classList.contains('opacity-100')) {
-            cardElement.classList.add('hidden');
-          }
-        }, 300);
-      });
-
       markerEl.addEventListener('click', (e) => {
         e.stopPropagation();
-        
-        if (popupRef.current) {
-          popupRef.current.remove();
-        }
-        removeGeofenceCircle();
-        
-        setSelectedEvent(event);
-        addGeofenceCircle(event);
-        
-        // Fly to event with 3D effect
-        map.current?.flyTo({
-          center: [event.coordinates.lng, event.coordinates.lat],
-          zoom: 15,
-          pitch: 60,
-          duration: 1000,
-          essential: true,
-        });
-        
-        // Hide all other cards
-        Object.values(markerCardsRef.current).forEach(card => {
-          if (card !== cardElement) {
-            card.classList.remove('opacity-100', 'scale-100');
-            card.classList.add('opacity-0', 'scale-95', 'hidden');
-          }
-        });
-      });
-
-      // Card click handler
-      cardElement.querySelector('button')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        handleEventCardClick(event);
+        handleEventMarkerClick(event);
       });
 
       markersRef.current.push(marker);
     });
+  };
+
+  const handleEventMarkerClick = (event: Event) => {
+    // Clear previous selection
+    clearEventSelection();
     
-    // Initial card position update
-    setTimeout(updateCardPositions, 100);
+    // Set new selection
+    setSelectedEvent(event);
+    addGeofenceCircle(event);
+    add3DEventCard(event);
+    
+    // Fly to event location
+    map.current?.flyTo({
+      center: [event.coordinates.lng, event.coordinates.lat],
+      zoom: 15,
+      pitch: 60,
+      duration: 800,
+    });
+  };
+
+  const add3DEventCard = (event: Event) => {
+    if (!map.current || !mapReady) return;
+
+    // Create 3D card element
+    const cardEl = document.createElement('div');
+    cardEl.className = 'event-card-3d absolute transform -translate-x-1/2 -translate-y-full';
+    cardEl.style.width = '280px';
+    cardEl.style.zIndex = '1000';
+    
+    cardEl.innerHTML = `
+      <div class="bg-background rounded-2xl shadow-2xl border border-border overflow-hidden">
+        <div class="flex items-start gap-3 p-3">
+          <img 
+            src="${event.coverImage}" 
+            alt="${event.name}"
+            class="w-20 h-20 rounded-xl object-cover flex-shrink-0"
+          />
+          <div class="flex-1 min-w-0 py-1">
+            <div class="flex items-start justify-between gap-2">
+              <h3 class="font-bold text-sm line-clamp-1">${event.name}</h3>
+              <button class="w-6 h-6 rounded-full bg-card flex items-center justify-center flex-shrink-0 close-3d-card">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              </svg>
+              <span>${event.date}</span>
+              <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span>${event.time}</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+              <span class="line-clamp-1">${event.location}</span>
+            </div>
+            <div class="flex items-center justify-between mt-2">
+              <span class="text-xs font-semibold" style="color: ${event.customTheme || '#8B5CF6'}">
+                ${event.price === 0 ? 'FREE' : `N$${event.price}`}
+              </span>
+              <button class="h-7 px-3 text-xs bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors view-event-btn">
+                View Event
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Create marker for the 3D card
+    const cardMarker = new mapboxgl.Marker({
+      element: cardEl,
+      anchor: 'bottom',
+      offset: [0, -20] // Position above the pin
+    })
+      .setLngLat([event.coordinates.lng, event.coordinates.lat])
+      .addTo(map.current!);
+
+    // Store reference
+    cardMarkersRef.current.set(event.id, cardMarker);
+    setEventCards3D(prev => new Map(prev).set(event.id, cardEl));
+
+    // Add event listeners to the 3D card
+    setTimeout(() => {
+      const closeBtn = cardEl.querySelector('.close-3d-card');
+      const viewBtn = cardEl.querySelector('.view-event-btn');
+      
+      if (closeBtn) {
+        closeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          clearEventSelection();
+        });
+      }
+      
+      if (viewBtn) {
+        viewBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          handleEventCardClick(event);
+        });
+      }
+    }, 10);
   };
 
   const addGeofenceCircle = (event: Event) => {
@@ -418,7 +389,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     }
     coords.push(coords[0]);
 
-    const sourceId = `geofence-active`;
+    const sourceId = `geofence-${event.id}`;
     
     if (map.current.getSource(sourceId)) {
       (map.current.getSource(sourceId) as mapboxgl.GeoJSONSource).setData({
@@ -462,32 +433,23 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const removeGeofenceCircle = () => {
     if (!map.current || !mapReady) return;
     
-    const sourceId = 'geofence-active';
-    if (map.current.getLayer(`${sourceId}-fill`)) {
-      map.current.removeLayer(`${sourceId}-fill`);
-    }
-    if (map.current.getLayer(`${sourceId}-line`)) {
-      map.current.removeLayer(`${sourceId}-line`);
-    }
-    if (map.current.getSource(sourceId)) {
-      map.current.removeSource(sourceId);
-    }
+    // Remove all geofence circles
+    events.forEach(event => {
+      const sourceId = `geofence-${event.id}`;
+      if (map.current!.getLayer(`${sourceId}-fill`)) {
+        map.current!.removeLayer(`${sourceId}-fill`);
+      }
+      if (map.current!.getLayer(`${sourceId}-line`)) {
+        map.current!.removeLayer(`${sourceId}-line`);
+      }
+      if (map.current!.getSource(sourceId)) {
+        map.current!.removeSource(sourceId);
+      }
+    });
   };
 
   const handleEventCardClick = (event: Event) => {
     navigate(`/event/${event.id}`);
-  };
-
-  const closeEventCard = () => {
-    setSelectedEvent(null);
-    removeGeofenceCircle();
-    if (map.current) {
-      map.current.flyTo({
-        zoom: 12,
-        pitch: 60,
-        duration: 500,
-      });
-    }
   };
 
   const getDrawerHeight = () => {
@@ -497,7 +459,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
   const snapToPosition = useCallback((percentage: number): DrawerPosition => {
     if (percentage > 0.6) return 'minimum';
-    if (percentage > 0.2) return 'half';
+    if (percentage > 0.25) return 'half';
     return 'full';
   }, []);
 
@@ -511,7 +473,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     if (!isDragging) return;
     
     const deltaY = clientY - dragStartY.current;
-    // Allow dragging up to full screen (0) but not below minimum
+    // Allow dragging up to full screen coverage
     const maxTranslate = getDrawerHeight() * SNAP_POSITIONS.minimum;
     const minTranslate = getDrawerHeight() * SNAP_POSITIONS.full;
     
@@ -569,22 +531,6 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     };
   }, [isDragging, dragOffset]);
 
-  // Update card positions when map moves
-  useEffect(() => {
-    if (map.current && mapReady) {
-      const updateOnMove = () => updateCardPositions();
-      map.current.on('move', updateOnMove);
-      map.current.on('zoom', updateOnMove);
-      map.current.on('pitch', updateOnMove);
-      
-      return () => {
-        map.current?.off('move', updateOnMove);
-        map.current?.off('zoom', updateOnMove);
-        map.current?.off('pitch', updateOnMove);
-      };
-    }
-  }, [mapReady, updateCardPositions]);
-
   const translateY = SNAP_POSITIONS[drawerPosition] * getDrawerHeight() + dragOffset;
   const isPro = user?.subscription?.tier === 'pro' || user?.subscription?.tier === 'max';
 
@@ -597,70 +543,16 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         style={{ zIndex: 0 }}
       />
       
-      {/* Optional: Map attribution in corner */}
-      <div className="absolute bottom-16 right-2 z-10 text-xs text-white/70 bg-black/30 px-2 py-1 rounded backdrop-blur-sm">
+      {/* Map attribution */}
+      <div className="absolute bottom-4 right-2 z-10 text-xs text-white/70 bg-black/30 px-2 py-1 rounded">
         © Mapbox © OpenStreetMap
       </div>
-
-      {/* Event Card Popup - Shows when event selected on map */}
-      {selectedEvent && (
-        <div 
-          className="absolute bottom-24 left-4 right-4 z-30 animate-slide-up"
-          style={{ maxWidth: '400px', margin: '0 auto' }}
-        >
-          <div className="bg-background rounded-2xl shadow-2xl border border-border overflow-hidden">
-            <div className="flex items-start gap-3 p-3">
-              <img 
-                src={selectedEvent.coverImage} 
-                alt={selectedEvent.name}
-                className="w-20 h-20 rounded-xl object-cover flex-shrink-0"
-              />
-              <div className="flex-1 min-w-0 py-1">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-bold text-sm line-clamp-1">{selectedEvent.name}</h3>
-                  <button 
-                    onClick={closeEventCard}
-                    className="w-6 h-6 rounded-full bg-card flex items-center justify-center flex-shrink-0 hover:bg-card/80 transition-colors"
-                    aria-label="Close event details"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                  <Calendar className="w-3 h-3" />
-                  <span>{selectedEvent.date}</span>
-                  <Clock className="w-3 h-3 ml-1" />
-                  <span>{selectedEvent.time}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                  <MapPin className="w-3 h-3" />
-                  <span className="line-clamp-1">{selectedEvent.location}</span>
-                </div>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs font-semibold" style={{ color: selectedEvent.customTheme || '#8B5CF6' }}>
-                    {selectedEvent.price === 0 ? 'FREE' : `N$${selectedEvent.price}`}
-                  </span>
-                  <Button 
-                    size="sm" 
-                    className="h-7 text-xs px-3"
-                    onClick={() => handleEventCardClick(selectedEvent)}
-                    aria-label={`View details for ${selectedEvent.name}`}
-                  >
-                    View Event
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Drawer - Events list that slides up from bottom */}
       <div
         ref={drawerRef}
         className={cn(
-          'absolute left-0 right-0 bg-background shadow-2xl z-20 flex flex-col',
-          drawerPosition === 'full' ? 'h-screen rounded-none' : 'rounded-t-3xl border-t border-border',
+          'absolute left-0 right-0 bg-background rounded-t-3xl shadow-2xl z-20 flex flex-col border-t border-border',
           isDragging ? '' : 'transition-transform duration-300 ease-out'
         )}
         style={{
@@ -669,12 +561,9 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
           touchAction: 'none',
         }}
       >
-        {/* Drawer Handle - Visible even in full screen */}
+        {/* Drawer Handle - Always visible at top when drawer is up */}
         <div
-          className={cn(
-            "flex flex-col items-center cursor-grab active:cursor-grabbing select-none",
-            drawerPosition === 'full' ? "pt-6 pb-4 bg-background" : "pt-3 pb-2"
-          )}
+          className="flex flex-col items-center pt-3 pb-2 cursor-grab active:cursor-grabbing select-none bg-background rounded-t-3xl"
           role="button"
           tabIndex={0}
           aria-label={`Drawer position: ${drawerPosition}. Drag to adjust.`}
@@ -689,24 +578,14 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
           onMouseDown={handleMouseDown}
         >
           <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full" />
-          <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-            {drawerPosition === 'full' ? (
-              <>
-                <ChevronDown className="w-3 h-3" />
-                Swipe down to minimize
-              </>
-            ) : drawerPosition === 'minimum' ? (
-              <>
-                <ChevronUp className="w-3 h-3" />
-                {filteredEvents.length} events nearby - Swipe up for details
-              </>
-            ) : (
-              'Swipe up or down'
-            )}
+          <p className="text-xs text-muted-foreground mt-2">
+            {drawerPosition === 'minimum' ? `${filteredEvents.length} events nearby - Swipe up` : 
+             drawerPosition === 'full' ? 'Swipe down for map' : 
+             'Swipe up or down'}
           </p>
         </div>
 
-        {/* Drawer Content - Shows when not minimized */}
+        {/* Drawer Content - Only shows when not minimized */}
         {drawerPosition !== 'minimum' && (
           <div className="flex-1 flex flex-col px-4 overflow-hidden">
             {/* Search and Create Row */}
@@ -720,7 +599,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                   onChange={(e) => setSearch(e.target.value)}
                   onFocus={() => setShowSuggestions(true)}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  className="pl-10 h-10 bg-card border-border rounded-xl focus:border-primary"
+                  className="pl-10 h-10 bg-card border-border rounded-xl"
                   aria-label="Search events"
                 />
                 
@@ -730,11 +609,11 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                     {searchSuggestions.map(event => (
                       <button
                         key={event.id}
-                        className="w-full px-3 py-2 text-left hover:bg-card flex items-center gap-2 transition-colors"
+                        className="w-full px-3 py-2 text-left hover:bg-card flex items-center gap-2"
                         onMouseDown={() => {
                           setSearch(event.name);
                           setShowSuggestions(false);
-                          handleEventCardClick(event);
+                          handleEventMarkerClick(event);
                         }}
                         aria-label={`Select event: ${event.name}`}
                       >
@@ -761,7 +640,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                 <Button
                   size="sm"
                   onClick={onCreateEvent}
-                  className="h-10 px-3 rounded-xl relative hover:scale-105 transition-transform"
+                  className="h-10 px-3 rounded-xl relative"
                   aria-label="Create new event"
                 >
                   <Plus className="w-4 h-4" />
@@ -783,8 +662,8 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                   className={cn(
                     'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all',
                     selectedCategory === category
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'bg-card text-muted-foreground hover:text-foreground border border-border hover:border-primary/50'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-card text-muted-foreground hover:text-foreground border border-border'
                   )}
                   aria-label={`Filter by ${category}`}
                   aria-pressed={selectedCategory === category}
@@ -818,14 +697,40 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         )}
       </div>
 
-      {/* Bottom Navbar Space (simulated) */}
-      <div 
-        className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/50 to-transparent pointer-events-none z-10"
-        style={{ height: `${BOTTOM_NAVBAR_HEIGHT * 100}%` }}
-      />
-
-      {/* Custom CSS for 3D effects and scrollbars */}
-      <style jsx>{`
+      {/* Custom CSS for 3D cards and scrollbars */}
+      <style jsx global>{`
+        .event-card-3d {
+          pointer-events: auto;
+          animation: float-up 0.3s ease-out;
+        }
+        
+        .event-card-3d .close-3d-card:hover {
+          background-color: rgba(0, 0, 0, 0.1);
+        }
+        
+        .event-card-3d .view-event-btn:hover {
+          opacity: 0.9;
+        }
+        
+        @keyframes float-up {
+          from {
+            opacity: 0;
+            transform: translate(-50%, -80%) scale(0.9);
+          }
+          to {
+            opacity: 1;
+            transform: translate(-50%, -100%) scale(1);
+          }
+        }
+        
+        .event-marker {
+          filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+        }
+        
+        .user-marker {
+          filter: drop-shadow(0 4px 8px rgba(59, 130, 246, 0.5));
+        }
+        
         .no-scrollbar::-webkit-scrollbar {
           display: none;
         }
@@ -846,12 +751,15 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: #555;
         }
-        .event-marker {
-          filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+        
+        /* Ensure map markers are above map tiles */
+        .mapboxgl-marker {
+          z-index: 1;
         }
-        .event-marker:hover {
-          filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.4));
-          z-index: 1001 !important;
+        
+        /* Make 3D cards appear above regular markers */
+        .event-card-3d {
+          z-index: 1000 !important;
         }
       `}</style>
     </div>
