@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { QrCode, Map, Plus, Ticket, Calendar, Users, Heart, ChevronRight, ChevronLeft, Bell, Zap, Bookmark, Star, MoreVertical } from 'lucide-react';
+import { QrCode, Map, Plus, Ticket, Calendar, Users, Heart, ChevronRight, ChevronLeft, Bell, Zap, Bookmark, Star } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
 import { EventCard } from '@/components/EventCard';
@@ -27,13 +27,13 @@ export default function Home() {
   const [showNotifications, setShowNotifications] = useState(false);
   const featuredRef = useRef<HTMLDivElement>(null);
   const myEventsRef = useRef<HTMLDivElement>(null);
+  const myEventsCarouselRef = useRef<HTMLDivElement>(null);
 
-  // Get bookmarked events (My Events)
-  const myEvents = events.filter(e => user?.bookmarkedEvents?.includes(e.id));
+  // Get all user events (created + bookmarked)
+  const createdEvents = events.filter(e => e.organizerId === user?.id);
+  const bookmarkedEvents = events.filter(e => user?.bookmarkedEvents.includes(e.id));
+  const myEvents = [...createdEvents, ...bookmarkedEvents];
   const featuredEvents = events.filter(e => e.isFeatured);
-  
-  // Get events created by user
-  const userCreatedEvents = events.filter(e => e.organizerId === user?.id);
 
   const isHeaderHidden = scrollDirection === 'down' && scrollY > 100;
 
@@ -49,19 +49,21 @@ export default function Home() {
   // Scroll to current featured event
   useEffect(() => {
     if (featuredRef.current && featuredEvents.length > 0) {
-      const cardWidth = featuredRef.current.offsetWidth;
-      featuredRef.current.scrollTo({
+      const container = featuredRef.current;
+      const cardWidth = container.offsetWidth - 40; // Account for padding
+      container.scrollTo({
         left: featuredIndex * cardWidth,
         behavior: 'smooth',
       });
     }
   }, [featuredIndex, featuredEvents.length]);
 
-  // Scroll to current my events slide
+  // Handle my events carousel scroll
   useEffect(() => {
-    if (myEventsRef.current && myEvents.length > 0) {
-      const cardWidth = myEventsRef.current.offsetWidth;
-      myEventsRef.current.scrollTo({
+    if (myEventsCarouselRef.current && myEvents.length > 0) {
+      const container = myEventsCarouselRef.current;
+      const cardWidth = container.offsetWidth / 2; // Show 2 cards at a time
+      container.scrollTo({
         left: myEventsIndex * cardWidth,
         behavior: 'smooth',
       });
@@ -77,102 +79,100 @@ export default function Home() {
     }
   };
 
+  // Quick actions in 2x2 grid with only 4 items
   const quickActions = [
     { 
       icon: QrCode, 
-      label: 'Check In', 
-      color: 'bg-brand-purple', 
-      onClick: () => setShowCheckIn(true) 
-    },
-    { 
-      icon: Map, 
-      label: 'View Map', 
-      color: 'bg-brand-blue', 
-      onClick: () => navigate('/events') 
+      label: 'QR Scan', 
+      color: 'bg-purple-500', 
+      onClick: () => setShowCheckIn(true),
+      iconSize: 'w-6 h-6' 
     },
     { 
       icon: Plus, 
       label: 'Create Event', 
-      color: 'bg-brand-pink', 
+      color: 'bg-pink-500', 
       onClick: handleCreateEvent, 
-      pro: true 
+      pro: user?.subscription.tier === 'free',
+      iconSize: 'w-6 h-6'
+    },
+    { 
+      icon: Map, 
+      label: 'View Map', 
+      color: 'bg-blue-500', 
+      onClick: () => navigate('/events'),
+      iconSize: 'w-6 h-6'
     },
     { 
       icon: Ticket, 
       label: 'Tickets', 
-      color: 'bg-brand-green', 
-      onClick: () => setShowTickets(true) 
+      color: 'bg-green-500', 
+      onClick: () => setShowTickets(true),
+      iconSize: 'w-6 h-6'
     },
   ];
 
+  // Compact stats grid
   const stats = [
     { 
       icon: Calendar, 
       value: myEvents.length, 
-      label: 'Events',
-      color: 'text-blue-500'
+      label: 'My Events',
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-500/10'
     },
     { 
       icon: Users, 
       value: user?.subscription.tier === 'free' ? 2 : 12, 
       label: 'Matches',
-      color: 'text-purple-500'
+      color: 'text-green-500',
+      bgColor: 'bg-green-500/10'
     },
     { 
       icon: Heart, 
       value: user?.subscription.tier === 'free' ? user?.likesRemaining ?? 10 : '∞', 
       label: 'Likes Left',
-      color: 'text-pink-500'
+      color: 'text-pink-500',
+      bgColor: 'bg-pink-500/10'
     },
   ];
 
-  // Calculate items per slide for My Events carousel
-  const getItemsPerSlide = () => {
-    if (typeof window === 'undefined') return 2;
-    const width = window.innerWidth;
-    if (width < 640) return 2; // Mobile
-    if (width < 768) return 3; // Tablet
-    if (width < 1024) return 4; // Small desktop
-    return 4; // Large desktop
-  };
-
-  const itemsPerSlide = getItemsPerSlide();
-  const myEventsSlides = Math.ceil(myEvents.length / itemsPerSlide);
+  // Calculate my events carousel items per slide
+  const itemsPerSlide = 2;
+  const totalMyEventsSlides = Math.ceil(myEvents.length / itemsPerSlide);
 
   return (
-    <div className="app-container min-h-screen bg-background pb-24">
-      {/* Instagram-style Header - Hide on scroll down */}
+    <div className="min-h-screen bg-background text-foreground pb-20">
+      {/* Header */}
       <header 
         className={cn(
-          'fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-app z-40 transition-transform duration-300',
+          'fixed top-0 left-0 right-0 z-50 transition-transform duration-300 bg-background/95 backdrop-blur-xl border-b border-border',
           isHeaderHidden ? '-translate-y-full' : 'translate-y-0'
         )}
       >
-        <div className="bg-background/95 backdrop-blur-xl border-b border-border">
-          <div className="flex items-center justify-between px-5 h-14 pt-safe">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                <Zap className="w-4 h-4 text-white" />
+              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+                <Zap className="w-4 h-4 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                Ampz
-              </span>
+              <span className="text-xl font-bold">Ampz</span>
             </div>
             <div className="flex items-center gap-3">
               {user?.subscription.tier !== 'free' && (
-                <span className="px-3 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold rounded-full uppercase tracking-wide">
+                <span className="px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full uppercase">
                   {user?.subscription.tier}
                 </span>
               )}
               <div className="relative">
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="w-10 h-10 rounded-full bg-card flex items-center justify-center border border-border hover:border-purple-500 transition-colors"
+                  className="w-9 h-9 rounded-full bg-card flex items-center justify-center border border-border hover:border-primary transition-colors"
                 >
                   <Bell className="w-5 h-5" />
                   {unreadNotificationsCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 rounded-full text-[10px] font-bold flex items-center justify-center text-white">
-                      {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs font-bold flex items-center justify-center text-white">
+                      {unreadNotificationsCount}
                     </span>
                   )}
                 </button>
@@ -183,77 +183,58 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="px-4 sm:px-6 pt-20 pb-6 max-w-6xl mx-auto">
-        {/* Profile Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-purple-500">
-            <img 
-              src={user?.profile.profilePhoto} 
-              alt={user?.profile.name} 
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm text-muted-foreground">Welcome back</p>
-            <h1 className="text-2xl font-bold text-foreground">
-              {user?.profile.name?.split(' ')[0]}
-            </h1>
+      {/* Main Content */}
+      <main className="container mx-auto px-4 pt-20">
+        {/* Welcome Section */}
+        <div className="mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary">
+              <img 
+                src={user?.profile.profilePhoto || '/default-avatar.png'} 
+                alt={user?.profile.name} 
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Welcome back</p>
+              <h1 className="text-xl font-bold">{user?.profile.name?.split(' ')[0]}</h1>
+            </div>
           </div>
         </div>
 
-        {/* Analytics Stats - Smaller, more square */}
-        <div className="grid grid-cols-3 gap-3 mb-8">
-          {stats.map(({ icon: Icon, value, label, color }) => (
+        {/* Stats Grid - Compact Squares */}
+        <div className="grid grid-cols-3 gap-2 mb-6">
+          {stats.map(({ icon: Icon, value, label, color, bgColor }) => (
             <div 
               key={label} 
-              className="bg-card rounded-xl p-3 text-center border border-border hover:border-purple-500/50 transition-colors"
+              className={cn(
+                "rounded-xl p-3 text-center border border-border",
+                bgColor
+              )}
             >
-              <div className={`w-8 h-8 ${color} mx-auto mb-2 flex items-center justify-center`}>
-                <Icon className="w-5 h-5" />
-              </div>
-              <p className="text-xl font-bold">{value}</p>
-              <p className="text-xs text-muted-foreground mt-1">{label}</p>
+              <Icon className={cn("w-5 h-5 mx-auto mb-1", color)} />
+              <p className="text-lg font-bold">{value}</p>
+              <p className="text-xs text-muted-foreground">{label}</p>
             </div>
           ))}
         </div>
 
-        {/* Pro/Max Event Manager Button */}
-        {user?.subscription.tier !== 'free' && userCreatedEvents.length > 0 && (
-          <button
-            onClick={() => navigate('/event-manager')}
-            className="w-full bg-card rounded-xl p-4 flex items-center justify-between mb-8 border border-border hover:border-purple-500 transition-all group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-white" />
-              </div>
-              <div className="text-left">
-                <p className="font-semibold text-foreground">Manage Events</p>
-                <p className="text-xs text-muted-foreground">{userCreatedEvents.length} events created</p>
-              </div>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-purple-500 transition-colors" />
-          </button>
-        )}
-
         {/* Quick Actions - 2x2 Grid */}
-        <div className="mb-10">
-          <h2 className="text-lg font-bold mb-4 text-foreground">Quick Actions</h2>
+        <div className="mb-8">
+          <h2 className="text-lg font-bold mb-3">Quick Actions</h2>
           <div className="grid grid-cols-2 gap-3">
-            {quickActions.map(({ icon: Icon, label, color, onClick, pro }) => (
+            {quickActions.map(({ icon: Icon, label, color, onClick, pro, iconSize }) => (
               <button 
                 key={label} 
-                onClick={onClick} 
-                className="bg-card rounded-xl p-4 flex flex-col items-center justify-center gap-3 border border-border hover:border-purple-500 transition-all relative group"
+                onClick={onClick}
+                className="bg-card rounded-xl p-4 flex flex-col items-center justify-center gap-2 border border-border hover:border-primary transition-all relative group"
               >
-                <div className={`w-14 h-14 ${color} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                  <Icon className="w-7 h-7 text-white" />
+                <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", color)}>
+                  <Icon className={cn("text-white", iconSize)} />
                 </div>
-                <span className="text-sm font-medium text-center text-foreground">{label}</span>
-                {pro && user?.subscription.tier === 'free' && (
-                  <span className="absolute -top-2 -right-2 px-2 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-bold rounded-full uppercase">
-                    PRO
-                  </span>
+                <span className="text-sm font-medium">{label}</span>
+                {pro && (
+                  <span className="absolute top-2 right-2 px-1.5 py-0.5 bg-primary text-white text-xs font-bold rounded">PRO</span>
                 )}
               </button>
             ))}
@@ -262,171 +243,264 @@ export default function Home() {
 
         {/* My Events - Horizontal Carousel */}
         {myEvents.length > 0 && (
-          <section className="mb-10">
+          <section className="mb-8">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <Bookmark className="w-5 h-5 text-purple-500" />
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Bookmark className="w-5 h-5 text-primary" />
                 My Events
               </h2>
               <button 
-                onClick={() => navigate('/my-events')}
-                className="text-purple-500 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all"
+                onClick={() => navigate('/events')}
+                className="text-primary text-sm font-medium flex items-center gap-1"
               >
-                See All <ChevronRight className="w-4 h-4" />
+                See All
+                <ChevronRight className="w-4 h-4" />
               </button>
             </div>
             
             <div className="relative">
               <div 
-                ref={myEventsRef}
-                className="flex gap-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory scroll-smooth px-1"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                ref={myEventsCarouselRef}
+                className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar"
+                style={{ scrollBehavior: 'smooth' }}
               >
-                {Array.from({ length: myEventsSlides }).map((_, slideIndex) => (
+                {Array.from({ length: totalMyEventsSlides }).map((_, slideIndex) => (
                   <div 
-                    key={slideIndex}
-                    className="snap-center flex-shrink-0 w-full"
-                    style={{ width: '100%' }}
+                    key={slideIndex} 
+                    className="flex-shrink-0 w-full snap-start px-1"
                   >
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                       {myEvents
                         .slice(slideIndex * itemsPerSlide, (slideIndex + 1) * itemsPerSlide)
-                        .map((event) => (
-                          <div key={event.id} className="relative">
-                            <EventCard 
-                              event={event} 
-                              variant="compact" 
+                        .map((event) => {
+                          const isBookmarked = user?.bookmarkedEvents.includes(event.id);
+                          const isCreated = event.organizerId === user?.id;
+                          
+                          return (
+                            <div 
+                              key={event.id} 
+                              className="bg-card rounded-xl overflow-hidden border border-border hover:border-primary transition-all group cursor-pointer"
                               onClick={() => navigate(`/event/${event.id}`)}
-                              showBookmark={false}
-                            />
-                            <div className="absolute top-2 right-2">
-                              <Bookmark className="w-5 h-5 fill-yellow-500 text-yellow-500" />
+                            >
+                              {/* Event Image with Bookmark Badge */}
+                              <div className="relative h-32">
+                                <img 
+                                  src={event.coverImage} 
+                                  alt={event.name}
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute top-2 right-2">
+                                  {isBookmarked && (
+                                    <div className="w-8 h-8 bg-yellow-500/90 rounded-full flex items-center justify-center">
+                                      <Bookmark className="w-4 h-4 text-white fill-white" />
+                                    </div>
+                                  )}
+                                </div>
+                                {isCreated && (
+                                  <div className="absolute top-2 left-2">
+                                    <div className="px-2 py-1 bg-primary/90 rounded text-xs font-bold text-white">
+                                      CREATED
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                                  {event.attendees} going
+                                </div>
+                              </div>
+                              
+                              {/* Event Info */}
+                              <div className="p-3">
+                                <h3 className="font-semibold text-sm line-clamp-1 mb-1">
+                                  {event.name}
+                                </h3>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-muted-foreground">
+                                    {event.category}
+                                  </span>
+                                  <span className="text-xs font-semibold">
+                                    {event.price === 0 ? 'FREE' : `N$${event.price}`}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                                  {event.location}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                     </div>
                   </div>
                 ))}
               </div>
-              
-              {/* Navigation Arrows for My Events */}
-              {myEvents.length > itemsPerSlide && (
+
+              {/* Carousel Navigation */}
+              {totalMyEventsSlides > 1 && (
                 <>
                   <button
-                    onClick={() => setMyEventsIndex((prev) => 
-                      (prev - 1 + myEventsSlides) % myEventsSlides
-                    )}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-background/90 backdrop-blur-sm flex items-center justify-center border border-border hover:border-purple-500 transition-colors z-10 shadow-lg"
+                    onClick={() => setMyEventsIndex(prev => (prev - 1 + totalMyEventsSlides) % totalMyEventsSlides)}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10"
                   >
-                    <ChevronLeft className="w-5 h-5" />
+                    <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => setMyEventsIndex((prev) => 
-                      (prev + 1) % myEventsSlides
-                    )}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-10 h-10 rounded-full bg-background/90 backdrop-blur-sm flex items-center justify-center border border-border hover:border-purple-500 transition-colors z-10 shadow-lg"
+                    onClick={() => setMyEventsIndex(prev => (prev + 1) % totalMyEventsSlides)}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10"
                   >
-                    <ChevronRight className="w-5 h-5" />
+                    <ChevronRight className="w-4 h-4" />
                   </button>
+                  
+                  {/* Dots Indicator */}
+                  <div className="flex justify-center gap-1.5 mt-4">
+                    {Array.from({ length: totalMyEventsSlides }).map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setMyEventsIndex(index)}
+                        className={cn(
+                          "h-1.5 rounded-full transition-all",
+                          index === myEventsIndex 
+                            ? "bg-primary w-4" 
+                            : "bg-muted w-1.5"
+                        )}
+                      />
+                    ))}
+                  </div>
                 </>
-              )}
-              
-              {/* Dots for My Events */}
-              {myEventsSlides > 1 && (
-                <div className="flex justify-center gap-2 mt-6">
-                  {Array.from({ length: myEventsSlides }).map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setMyEventsIndex(index)}
-                      className={`h-2 rounded-full transition-all ${index === myEventsIndex 
-                        ? 'bg-purple-500 w-8' 
-                        : 'bg-muted w-2 hover:bg-purple-500/50'}`}
-                    />
-                  ))}
-                </div>
               )}
             </div>
           </section>
         )}
 
-        {/* Featured Events - Reduced spacing */}
-        <section className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-              <Star className="w-5 h-5 text-yellow-500" />
-              Featured Events
-            </h2>
-            <button 
-              onClick={() => navigate('/events')} 
-              className="text-purple-500 text-sm font-medium flex items-center gap-1 hover:gap-2 transition-all"
-            >
-              View All <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-          
-          <div className="relative">
-            <div 
-              ref={featuredRef}
-              className="flex gap-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory scroll-smooth"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
-              {featuredEvents.map((event) => (
-                <div 
-                  key={event.id} 
-                  className="snap-center flex-shrink-0 w-full px-1"
-                  style={{ width: '100%' }}
-                >
-                  <EventCard 
-                    event={event} 
-                    variant="featured" 
-                    onClick={() => navigate(`/event/${event.id}`)}
-                  />
-                </div>
-              ))}
+        {/* Featured Events - Carousel */}
+        {featuredEvents.length > 0 && (
+          <section className="mb-6"> {/* Reduced margin from bottom */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Star className="w-5 h-5 text-yellow-500" />
+                Featured Events
+              </h2>
+              <button 
+                onClick={() => navigate('/events')}
+                className="text-primary text-sm font-medium flex items-center gap-1"
+              >
+                View All
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
-            
-            {/* Navigation Arrows for Featured Events */}
-            {featuredEvents.length > 1 && (
-              <>
-                <button
-                  onClick={() => setFeaturedIndex((prev) => 
-                    (prev - 1 + featuredEvents.length) % featuredEvents.length
-                  )}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-background/90 backdrop-blur-sm flex items-center justify-center border border-border hover:border-purple-500 transition-colors z-10 shadow-lg"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => setFeaturedIndex((prev) => 
-                    (prev + 1) % featuredEvents.length
-                  )}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-10 h-10 rounded-full bg-background/90 backdrop-blur-sm flex items-center justify-center border border-border hover:border-purple-500 transition-colors z-10 shadow-lg"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </>
-            )}
-            
-            {/* Dots for Featured Events */}
-            {featuredEvents.length > 1 && (
-              <div className="flex justify-center gap-2 mt-6">
-                {featuredEvents.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setFeaturedIndex(index)}
-                    className={`h-2 rounded-full transition-all ${index === featuredIndex 
-                      ? 'bg-purple-500 w-8' 
-                      : 'bg-muted w-2 hover:bg-purple-500/50'}`}
-                  />
+
+            <div className="relative">
+              <div 
+                ref={featuredRef}
+                className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar"
+                style={{ scrollBehavior: 'smooth' }}
+              >
+                {featuredEvents.map((event) => (
+                  <div 
+                    key={event.id} 
+                    className="flex-shrink-0 w-full snap-start px-1"
+                  >
+                    <div 
+                      className="bg-card rounded-xl overflow-hidden border border-border hover:border-primary transition-all cursor-pointer"
+                      onClick={() => navigate(`/event/${event.id}`)}
+                    >
+                      {/* Featured Event Image */}
+                      <div className="relative h-48">
+                        <img 
+                          src={event.coverImage} 
+                          alt={event.name}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute top-3 right-3">
+                          <div className="px-3 py-1 bg-primary/90 rounded-full text-xs font-bold text-white">
+                            FEATURED
+                          </div>
+                        </div>
+                        <div className="absolute bottom-3 left-3 bg-black/70 text-white text-sm px-3 py-1 rounded">
+                          {event.attendees} attendees
+                        </div>
+                      </div>
+                      
+                      {/* Event Details */}
+                      <div className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <h3 className="text-lg font-bold line-clamp-1">{event.name}</h3>
+                          <span className="text-sm font-semibold">
+                            {event.price === 0 ? 'FREE' : `N$${event.price}`}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="px-2 py-1 bg-primary/10 text-primary text-xs font-medium rounded">
+                            {event.category}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {event.date} • {event.time}
+                          </span>
+                        </div>
+                        
+                        <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+                          {event.description || 'Join this amazing event!'}
+                        </p>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full overflow-hidden">
+                              <img 
+                                src={event.organizerId === user?.id ? user.profile.profilePhoto : '/default-avatar.png'} 
+                                alt="Organizer"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {event.organizerId === user?.id ? 'You' : 'Host'} • {event.location}
+                            </span>
+                          </div>
+                          <button className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors">
+                            Check In
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
-            )}
-          </div>
-        </section>
 
-        {/* Additional spacing before bottom nav */}
-        <div className="h-8" />
-      </div>
+              {/* Featured Events Navigation */}
+              {featuredEvents.length > 1 && (
+                <>
+                  <button
+                    onClick={() => setFeaturedIndex(prev => (prev - 1 + featuredEvents.length) % featuredEvents.length)}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setFeaturedIndex(prev => (prev + 1) % featuredEvents.length)}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                  
+                  {/* Dots Indicator */}
+                  <div className="flex justify-center gap-1.5 mt-4">
+                    {featuredEvents.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setFeaturedIndex(index)}
+                        className={cn(
+                          "h-1.5 rounded-full transition-all",
+                          index === featuredIndex 
+                            ? "bg-primary w-4" 
+                            : "bg-muted w-1.5"
+                        )}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
+        )}
+      </main>
 
       <BottomNav />
 
