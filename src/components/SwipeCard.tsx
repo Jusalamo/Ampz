@@ -49,13 +49,13 @@ export function SwipeCard({ profile, onSwipe, isTop }: SwipeCardProps) {
     <div
       ref={cardRef}
       className={cn(
-        'swipe-card touch-none select-none',
+        'absolute inset-0 w-full h-full rounded-3xl overflow-hidden swipe-card touch-none select-none',
         isTop ? 'z-10' : 'z-0'
       )}
       style={{
         transform: isTop
           ? `translateX(${dragOffset.x}px) translateY(${dragOffset.y * 0.5}px) rotate(${rotation}deg)`
-          : 'scale(0.95) translateY(10px)',
+          : 'scale(0.95) translateY(20px)',
         opacity: isTop ? opacity : 0.7,
         transition: isDragging ? 'none' : 'all 0.3s ease-out',
       }}
@@ -67,25 +67,34 @@ export function SwipeCard({ profile, onSwipe, isTop }: SwipeCardProps) {
       onTouchMove={(e) => handleDragMove(e.touches[0].clientX, e.touches[0].clientY)}
       onTouchEnd={handleDragEnd}
     >
-      <img
-        src={profile.photo}
-        alt={profile.name}
-        className="w-full h-full object-cover"
-        draggable={false}
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+      {/* Card Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-violet-600 to-purple-700">
+        {/* Gold frame effect */}
+        <div className="absolute -inset-1 bg-gradient-to-br from-amber-300/30 to-orange-400/30 rounded-3xl -z-10 rotate-2" />
+      </div>
       
+      {/* Profile Photo */}
+      <div className="relative h-[65%]">
+        <img
+          src={profile.photo}
+          alt={profile.name}
+          className="w-full h-full object-cover"
+          draggable={false}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+      </div>
+
       {/* Swipe Indicators */}
       {isTop && (
         <>
           <div
-            className="absolute top-8 left-8 px-4 py-2 border-4 border-brand-green text-brand-green font-bold text-2xl rounded-lg rotate-[-20deg]"
+            className="absolute top-8 left-8 px-4 py-2 border-4 border-green-500 text-green-500 font-bold text-2xl rounded-lg rotate-[-20deg] shadow-lg bg-black/30 backdrop-blur-sm"
             style={{ opacity: Math.max(0, dragOffset.x / 100) }}
           >
             LIKE
           </div>
           <div
-            className="absolute top-8 right-8 px-4 py-2 border-4 border-brand-red text-brand-red font-bold text-2xl rounded-lg rotate-[20deg]"
+            className="absolute top-8 right-8 px-4 py-2 border-4 border-red-500 text-red-500 font-bold text-2xl rounded-lg rotate-[20deg] shadow-lg bg-black/30 backdrop-blur-sm"
             style={{ opacity: Math.max(0, -dragOffset.x / 100) }}
           >
             NOPE
@@ -94,30 +103,31 @@ export function SwipeCard({ profile, onSwipe, isTop }: SwipeCardProps) {
       )}
 
       {/* Profile Info */}
-      <div className="absolute bottom-0 left-0 right-0 p-6">
-        <div className="flex items-end justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">
-              {profile.name}, {profile.age}
-            </h2>
-            {profile.occupation && (
-              <div className="flex items-center gap-2 text-muted-foreground mt-1">
-                <Briefcase className="w-4 h-4" />
-                <span>{profile.occupation}</span>
-              </div>
-            )}
-            <div className="flex items-center gap-2 text-muted-foreground mt-1">
-              <MapPin className="w-4 h-4" />
-              <span>{profile.location}</span>
-            </div>
-          </div>
+      <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+        <div className="flex items-center gap-2 mb-2">
+          <h2 className="text-2xl font-bold">{profile.name}</h2>
+          <span className="text-xl opacity-80">{profile.age}</span>
         </div>
-        <p className="text-sm text-muted-foreground mt-3 line-clamp-2">{profile.bio}</p>
-        <div className="flex flex-wrap gap-2 mt-3">
+        
+        {profile.occupation && (
+          <div className="flex items-center gap-2 text-sm opacity-80 mb-2">
+            <Briefcase className="w-4 h-4" />
+            <span>{profile.occupation}</span>
+          </div>
+        )}
+        
+        <div className="flex items-center gap-2 text-sm opacity-80 mb-3">
+          <MapPin className="w-4 h-4" />
+          <span>{profile.location}</span>
+        </div>
+        
+        <p className="text-sm opacity-90 mb-3 line-clamp-2">{profile.bio}</p>
+        
+        <div className="flex flex-wrap gap-2">
           {profile.interests.slice(0, 4).map((interest) => (
             <span
               key={interest}
-              className="px-3 py-1 bg-primary/20 text-primary text-xs font-medium rounded-full"
+              className="px-3 py-1 bg-white/20 backdrop-blur-sm text-xs font-medium rounded-full"
             >
               {interest}
             </span>
