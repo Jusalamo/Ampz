@@ -3,7 +3,9 @@ import {
   X, ArrowRight, ArrowLeft, MapPin, Check, QrCode, Copy, Download, 
   Upload, Image, Video, Map, Loader2, Search, Calendar, Clock, 
   DollarSign, Palette, ChevronRight, Edit2, Music, Cpu, Users, 
-  Brush, Globe, Camera, Map as MapIcon, Radio, Eye
+  Brush, Globe, Camera, Map as MapIcon, Radio, Eye, Utensils,
+  Coffee, Beer, Hotel, ShoppingBag, Trees, School, Hospital,
+  Building, Navigation, Home, Landmark
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Input } from '@/components/ui/input';
@@ -15,6 +17,7 @@ import { cn } from '@/lib/utils';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Event } from '@/lib/types';
+import debounce from 'lodash/debounce';
 
 const MAPBOX_TOKEN = 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg';
 
@@ -48,15 +51,6 @@ const presetColors = [
   '#10B981', '#F59E0B', '#EF4444', '#6366F1', '#06B6D4'
 ];
 
-// Debounce function for search
-const debounce = (func: Function, wait: number) => {
-  let timeout: NodeJS.Timeout;
-  return (...args: any[]) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-};
-
 export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const { addEvent, user } = useApp();
   const { toast } = useToast();
@@ -65,7 +59,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     name: '',
     description: '',
     category: '',
-    price: 0,
+    price: '',
     date: '',
     time: '',
     location: '',
@@ -76,11 +70,11 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     images: [] as string[],
     videos: [] as string[],
     themeColor: '#8B5CF6',
+    isFree: true,
   });
   const [createdEvent, setCreatedEvent] = useState<Event | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [isMapLoading, setIsMapLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -89,8 +83,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     address: string;
     website?: string;
   } | null>(null);
-  const [ticketType, setTicketType] = useState<'free' | 'paid'>('free');
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
 
   const mapContainer1 = useRef<HTMLDivElement>(null);
   const mapContainer2 = useRef<HTMLDivElement>(null);
@@ -103,6 +97,29 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const videoInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Get user's location for proximity bias
+  const [userLocation, setUserLocation] = useState({ lat: -22.5609, lng: 17.0658 });
+
+  useEffect(() => {
+    // Try to get user's current location for better search results
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.log('Geolocation error:', error);
+          // Default to Windhoek, Namibia
+          setUserLocation({ lat: -22.5609, lng: 17.0658 });
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    }
+  }, []);
 
   // Cleanup URLs when component unmounts or images/videos change
   useEffect(() => {
@@ -120,7 +137,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         name: '',
         description: '',
         category: '',
-        price: 0,
+        price: '',
         date: '',
         time: '',
         location: '',
@@ -131,6 +148,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         images: [],
         videos: [],
         themeColor: '#8B5CF6',
+        isFree: true,
       });
       setImageFiles([]);
       setVideoFile(null);
@@ -139,7 +157,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       setLocationSuggestions([]);
       setShowSuggestions(false);
       setSelectedVenueDetails(null);
-      setTicketType('free');
+      setIsSearching(false);
+      setIsReverseGeocoding(false);
     }
   }, [isOpen]);
 
@@ -159,44 +178,45 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   }, [isOpen]);
 
-  // Initialize or restore maps when step changes
+  // Initialize map for step 3 (Location)
   useEffect(() => {
-    if (isOpen) {
-      if (step === 3 && mapContainer1.current) {
-        if (!map1.current) {
-          initializeMap(mapContainer1.current, 1);
-        } else {
-          // Ensure map is visible and properly sized
-          setTimeout(() => {
-            if (map1.current) {
-              map1.current.resize();
-              map1.current.flyTo({
-                center: [eventData.coordinates.lng, eventData.coordinates.lat],
-                zoom: 14,
-                duration: 0
-              });
-            }
-          }, 100);
-        }
+    if (step === 3 && isOpen && mapContainer1.current) {
+      if (!map1.current) {
+        initializeMap(mapContainer1.current, 1);
+      } else {
+        // Map already exists, just make sure it's visible
+        setTimeout(() => {
+          if (map1.current) {
+            map1.current.resize();
+            map1.current.flyTo({
+              center: [eventData.coordinates.lng, eventData.coordinates.lat],
+              zoom: 14,
+              duration: 500
+            });
+          }
+        }, 50);
       }
-      
-      if (step === 4 && mapContainer2.current) {
-        if (!map2.current) {
-          initializeMap(mapContainer2.current, 2);
-        } else {
-          // Ensure map is visible and properly sized
-          setTimeout(() => {
-            if (map2.current) {
-              map2.current.resize();
-              map2.current.flyTo({
-                center: [eventData.coordinates.lng, eventData.coordinates.lat],
-                zoom: 14,
-                duration: 0
-              });
-              updateGeofenceCircle(map2.current);
-            }
-          }, 100);
-        }
+    }
+  }, [step, isOpen]);
+
+  // Initialize map for step 4 (Radius)
+  useEffect(() => {
+    if (step === 4 && isOpen && mapContainer2.current) {
+      if (!map2.current) {
+        initializeMap(mapContainer2.current, 2);
+      } else {
+        // Map already exists, just make sure it's visible
+        setTimeout(() => {
+          if (map2.current) {
+            map2.current.resize();
+            map2.current.flyTo({
+              center: [eventData.coordinates.lng, eventData.coordinates.lat],
+              zoom: 14,
+              duration: 500
+            });
+            updateGeofenceCircle(map2.current);
+          }
+        }, 50);
       }
     }
   }, [step, isOpen]);
@@ -213,9 +233,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         container,
         style: 'mapbox://styles/mapbox/streets-v12',
         center: [eventData.coordinates.lng, eventData.coordinates.lat],
-        zoom: 13,
-        pitch: 45,
-        bearing: -17.6,
+        zoom: 14,
+        pitch: 0,
+        bearing: 0,
         antialias: true,
         attributionControl: false,
       });
@@ -258,7 +278,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 .addTo(mapInstance);
             }
             reverseGeocode(lng, lat);
-            mapInstance.flyTo({ center: [lng, lat], zoom: 14 });
           });
         } else {
           map2.current = mapInstance;
@@ -380,58 +399,77 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     if (mapInstance.getLayer(lineLayerId)) {
       mapInstance.setPaintProperty(lineLayerId, 'line-color', eventData.themeColor);
     }
-
-    // Ensure map is centered on the marker
-    mapInstance.flyTo({
-      center: [lng, lat],
-      zoom: 14,
-      duration: 500
-    });
   }, [eventData.geofenceRadius, eventData.coordinates, eventData.themeColor]);
 
   const reverseGeocode = async (lng: number, lat: number) => {
+    setIsReverseGeocoding(true);
     try {
       const response = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` +
         `access_token=${MAPBOX_TOKEN}&` +
         `language=en&` +
-        `types=address,poi&` +
+        `types=address,poi,place,neighborhood,locality,region&` +
         `limit=1`
       );
-      
       const data = await response.json();
       if (data.features && data.features.length > 0) {
         const place = data.features[0];
+        
+        // Extract structured address information
+        const context = place.context || [];
+        const street = place.properties?.address || '';
+        const neighborhood = context.find((c: any) => c.id.includes('neighborhood'))?.text || '';
+        const locality = context.find((c: any) => c.id.includes('place'))?.text || '';
+        const region = context.find((c: any) => c.id.includes('region'))?.text || '';
+        const country = context.find((c: any) => c.id.includes('country'))?.text || '';
+        
+        // Build full address
+        const fullAddress = [
+          street,
+          neighborhood,
+          locality,
+          region,
+          country
+        ].filter(Boolean).join(', ');
+        
         setEventData(prev => ({
           ...prev,
-          location: place.text || '',
-          address: place.place_name || '',
-          streetName: place.properties?.address || place.text || '',
+          location: place.text || locality || '',
+          address: fullAddress || place.place_name || '',
+          streetName: street || place.text || '',
         }));
+        
         setSelectedVenueDetails({
-          name: place.text || '',
-          address: place.place_name || '',
+          name: place.text || locality || 'Selected Location',
+          address: fullAddress || place.place_name || '',
         });
+        
+        // Update search input
+        if (searchInputRef.current) {
+          searchInputRef.current.value = fullAddress || place.text || '';
+        }
       }
     } catch (error) {
-      console.error('Geocoding error:', error);
+      console.error('Reverse geocoding error:', error);
+    } finally {
+      setIsReverseGeocoding(false);
     }
   };
 
-  // Debounced search function
-  const debouncedSearch = useCallback(
+  // Debounced search function for location autocomplete
+  const searchLocation = useCallback(
     debounce(async (query: string) => {
-      if (query.trim().length < 2) {
+      if (!query.trim() || query.length < 2) {
         setLocationSuggestions([]);
         setShowSuggestions(false);
-        setIsLoadingSuggestions(false);
         return;
       }
-
+      
+      setIsSearching(true);
+      
       try {
-        // Get user's approximate location (default to Ongwediva, Namibia)
-        const proximity = '15.9650,-22.5597'; // Ongwediva, Namibia
-        const bbox = '11.7344,-28.9714,25.2567,-16.9596'; // Namibia bounding box
+        // Get proximity string for user's location
+        const proximity = `${userLocation.lng},${userLocation.lat}`;
         
         const response = await fetch(
           `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
@@ -441,16 +479,18 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           `limit=10&` +
           `types=country,region,district,place,locality,neighborhood,address,poi&` +
           `autocomplete=true&` +
-          `fuzzy=true&` +
-          `bbox=${bbox}`
+          `fuzzy=true`
         );
         
         const data = await response.json();
         
         if (data.features && data.features.length > 0) {
-          // Limit to first 3 suggestions as requested
-          const limitedSuggestions = data.features.slice(0, 3);
-          setLocationSuggestions(limitedSuggestions);
+          // Sort by relevance and limit to 5 results
+          const sortedSuggestions = data.features
+            .sort((a: any, b: any) => b.relevance - a.relevance)
+            .slice(0, 5);
+          
+          setLocationSuggestions(sortedSuggestions);
           setShowSuggestions(true);
         } else {
           setLocationSuggestions([]);
@@ -461,51 +501,57 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         setLocationSuggestions([]);
         setShowSuggestions(false);
       } finally {
-        setIsLoadingSuggestions(false);
+        setIsSearching(false);
       }
     }, 300),
-    []
+    [userLocation]
   );
-
-  const handleSearchInput = (value: string) => {
-    setEventData(prev => ({ ...prev, location: value }));
-    setIsLoadingSuggestions(true);
-    debouncedSearch(value);
-  };
 
   const getSuggestionIcon = (placeType: string[], category?: string) => {
     if (placeType.includes('poi')) {
-      if (category?.includes('restaurant') || category?.includes('food')) return '🍽️';
-      if (category?.includes('cafe') || category?.includes('coffee')) return '☕';
-      if (category?.includes('bar') || category?.includes('pub')) return '🍺';
-      if (category?.includes('hotel') || category?.includes('lodging')) return '🏨';
-      if (category?.includes('shop') || category?.includes('store')) return '🛍️';
-      if (category?.includes('park') || category?.includes('garden')) return '🌳';
-      if (category?.includes('museum') || category?.includes('gallery')) return '🏛️';
-      if (category?.includes('stadium') || category?.includes('arena')) return '🏟️';
-      if (category?.includes('school') || category?.includes('university')) return '🏫';
-      if (category?.includes('hospital') || category?.includes('clinic')) return '🏥';
-      return '📍';
+      if (category?.includes('restaurant') || category?.includes('food')) return <Utensils className="w-4 h-4" />;
+      if (category?.includes('cafe') || category?.includes('coffee')) return <Coffee className="w-4 h-4" />;
+      if (category?.includes('bar') || category?.includes('pub')) return <Beer className="w-4 h-4" />;
+      if (category?.includes('hotel') || category?.includes('lodging')) return <Hotel className="w-4 h-4" />;
+      if (category?.includes('shop') || category?.includes('store')) return <ShoppingBag className="w-4 h-4" />;
+      if (category?.includes('park') || category?.includes('garden')) return <Trees className="w-4 h-4" />;
+      if (category?.includes('school') || category?.includes('university')) return <School className="w-4 h-4" />;
+      if (category?.includes('hospital') || category?.includes('clinic')) return <Hospital className="w-4 h-4" />;
+      if (category?.includes('government')) return <Building className="w-4 h-4" />;
+      return <Landmark className="w-4 h-4" />;
     }
-    if (placeType.includes('address')) return '🏠';
-    if (placeType.includes('place') || placeType.includes('locality')) return '🏙️';
-    if (placeType.includes('region') || placeType.includes('district')) return '🗺️';
-    if (placeType.includes('country')) return '🌍';
-    if (placeType.includes('neighborhood')) return '🏘️';
-    return '📍';
+    if (placeType.includes('address')) return <Home className="w-4 h-4" />;
+    if (placeType.includes('place') || placeType.includes('locality')) return <MapPin className="w-4 h-4" />;
+    if (placeType.includes('neighborhood')) return <Navigation className="w-4 h-4" />;
+    if (placeType.includes('region') || placeType.includes('district')) return <Map className="w-4 h-4" />;
+    return <MapPin className="w-4 h-4" />;
   };
 
-  const handleLocationSelect = (place: any) => {
-    const [lng, lat] = place.center;
-    const venueName = place.text || '';
-    const address = place.place_name || '';
+  const formatSuggestion = (feature: any) => {
+    const primaryText = feature.text;
+    const secondaryText = feature.place_name.replace(feature.text + ', ', '');
+    const icon = getSuggestionIcon(feature.place_type, feature.properties?.category);
+    
+    return {
+      icon,
+      primary: primaryText,
+      secondary: secondaryText,
+      coordinates: feature.center,
+      fullData: feature
+    };
+  };
+
+  const handleLocationSelect = (selectedFeature: any) => {
+    const [lng, lat] = selectedFeature.center;
+    const venueName = selectedFeature.text || '';
+    const address = selectedFeature.place_name || '';
     
     setEventData(prev => ({
       ...prev,
       coordinates: { lat, lng },
       location: venueName,
       address: address,
-      streetName: place.properties?.address || venueName,
+      streetName: selectedFeature.properties?.address || venueName,
     }));
     
     setSelectedVenueDetails({
@@ -516,15 +562,28 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     setLocationSuggestions([]);
     setShowSuggestions(false);
     
-    // Update maps if they exist
+    // Update search input
+    if (searchInputRef.current) {
+      searchInputRef.current.value = address;
+    }
+    
+    // Update both maps if they exist
     if (map1.current) {
-      map1.current.flyTo({ center: [lng, lat], zoom: 14 });
+      map1.current.flyTo({
+        center: [lng, lat],
+        zoom: 15,
+        duration: 1500
+      });
       if (marker1.current) {
         marker1.current.setLngLat([lng, lat]);
       }
     }
     if (map2.current) {
-      map2.current.flyTo({ center: [lng, lat], zoom: 14 });
+      map2.current.flyTo({
+        center: [lng, lat],
+        zoom: 15,
+        duration: 1500
+      });
       if (marker2.current) {
         marker2.current.setLngLat([lng, lat]);
       }
@@ -621,19 +680,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     try {
       const qrCode = `${eventData.name.replace(/\s+/g, '-').toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
       
-      // In a real app, you would upload files to a server here
-      // For now, we'll use placeholder URLs
-      const uploadedImages = await Promise.all(
-        imageFiles.map(async (file) => {
-          // Convert to data URL for demo purposes
-          return new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(file);
-          });
-        })
-      );
-
+      // Parse price - ensure it's a number
+      const price = eventData.isFree ? 0 : parseFloat(eventData.price) || 0;
+      
       const newEvent: Event = {
         id: crypto.randomUUID(),
         name: eventData.name,
@@ -644,7 +693,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         coordinates: eventData.coordinates,
         date: eventData.date,
         time: eventData.time,
-        price: ticketType === 'paid' ? eventData.price : 0,
+        price: price,
         currency: 'NAD',
         maxAttendees: 500,
         attendees: 0,
@@ -653,14 +702,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         qrCode,
         geofenceRadius: eventData.geofenceRadius,
         customTheme: eventData.themeColor,
-        coverImage: uploadedImages[0] || `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800&auto=format&fit=crop`,
-        images: uploadedImages,
+        coverImage: eventData.images[0] || `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800&auto=format&fit=crop`,
+        images: eventData.images,
         videos: eventData.videos,
         tags: [eventData.category],
         isFeatured: user?.subscription?.tier === 'max',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         status: 'active' as const,
+        isFree: eventData.isFree,
       };
 
       await addEvent(newEvent);
@@ -927,18 +977,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     )}
                   </div>
 
-                  {/* Ticket Price Section - Fixed empty state */}
+                  {/* Ticket Price - Fixed empty state */}
                   <div>
                     <label className="text-sm font-medium mb-2 block">Event Access</label>
                     <div className="flex items-center gap-4 mb-3">
                       <button
-                        onClick={() => {
-                          setTicketType('free');
-                          setEventData(prev => ({ ...prev, price: 0 }));
-                        }}
+                        onClick={() => setEventData(prev => ({ ...prev, isFree: true, price: '' }))}
                         className={cn(
                           'px-4 py-2 rounded-lg border transition-colors',
-                          ticketType === 'free'
+                          eventData.isFree
                             ? 'border-primary bg-primary/5 text-primary'
                             : 'border-border hover:border-primary'
                         )}
@@ -946,10 +993,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         Free Event
                       </button>
                       <button
-                        onClick={() => setTicketType('paid')}
+                        onClick={() => setEventData(prev => ({ ...prev, isFree: false }))}
                         className={cn(
                           'px-4 py-2 rounded-lg border transition-colors',
-                          ticketType === 'paid'
+                          !eventData.isFree
                             ? 'border-primary bg-primary/5 text-primary'
                             : 'border-border hover:border-primary'
                         )}
@@ -957,19 +1004,13 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         Paid Event
                       </button>
                     </div>
-                    {ticketType === 'paid' && (
+                    {!eventData.isFree && (
                       <div className="relative">
                         <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
                           type="number"
-                          value={eventData.price || ''}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setEventData(prev => ({ 
-                              ...prev, 
-                              price: value === '' ? 0 : Math.max(0, parseFloat(value) || 0)
-                            }));
-                          }}
+                          value={eventData.price}
+                          onChange={(e) => setEventData({ ...eventData, price: e.target.value })}
                           placeholder="0.00"
                           className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10"
                           disabled={isSubmitting}
@@ -981,8 +1022,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         </div>
                       </div>
                     )}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {ticketType === 'free' 
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {eventData.isFree 
                         ? 'Attendees can join for free' 
                         : 'Enter the ticket price for your event'}
                     </p>
@@ -1204,51 +1245,58 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       ref={searchInputRef}
-                      value={eventData.location}
-                      onChange={(e) => handleSearchInput(e.target.value)}
+                      defaultValue={eventData.address || eventData.location}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setEventData(prev => ({ ...prev, location: value }));
+                        searchLocation(value);
+                      }}
                       onFocus={() => {
-                        if (eventData.location && locationSuggestions.length > 0) {
+                        const value = searchInputRef.current?.value || '';
+                        if (value.length >= 2) {
+                          searchLocation(value);
                           setShowSuggestions(true);
                         }
                       }}
                       onBlur={() => {
+                        // Delay hiding suggestions to allow click
                         setTimeout(() => setShowSuggestions(false), 200);
                       }}
-                      placeholder="Search for venues, addresses, or landmarks in Namibia..."
+                      placeholder="Search for a location, street, or venue..."
                       className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10"
                       disabled={isSubmitting}
                     />
-                    {isLoadingSuggestions && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                    {isSearching && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                      </div>
                     )}
                   </div>
                   
-                  {/* Autocomplete Dropdown - Limited to 3 suggestions with grey background */}
+                  {/* Autocomplete Dropdown */}
                   {showSuggestions && locationSuggestions.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                      {locationSuggestions.map((suggestion, index) => {
-                        const icon = getSuggestionIcon(suggestion.place_type, suggestion.properties?.category);
-                        const primaryText = suggestion.text;
-                        const secondaryText = suggestion.place_name.replace(suggestion.text + ', ', '');
-                        
+                    <div className="absolute z-10 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
+                      {locationSuggestions.map((place, index) => {
+                        const formatted = formatSuggestion(place);
                         return (
                           <button
-                            key={suggestion.id || index}
-                            onClick={() => handleLocationSelect(suggestion)}
+                            key={place.id || index}
+                            onClick={() => handleLocationSelect(place)}
                             className={cn(
-                              "w-full px-4 py-3 flex items-start gap-3 hover:bg-accent/50 transition-colors text-left border-b border-border last:border-b-0",
-                              index % 2 === 0 ? "bg-muted/30" : "bg-muted/20"
+                              "w-full px-4 py-3 flex items-start gap-3 transition-colors text-left border-border",
+                              index < locationSuggestions.length - 1 && "border-b",
+                              "hover:bg-accent bg-gray-50" // Changed from transparent to gray-50
                             )}
                           >
-                            <span className="text-lg mt-0.5 flex-shrink-0">
-                              {icon}
+                            <span className="text-muted-foreground mt-0.5 flex-shrink-0">
+                              {formatted.icon}
                             </span>
                             <div className="flex-1 min-w-0">
-                              <div className="font-medium text-foreground truncate">
-                                {primaryText}
+                              <div className="font-medium truncate">
+                                {formatted.primary}
                               </div>
                               <div className="text-sm text-muted-foreground truncate">
-                                {secondaryText}
+                                {formatted.secondary}
                               </div>
                             </div>
                           </button>
@@ -1258,7 +1306,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   )}
                 </div>
 
-                {/* Map */}
+                {/* Map - Now persists between steps */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium">Map View</label>
@@ -1286,8 +1334,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       ref={mapContainer1}
                       className="w-full h-full"
                     />
-                    <div className="absolute top-3 left-3 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs">
-                      Drag marker to adjust
+                    <div className="absolute top-3 left-3 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs border border-border">
+                      {isReverseGeocoding ? (
+                        <div className="flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Getting address...
+                        </div>
+                      ) : (
+                        "Drag marker to adjust location"
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1333,7 +1388,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </p>
                 </div>
 
-                {/* Map with Radius - NO giant display box above */}
+                {/* Map with Radius */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium">Geofence Area</label>
@@ -1341,7 +1396,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       Drag marker to adjust location
                     </span>
                   </div>
-                  <div className="relative w-full h-80 rounded-xl overflow-hidden border border-border">
+                  <div className="relative w-full h-96 rounded-xl overflow-hidden border border-border">
                     {isMapLoading && (
                       <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 z-10">
                         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -1351,13 +1406,19 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       ref={mapContainer2}
                       className="w-full h-full"
                     />
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs border border-border">
-                      Radius: {eventData.geofenceRadius}m
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm px-4 py-2 rounded-lg text-sm border border-border flex items-center gap-2">
+                      <div 
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: eventData.themeColor }}
+                      />
+                      <span className="font-medium" style={{ color: eventData.themeColor }}>
+                        {eventData.geofenceRadius}m radius
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Radius Slider with inline value display */}
+                {/* Radius Slider */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium">Adjust Radius</label>
@@ -1389,6 +1450,20 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   <p className="text-sm text-muted-foreground">
                     💡 <span className="font-medium">Recommended:</span> 50-100m for most venues
                   </p>
+                  <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      <span>10-50m: High precision (small venues)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                      <span>50-100m: Standard events</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                      <span>100-300m: Large venues & outdoor events</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1467,7 +1542,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         </div>
                         <div className="flex items-center gap-2">
                           <DollarSign className="w-4 h-4 text-muted-foreground" />
-                          <span>{ticketType === 'free' ? 'Free' : `N$${eventData.price}`}</span>
+                          <span>{eventData.isFree ? 'Free' : `N$${eventData.price}`}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Map className="w-4 h-4 text-muted-foreground" />
@@ -1501,7 +1576,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         <p><span className="text-muted-foreground">Name:</span> {eventData.name}</p>
                         <p><span className="text-muted-foreground">Category:</span> {eventData.category}</p>
                         <p><span className="text-muted-foreground">Date:</span> {eventData.date} at {eventData.time}</p>
-                        <p><span className="text-muted-foreground">Price:</span> {ticketType === 'free' ? 'Free' : `N$${eventData.price}`}</p>
+                        <p><span className="text-muted-foreground">Price:</span> {eventData.isFree ? 'Free' : `N$${eventData.price}`}</p>
                       </div>
                     </div>
                     
