@@ -3,7 +3,9 @@ import {
   X, ArrowRight, ArrowLeft, MapPin, Check, QrCode, Copy, Download, 
   Upload, Image, Video, Map, Loader2, Search, Calendar, Clock, 
   DollarSign, Palette, ChevronRight, Edit2, Music, Cpu, Users, 
-  Brush, Globe, Camera, Map as MapIcon, Radio, Eye
+  Brush, Globe, Camera, Map as MapIcon, Radio, Eye, Building,
+  Landmark, Home, School, ShoppingBag, Utensils, Coffee, Tree,
+  Navigation
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Input } from '@/components/ui/input';
@@ -16,8 +18,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Event } from '@/lib/types';
 
-// Set Mapbox access token globally
-mapboxgl.accessToken = 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg';
+const MAPBOX_TOKEN = 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg';
 
 interface EventWizardModalProps {
   isOpen: boolean;
@@ -49,9 +50,6 @@ const presetColors = [
   '#10B981', '#F59E0B', '#EF4444', '#6366F1', '#06B6D4'
 ];
 
-// Default to Ongwediva, Namibia coordinates
-const DEFAULT_LOCATION = { lat: -22.5597, lng: 15.9650 };
-
 export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const { addEvent, user } = useApp();
   const { toast } = useToast();
@@ -60,13 +58,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     name: '',
     description: '',
     category: '',
-    price: 0,
+    price: '',
+    ticketType: 'free',
+    currency: 'NAD',
     date: '',
     time: '',
     location: '',
     address: '',
     streetName: '',
-    coordinates: DEFAULT_LOCATION,
+    coordinates: { lat: -22.5609, lng: 17.0658 },
     geofenceRadius: 50,
     images: [] as string[],
     videos: [] as string[],
@@ -79,60 +79,52 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
   const [selectedVenueDetails, setSelectedVenueDetails] = useState<{
     name: string;
     address: string;
     website?: string;
   } | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
-  // Refs
   const mapContainer1 = useRef<HTMLDivElement>(null);
   const mapContainer2 = useRef<HTMLDivElement>(null);
   const map1 = useRef<mapboxgl.Map | null>(null);
   const map2 = useRef<mapboxgl.Map | null>(null);
   const marker1 = useRef<mapboxgl.Marker | null>(null);
   const marker2 = useRef<mapboxgl.Marker | null>(null);
+  const geofenceCircleRef = useRef<mapboxgl.GeoJSONSource | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const primaryPhotoRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchDebounceRef = useRef<NodeJS.Timeout>();
 
-  // Set mounted state
-  useEffect(() => {
-    setIsMounted(true);
-    return () => setIsMounted(false);
-  }, []);
-
-  // Cleanup URLs
+  // Cleanup URLs when component unmounts
   useEffect(() => {
     return () => {
       eventData.images.forEach(url => URL.revokeObjectURL(url));
       eventData.videos.forEach(url => URL.revokeObjectURL(url));
-      if (debounceTimeout.current) {
-        clearTimeout(debounceTimeout.current);
-      }
     };
   }, []);
 
   // Reset form when modal opens
   useEffect(() => {
-    if (isOpen && isMounted) {
+    if (isOpen) {
       setStep(1);
       setEventData({
         name: '',
         description: '',
         category: '',
-        price: 0,
+        price: '',
+        ticketType: 'free',
+        currency: 'NAD',
         date: '',
         time: '',
         location: '',
         address: '',
         streetName: '',
-        coordinates: DEFAULT_LOCATION,
+        coordinates: { lat: -22.5609, lng: 17.0658 },
         geofenceRadius: 50,
         images: [],
         videos: [],
@@ -141,15 +133,16 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       setImageFiles([]);
       setVideoFile(null);
       setCreatedEvent(null);
+      setIsSubmitting(false);
       setLocationSuggestions([]);
       setShowSuggestions(false);
       setSelectedVenueDetails(null);
     }
-  }, [isOpen, isMounted]);
+  }, [isOpen]);
 
   // Cleanup maps when modal closes
   useEffect(() => {
-    if (!isOpen && isMounted) {
+    if (!isOpen) {
       if (map1.current) {
         map1.current.remove();
         map1.current = null;
@@ -159,141 +152,175 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         map2.current.remove();
         map2.current = null;
         marker2.current = null;
+        geofenceCircleRef.current = null;
       }
     }
-  }, [isOpen, isMounted]);
+  }, [isOpen]);
 
-  // Initialize maps when step changes
+  // Initialize map for step 3 (Location) - PERSISTENT
   useEffect(() => {
-    if (!isOpen || !isMounted) return;
+    if (step === 3 && isOpen && mapContainer1.current && !map1.current) {
+      initializeMap(mapContainer1.current, 1);
+    }
+  }, [step, isOpen]);
 
-    const initializeMaps = async () => {
-      if (step === 3 && mapContainer1.current && !map1.current) {
-        await initializeMap(1);
-      }
-      
-      if (step === 4 && mapContainer2.current && !map2.current) {
-        await initializeMap(2);
-      }
+  // Initialize map for step 4 (Radius) - PERSISTENT
+  useEffect(() => {
+    if (step === 4 && isOpen && mapContainer2.current && !map2.current) {
+      initializeMap(mapContainer2.current, 2);
+    }
+  }, [step, isOpen]);
 
-      // Resize maps if they exist
-      if (step === 3 && map1.current) {
-        setTimeout(() => {
-          map1.current?.resize();
-        }, 100);
-      }
-      
-      if (step === 4 && map2.current) {
-        setTimeout(() => {
-          map2.current?.resize();
-        }, 100);
-      }
-    };
+  // Keep maps initialized when switching steps
+  useEffect(() => {
+    if (step === 3 && mapContainer1.current && map1.current) {
+      // Map already exists, ensure it's visible
+      setTimeout(() => {
+        if (map1.current && mapContainer1.current) {
+          map1.current.resize();
+        }
+      }, 100);
+    }
+    
+    if (step === 4 && mapContainer2.current && map2.current) {
+      // Map already exists, ensure it's visible
+      setTimeout(() => {
+        if (map2.current && mapContainer2.current) {
+          map2.current.resize();
+          updateGeofenceCircle(map2.current);
+        }
+      }, 100);
+    }
+  }, [step]);
 
-    initializeMaps();
-  }, [step, isOpen, isMounted]);
-
-  const initializeMap = useCallback(async (mapNumber: 1 | 2) => {
-    if (!isMounted) return;
-
-    const container = mapNumber === 1 ? mapContainer1.current : mapContainer2.current;
+  const initializeMap = useCallback((container: HTMLDivElement, mapNumber: 1 | 2) => {
     if (!container) return;
     
     setIsMapLoading(true);
     
     try {
-      // Clear any existing content
-      container.innerHTML = '';
+      mapboxgl.accessToken = MAPBOX_TOKEN;
       
       const mapInstance = new mapboxgl.Map({
         container,
         style: 'mapbox://styles/mapbox/streets-v12',
         center: [eventData.coordinates.lng, eventData.coordinates.lat],
-        zoom: 14,
-        pitch: 0,
-        bearing: 0,
+        zoom: 13,
+        pitch: 45,
+        bearing: -17.6,
         antialias: true,
         attributionControl: false,
       });
 
-      // Wait for map to load
-      await new Promise<void>((resolve) => {
-        mapInstance.on('load', () => {
-          setIsMapLoading(false);
+      mapInstance.on('load', () => {
+        setIsMapLoading(false);
+        
+        if (mapNumber === 1) {
+          map1.current = mapInstance;
           
-          if (mapNumber === 1) {
-            map1.current = mapInstance;
-            
-            // Add marker for map 1
-            marker1.current = new mapboxgl.Marker({ 
-              color: eventData.themeColor,
-              draggable: true 
-            })
-              .setLngLat([eventData.coordinates.lng, eventData.coordinates.lat])
-              .addTo(mapInstance);
+          // Add marker for map 1
+          marker1.current = new mapboxgl.Marker({ 
+            color: eventData.themeColor,
+            draggable: true 
+          })
+            .setLngLat([eventData.coordinates.lng, eventData.coordinates.lat])
+            .addTo(mapInstance);
 
-            // Handle marker drag
-            marker1.current.on('dragend', () => {
-              if (marker1.current) {
-                const lngLat = marker1.current.getLngLat();
-                setEventData(prev => ({ 
-                  ...prev, 
-                  coordinates: { lat: lngLat.lat, lng: lngLat.lng } 
-                }));
-                reverseGeocode(lngLat.lng, lngLat.lat);
-              }
-            });
-
-            // Click to set location
-            mapInstance.on('click', (e) => {
-              const { lng, lat } = e.lngLat;
-              setEventData(prev => ({ ...prev, coordinates: { lat, lng } }));
-              if (marker1.current) {
-                marker1.current.setLngLat([lng, lat]);
-              } else {
-                marker1.current = new mapboxgl.Marker({ color: eventData.themeColor })
-                  .setLngLat([lng, lat])
-                  .addTo(mapInstance);
-              }
-              reverseGeocode(lng, lat);
-            });
-          } else {
-            map2.current = mapInstance;
-            
-            // Add marker for map 2
-            marker2.current = new mapboxgl.Marker({ 
-              color: eventData.themeColor 
-            })
-              .setLngLat([eventData.coordinates.lng, eventData.coordinates.lat])
-              .addTo(mapInstance);
-
-            // Add geofence circle
-            updateGeofenceCircle(mapInstance);
-          }
-
-          // Add navigation controls
-          mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
-          
-          // Add geolocate control
-          const geolocateControl = new mapboxgl.GeolocateControl({
-            positionOptions: { enableHighAccuracy: true },
-            trackUserLocation: true,
-            showUserLocation: true,
+          // Handle marker drag
+          marker1.current.on('dragend', () => {
+            if (marker1.current) {
+              const lngLat = marker1.current.getLngLat();
+              setEventData(prev => ({ 
+                ...prev, 
+                coordinates: { lat: lngLat.lat, lng: lngLat.lng } 
+              }));
+              reverseGeocode(lngLat.lng, lngLat.lat);
+            }
           });
-          
-          geolocateControl.on('geolocate', (position: GeolocationPosition) => {
-            const { longitude, latitude } = position.coords;
-            setEventData(prev => ({
-              ...prev,
-              coordinates: { lat: latitude, lng: longitude }
-            }));
-            reverseGeocode(longitude, latitude);
+
+          // Click to set location
+          mapInstance.on('click', (e) => {
+            const { lng, lat } = e.lngLat;
+            setEventData(prev => ({ ...prev, coordinates: { lat, lng } }));
+            if (marker1.current) {
+              marker1.current.setLngLat([lng, lat]);
+            } else {
+              marker1.current = new mapboxgl.Marker({ color: eventData.themeColor })
+                .setLngLat([lng, lat])
+                .addTo(mapInstance);
+            }
+            reverseGeocode(lng, lat);
+            mapInstance.flyTo({ center: [lng, lat], zoom: 14 });
           });
+        } else {
+          map2.current = mapInstance;
           
-          mapInstance.addControl(geolocateControl, 'top-right');
+          // Add marker for map 2
+          marker2.current = new mapboxgl.Marker({ 
+            color: eventData.themeColor 
+          })
+            .setLngLat([eventData.coordinates.lng, eventData.coordinates.lat])
+            .addTo(mapInstance);
+
+          // Initialize geofence circle source
+          mapInstance.addSource('geofence-circle', {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              properties: {},
+              geometry: { type: 'Polygon', coordinates: [[]] }
+            }
+          });
+
+          // Add geofence layers
+          mapInstance.addLayer({
+            id: 'geofence-fill',
+            type: 'fill',
+            source: 'geofence-circle',
+            paint: {
+              'fill-color': eventData.themeColor,
+              'fill-opacity': 0.15,
+            },
+          });
+
+          mapInstance.addLayer({
+            id: 'geofence-line',
+            type: 'line',
+            source: 'geofence-circle',
+            paint: {
+              'line-color': eventData.themeColor,
+              'line-width': 2,
+              'line-dasharray': [2, 2],
+            },
+          });
+
+          // Store reference to circle source
+          geofenceCircleRef.current = mapInstance.getSource('geofence-circle') as mapboxgl.GeoJSONSource;
           
-          resolve();
+          // Update circle with current radius
+          updateGeofenceCircle(mapInstance);
+        }
+
+        // Add navigation controls
+        mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
+        
+        // Add geolocate control
+        const geolocateControl = new mapboxgl.GeolocateControl({
+          positionOptions: { enableHighAccuracy: true },
+          trackUserLocation: true,
+          showUserLocation: true,
         });
+        
+        geolocateControl.on('geolocate', (position: GeolocationPosition) => {
+          const { longitude, latitude } = position.coords;
+          setEventData(prev => ({
+            ...prev,
+            coordinates: { lat: latitude, lng: longitude }
+          }));
+          reverseGeocode(longitude, latitude);
+        });
+        
+        mapInstance.addControl(geolocateControl, 'top-right');
       });
 
       mapInstance.on('error', (e) => {
@@ -304,16 +331,18 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     } catch (error) {
       console.error('Error initializing map:', error);
       setIsMapLoading(false);
-      toast({
-        title: 'Map Error',
-        description: 'Failed to load map. Please check your internet connection.',
-        variant: 'destructive'
-      });
     }
-  }, [eventData.themeColor, eventData.coordinates, isMounted, toast]);
+  }, [eventData.themeColor, eventData.coordinates]);
+
+  // Update geofence circle when radius changes
+  useEffect(() => {
+    if (step === 4 && map2.current && map2.current.isStyleLoaded()) {
+      updateGeofenceCircle(map2.current);
+    }
+  }, [eventData.geofenceRadius, eventData.coordinates, step]);
 
   const updateGeofenceCircle = useCallback((mapInstance: mapboxgl.Map) => {
-    if (!mapInstance.isStyleLoaded()) return;
+    if (!mapInstance.isStyleLoaded() || !geofenceCircleRef.current) return;
 
     const { lat, lng } = eventData.coordinates;
     const radiusInKm = eventData.geofenceRadius / 1000;
@@ -329,96 +358,55 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
     coords.push(coords[0]); // Close the circle
 
-    const sourceId = 'geofence-circle';
-    const fillLayerId = 'geofence-fill';
-    const lineLayerId = 'geofence-line';
-    
-    if (mapInstance.getSource(sourceId)) {
-      (mapInstance.getSource(sourceId) as mapboxgl.GeoJSONSource).setData({
-        type: 'Feature',
-        properties: {},
-        geometry: { type: 'Polygon', coordinates: [coords] },
-      });
-    } else {
-      mapInstance.addSource(sourceId, {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          properties: {},
-          geometry: { type: 'Polygon', coordinates: [coords] },
-        },
-      });
+    // Update the circle data
+    geofenceCircleRef.current.setData({
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'Polygon', coordinates: [coords] },
+    });
 
-      mapInstance.addLayer({
-        id: fillLayerId,
-        type: 'fill',
-        source: sourceId,
-        paint: {
-          'fill-color': eventData.themeColor,
-          'fill-opacity': 0.15,
-        },
-      });
+    // Update layer colors
+    mapInstance.setPaintProperty('geofence-fill', 'fill-color', eventData.themeColor);
+    mapInstance.setPaintProperty('geofence-line', 'line-color', eventData.themeColor);
 
-      mapInstance.addLayer({
-        id: lineLayerId,
-        type: 'line',
-        source: sourceId,
-        paint: {
-          'line-color': eventData.themeColor,
-          'line-width': 2,
-          'line-dasharray': [2, 2],
-        },
-      });
-    }
-
-    // Update layer colors if theme changes
-    if (mapInstance.getLayer(fillLayerId)) {
-      mapInstance.setPaintProperty(fillLayerId, 'fill-color', eventData.themeColor);
-    }
-    if (mapInstance.getLayer(lineLayerId)) {
-      mapInstance.setPaintProperty(lineLayerId, 'line-color', eventData.themeColor);
-    }
+    // Ensure map is centered on the marker
+    mapInstance.flyTo({
+      center: [lng, lat],
+      zoom: 14,
+      duration: 500
+    });
   }, [eventData.geofenceRadius, eventData.coordinates, eventData.themeColor]);
 
   const reverseGeocode = async (lng: number, lat: number) => {
     try {
       const response = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` +
-        `access_token=${mapboxgl.accessToken}&` +
+        `access_token=${MAPBOX_TOKEN}&` +
         `language=en&` +
-        `types=address,poi,place&` +
-        `limit=1`
+        `types=address,poi,place,neighborhood,locality,region,country`
       );
       const data = await response.json();
       if (data.features && data.features.length > 0) {
         const place = data.features[0];
-        const venueName = place.text || '';
-        const address = place.place_name || '';
-        
         setEventData(prev => ({
           ...prev,
-          location: venueName,
-          address: address,
-          streetName: place.properties?.address || venueName,
+          location: place.text || '',
+          address: place.place_name || '',
+          streetName: place.properties?.address || place.text || '',
         }));
-        
         setSelectedVenueDetails({
-          name: venueName,
-          address: address,
+          name: place.text || '',
+          address: place.place_name || '',
         });
-        
-        // Update search input if it exists
-        if (searchInputRef.current) {
-          searchInputRef.current.value = address;
-        }
       }
     } catch (error) {
       console.error('Geocoding error:', error);
     }
   };
 
+  // Enhanced location search with comprehensive Namibian coverage
   const searchLocation = async (query: string) => {
-    if (!query.trim() || query.length < 2) {
+    if (!query.trim()) {
       setLocationSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -427,40 +415,26 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     setIsSearching(true);
     
     try {
-      // Get user's approximate location
-      let proximity = '15.9650,-22.5597'; // Ongwediva, Namibia
+      // Get user's approximate location for proximity bias
+      const userCoords = await getUserProximity();
       
-      if (eventData.coordinates.lat !== DEFAULT_LOCATION.lat && 
-          eventData.coordinates.lng !== DEFAULT_LOCATION.lng) {
-        proximity = `${eventData.coordinates.lng},${eventData.coordinates.lat}`;
-      }
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+        `access_token=${MAPBOX_TOKEN}&` +
+        `proximity=${userCoords}&` +
+        `language=en&` +
+        `limit=10&` +
+        `types=country,region,postcode,district,place,locality,neighborhood,address,poi&` +
+        `autocomplete=true&` +
+        `fuzzy=true`
+      );
       
-      // Build Mapbox search URL
-      const searchUrl = new URL(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`);
-      
-      const params = {
-        access_token: mapboxgl.accessToken,
-        proximity: proximity,
-        language: 'en',
-        limit: '10',
-        types: 'country,region,postcode,district,place,locality,neighborhood,address,poi',
-        autocomplete: 'true',
-        fuzzy: 'true',
-      };
-      
-      Object.entries(params).forEach(([key, value]) => {
-        searchUrl.searchParams.append(key, value);
-      });
-      
-      const response = await fetch(searchUrl.toString());
       const data = await response.json();
       
       if (data.features && data.features.length > 0) {
-        const sortedSuggestions = data.features.sort((a: any, b: any) => {
-          return b.relevance - a.relevance;
-        });
-        
-        setLocationSuggestions(sortedSuggestions);
+        // Take only first 3 suggestions as requested
+        const limitedSuggestions = data.features.slice(0, 3);
+        setLocationSuggestions(limitedSuggestions);
         setShowSuggestions(true);
       } else {
         setLocationSuggestions([]);
@@ -475,100 +449,102 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   };
 
-  const handleSearchInputChange = (value: string) => {
-    setEventData(prev => ({ ...prev, location: value }));
+  const getUserProximity = async (): Promise<string> => {
+    // Default to Ongwediva, Namibia as fallback
+    const fallbackCoords = '15.9650,-22.5597';
     
-    if (debounceTimeout.current) {
-      clearTimeout(debounceTimeout.current);
-    }
-    
-    debounceTimeout.current = setTimeout(() => {
-      if (value.trim().length >= 2) {
-        searchLocation(value);
-      } else {
-        setLocationSuggestions([]);
-        setShowSuggestions(false);
+    try {
+      if (navigator.geolocation) {
+        return new Promise((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const coords = `${position.coords.longitude},${position.coords.latitude}`;
+              resolve(coords);
+            },
+            () => resolve(fallbackCoords),
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+          );
+        });
       }
-    }, 300);
-  };
-
-  const getSuggestionIcon = (placeType: string[], category?: string) => {
-    if (placeType.includes('poi')) {
-      if (category?.includes('restaurant')) return '🍽️';
-      if (category?.includes('cafe') || category?.includes('coffee')) return '☕';
-      if (category?.includes('bar') || category?.includes('pub')) return '🍺';
-      if (category?.includes('hotel') || category?.includes('lodging')) return '🏨';
-      if (category?.includes('shop') || category?.includes('store')) return '🛍️';
-      if (category?.includes('park') || category?.includes('garden')) return '🌳';
-      if (category?.includes('museum') || category?.includes('gallery')) return '🏛️';
-      if (category?.includes('stadium') || category?.includes('arena')) return '🏟️';
-      if (category?.includes('school') || category?.includes('university')) return '🏫';
-      if (category?.includes('hospital') || category?.includes('clinic')) return '🏥';
-      if (category?.includes('bank')) return '🏦';
-      if (category?.includes('gas_station')) return '⛽';
-      return '📍';
+    } catch (error) {
+      console.error('Geolocation error:', error);
     }
-    if (placeType.includes('address')) return '🏠';
-    if (placeType.includes('place') || placeType.includes('locality')) return '🏙️';
-    if (placeType.includes('region') || placeType.includes('district')) return '🗺️';
-    if (placeType.includes('country')) return '🌍';
-    if (placeType.includes('neighborhood')) return '🏘️';
-    if (placeType.includes('postcode')) return '📮';
-    return '📍';
+    
+    return fallbackCoords;
   };
 
-  const handleLocationSelect = (place: any) => {
-    const [lng, lat] = place.center;
-    const venueName = place.text || '';
-    const address = place.place_name || '';
+  // Get icon for suggestion
+  const getSuggestionIcon = (placeType: string[], category?: string): React.ReactNode => {
+    if (placeType.includes('poi')) {
+      if (category?.includes('restaurant') || category?.includes('cafe') || category?.includes('bar')) return <Utensils className="w-4 h-4" />;
+      if (category?.includes('hotel') || category?.includes('lodging')) return <Building className="w-4 h-4" />;
+      if (category?.includes('shop') || category?.includes('store') || category?.includes('mall')) return <ShoppingBag className="w-4 h-4" />;
+      if (category?.includes('park') || category?.includes('garden')) return <Tree className="w-4 h-4" />;
+      if (category?.includes('school') || category?.includes('university')) return <School className="w-4 h-4" />;
+      if (category?.includes('hospital') || category?.includes('clinic')) return <Building className="w-4 h-4" />;
+      return <Landmark className="w-4 h-4" />;
+    }
+    if (placeType.includes('address')) return <Home className="w-4 h-4" />;
+    if (placeType.includes('place') || placeType.includes('locality')) return <MapPin className="w-4 h-4" />;
+    if (placeType.includes('region') || placeType.includes('district')) return <Navigation className="w-4 h-4" />;
+    return <MapPin className="w-4 h-4" />;
+  };
+
+  const handleLocationSelect = async (selectedFeature: any) => {
+    const [lng, lat] = selectedFeature.center;
+    const venueName = selectedFeature.text || '';
+    const address = selectedFeature.place_name || '';
     
-    const context = place.context || [];
-    const city = context.find((c: any) => c.id.includes('place') || c.id.includes('locality'))?.text || '';
-    const region = context.find((c: any) => c.id.includes('region'))?.text || '';
-    const country = context.find((c: any) => c.id.includes('country'))?.text || '';
-    
+    // Update event data
     setEventData(prev => ({
       ...prev,
       coordinates: { lat, lng },
       location: venueName,
       address: address,
-      streetName: place.properties?.address || venueName,
+      streetName: selectedFeature.properties?.address || venueName,
     }));
     
+    // Set venue details
     setSelectedVenueDetails({
       name: venueName,
       address: address,
     });
     
+    // Clear suggestions
     setLocationSuggestions([]);
     setShowSuggestions(false);
     
-    if (searchInputRef.current) {
-      searchInputRef.current.value = address;
-    }
-    
+    // Update map 1 if it exists
     if (map1.current) {
-      map1.current.flyTo({
-        center: [lng, lat],
-        zoom: 15,
-        duration: 1500
-      });
+      map1.current.flyTo({ center: [lng, lat], zoom: 15 });
       if (marker1.current) {
         marker1.current.setLngLat([lng, lat]);
       }
     }
     
+    // Update map 2 if it exists
     if (map2.current) {
-      map2.current.flyTo({
-        center: [lng, lat],
-        zoom: 15,
-        duration: 1500
-      });
+      map2.current.flyTo({ center: [lng, lat], zoom: 15 });
       if (marker2.current) {
         marker2.current.setLngLat([lng, lat]);
       }
       updateGeofenceCircle(map2.current);
     }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setEventData(prev => ({ ...prev, location: value }));
+    
+    // Clear previous debounce
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    
+    // Debounce search
+    searchDebounceRef.current = setTimeout(() => {
+      searchLocation(value);
+    }, 300);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -577,12 +553,14 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       const newImages = Array.from(files).slice(0, 5 - imageFiles.length);
       setImageFiles(prev => [...prev, ...newImages]);
       
+      // Create preview URLs
       const imageUrls = newImages.map(file => URL.createObjectURL(file));
       setEventData(prev => ({
         ...prev,
         images: [...prev.images, ...imageUrls]
       }));
       
+      // Reset file input
       e.target.value = '';
     }
   };
@@ -590,12 +568,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const handlePrimaryPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files[0]) {
-      const newFile = files[0];
-      setImageFiles(prev => [newFile, ...prev.slice(1)]);
-      setEventData(prev => ({
-        ...prev,
-        images: [URL.createObjectURL(newFile), ...prev.images.slice(1)]
-      }));
+      // If this is the first photo, treat as primary
+      if (imageFiles.length === 0) {
+        const newFile = files[0];
+        setImageFiles([newFile]);
+        setEventData(prev => ({
+          ...prev,
+          images: [URL.createObjectURL(newFile)]
+        }));
+      }
       e.target.value = '';
     }
   };
@@ -605,17 +586,22 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     if (files && files[0]) {
       const newVideo = files[0];
       setVideoFile(newVideo);
+      
+      // Create preview URL
       const videoUrl = URL.createObjectURL(newVideo);
       setEventData(prev => ({
         ...prev,
         videos: [videoUrl]
       }));
+      
       e.target.value = '';
     }
   };
 
   const removeImage = (index: number) => {
+    // Revoke the object URL to prevent memory leaks
     URL.revokeObjectURL(eventData.images[index]);
+    
     setEventData(prev => ({
       ...prev,
       images: prev.images.filter((_, i) => i !== index)
@@ -627,6 +613,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     if (eventData.videos[0]) {
       URL.revokeObjectURL(eventData.videos[0]);
     }
+    
     setEventData(prev => ({
       ...prev,
       videos: []
@@ -649,6 +636,21 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     try {
       const qrCode = `${eventData.name.replace(/\s+/g, '-').toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
       
+      // In a real app, you would upload files to a server here
+      // For now, we'll use placeholder URLs
+      const uploadedImages = await Promise.all(
+        imageFiles.map(async (file) => {
+          // Convert to data URL for demo purposes
+          return new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+
+      const priceValue = eventData.ticketType === 'paid' && eventData.price ? parseFloat(eventData.price) : 0;
+
       const newEvent: Event = {
         id: crypto.randomUUID(),
         name: eventData.name,
@@ -659,8 +661,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         coordinates: eventData.coordinates,
         date: eventData.date,
         time: eventData.time,
-        price: eventData.price,
-        currency: 'NAD',
+        price: priceValue,
+        currency: eventData.currency,
         maxAttendees: 500,
         attendees: 0,
         organizerId: user.id,
@@ -668,8 +670,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         qrCode,
         geofenceRadius: eventData.geofenceRadius,
         customTheme: eventData.themeColor,
-        coverImage: eventData.images[0] || `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800&auto=format&fit=crop`,
-        images: eventData.images,
+        coverImage: uploadedImages[0] || `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800&auto=format&fit=crop`,
+        images: uploadedImages,
         videos: eventData.videos,
         tags: [eventData.category],
         isFeatured: user?.subscription?.tier === 'max',
@@ -708,11 +710,19 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   };
 
+  const handleDownloadQR = () => {
+    toast({
+      title: 'QR Code Download',
+      description: 'This feature would generate and download a QR code image.',
+    });
+  };
+
   const isStep1Valid = eventData.name.trim() && eventData.category && eventData.date && eventData.time;
   const isStep3Valid = eventData.coordinates.lat !== 0 && eventData.location.trim();
 
-  if (!isOpen || !isMounted) return null;
+  if (!isOpen) return null;
 
+  // Get current date for date input min
   const today = new Date().toISOString().split('T')[0];
 
   return (
@@ -721,8 +731,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         ref={modalRef}
         className="bg-background rounded-2xl flex flex-col w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl border border-border"
       >
-        {/* Header */}
+        {/* Header - Redesigned to be compact */}
         <div className="border-b border-border shrink-0">
+          {/* Row 1: Title and Close */}
           <div className="flex items-center justify-between px-6 h-14">
             <h2 className="text-xl font-semibold">Create Event</h2>
             <button 
@@ -734,46 +745,50 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             </button>
           </div>
           
+          {/* Row 2: Progress Dots */}
           {step < 6 && (
-            <>
-              <div className="flex justify-center items-center h-10">
-                <div className="flex gap-3">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <div key={s} className="flex items-center">
-                      <div
-                        className={cn(
-                          'w-2 h-2 rounded-full transition-all duration-300',
-                          s < step ? 'bg-primary' : 
-                          s === step ? 'bg-primary w-3 h-3' : 'bg-muted'
-                        )}
-                      />
-                      {s < 5 && (
-                        <div className={cn(
-                          'w-3 h-0.5 mx-1 transition-colors duration-300',
-                          s < step ? 'bg-primary' : 'bg-muted'
-                        )} />
+            <div className="flex justify-center items-center h-10">
+              <div className="flex gap-3">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <div key={s} className="flex items-center">
+                    <div
+                      className={cn(
+                        'w-2 h-2 rounded-full transition-all duration-300',
+                        s < step ? 'bg-primary' : 
+                        s === step ? 'bg-primary w-3 h-3' : 'bg-muted'
                       )}
-                    </div>
-                  ))}
-                </div>
+                    />
+                    {s < 5 && (
+                      <div className={cn(
+                        'w-3 h-0.5 mx-1 transition-colors duration-300',
+                        s < step ? 'bg-primary' : 'bg-muted'
+                      )} />
+                    )}
+                  </div>
+                ))}
               </div>
-              
-              <div className="flex justify-center items-center h-8 pb-2">
-                <span className="text-sm text-muted-foreground">
-                  {stepTitles[step - 1]}
-                </span>
-              </div>
-            </>
+            </div>
+          )}
+          
+          {/* Row 3: Current Step Title */}
+          {step < 6 && (
+            <div className="flex justify-center items-center h-8 pb-2">
+              <span className="text-sm text-muted-foreground">
+                {stepTitles[step - 1]}
+              </span>
+            </div>
           )}
         </div>
 
-        {/* Content */}
+        {/* Content - Scrollable area */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6">
             {/* Step 1: Basic Info */}
             {step === 1 && (
               <div className="space-y-6 animate-fade-in">
-                <h3 className="text-lg font-semibold mb-4">Event Details</h3>
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Event Details</h3>
+                </div>
 
                 <div className="space-y-4">
                   <div>
@@ -867,58 +882,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     </div>
                   </div>
 
-                  {/* Ticket Price */}
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Ticket Price</label>
-                    <div className="flex items-center gap-4 mb-3">
-                      <button
-                        onClick={() => setEventData({ ...eventData, price: 0 })}
-                        className={cn(
-                          'px-4 py-2 rounded-lg border transition-colors',
-                          eventData.price === 0
-                            ? 'border-primary bg-primary/5 text-primary'
-                            : 'border-border hover:border-primary'
-                        )}
-                      >
-                        Free Event
-                      </button>
-                      <button
-                        onClick={() => setEventData({ ...eventData, price: eventData.price > 0 ? eventData.price : 0 })}
-                        className={cn(
-                          'px-4 py-2 rounded-lg border transition-colors',
-                          eventData.price > 0
-                            ? 'border-primary bg-primary/5 text-primary'
-                            : 'border-border hover:border-primary'
-                        )}
-                      >
-                        Paid Event
-                      </button>
-                    </div>
-                    {eventData.price > 0 && (
-                      <div className="relative">
-                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          type="number"
-                          value={eventData.price === 0 ? '' : eventData.price}
-                          onChange={(e) => setEventData({ 
-                            ...eventData, 
-                            price: e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)) 
-                          })}
-                          placeholder="Enter ticket price"
-                          className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10"
-                          disabled={isSubmitting}
-                          min={0}
-                        />
-                      </div>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {eventData.price === 0 
-                        ? 'Attendees can join for free' 
-                        : 'Enter the ticket price for your event'}
-                    </p>
-                  </div>
-
-                  {/* Theme Color */}
+                  {/* Theme Color Section */}
                   <div>
                     <label className="text-sm font-medium mb-3 block">Event Theme Color</label>
                     {user?.subscription?.tier === 'max' ? (
@@ -979,6 +943,82 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       </div>
                     )}
                   </div>
+
+                  {/* Ticket Price - IMPROVED EMPTY STATE */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Event Access</label>
+                    <div className="flex items-center gap-4 mb-3">
+                      <button
+                        onClick={() => setEventData(prev => ({ 
+                          ...prev, 
+                          ticketType: 'free',
+                          price: '' 
+                        }))}
+                        className={cn(
+                          'px-4 py-2 rounded-lg border transition-colors',
+                          eventData.ticketType === 'free'
+                            ? 'border-primary bg-primary/5 text-primary'
+                            : 'border-border hover:border-primary'
+                        )}
+                      >
+                        Free Event
+                      </button>
+                      <button
+                        onClick={() => setEventData(prev => ({ 
+                          ...prev, 
+                          ticketType: 'paid',
+                          price: eventData.price || ''
+                        }))}
+                        className={cn(
+                          'px-4 py-2 rounded-lg border transition-colors',
+                          eventData.ticketType === 'paid'
+                            ? 'border-primary bg-primary/5 text-primary'
+                            : 'border-border hover:border-primary'
+                        )}
+                      >
+                        Paid Event
+                      </button>
+                    </div>
+                    {eventData.ticketType === 'paid' && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Currency</label>
+                          <select
+                            value={eventData.currency}
+                            onChange={(e) => setEventData(prev => ({ ...prev, currency: e.target.value }))}
+                            className="w-full h-11 rounded-lg border border-border bg-background px-3 focus:border-primary focus:ring-1 focus:ring-primary"
+                          >
+                            <option value="NAD">NAD - Namibian Dollar</option>
+                            <option value="USD">USD - US Dollar</option>
+                            <option value="EUR">EUR - Euro</option>
+                            <option value="ZAR">ZAR - South African Rand</option>
+                            <option value="GBP">GBP - British Pound</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Ticket Price</label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              value={eventData.price}
+                              onChange={(e) => setEventData(prev => ({ ...prev, price: e.target.value }))}
+                              placeholder="0.00"
+                              className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10"
+                              disabled={isSubmitting}
+                              min="0"
+                              step="0.01"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {eventData.ticketType === 'free' 
+                        ? 'Attendees can join for free' 
+                        : 'Enter the ticket price for your event'}
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
@@ -986,10 +1026,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             {/* Step 2: Event Media */}
             {step === 2 && (
               <div className="space-y-6 animate-fade-in">
-                <h3 className="text-lg font-semibold mb-1">Add Photos & Videos</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Make your event visually appealing
-                </p>
+                <div>
+                  <h3 className="text-lg font-semibold mb-1">Add Photos & Videos</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Make your event visually appealing
+                  </p>
+                </div>
 
                 {/* Primary Event Photo */}
                 <div className="space-y-3">
@@ -1139,123 +1181,155 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     disabled={isSubmitting}
                   />
                 </div>
+
+                {/* Preview */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium block">Preview</label>
+                  <div className="border border-border rounded-xl p-4 bg-card">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                        <Eye className="w-6 h-6 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Event Card Preview</p>
+                        <p className="text-xs text-muted-foreground">
+                          Shows how your primary photo appears
+                        </p>
+                      </div>
+                    </div>
+                    <div className="border border-border rounded-lg overflow-hidden">
+                      <div className="h-32 bg-gradient-to-r from-primary/10 to-primary/5 flex items-center justify-center">
+                        {imageFiles.length > 0 ? (
+                          <img
+                            src={eventData.images[0]}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Image className="w-12 h-12 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="p-3">
+                        <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                        <div className="h-3 bg-muted rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
             {/* Step 3: Location & Check-In */}
             {step === 3 && (
               <div className="space-y-6 animate-fade-in">
-                <h3 className="text-lg font-semibold mb-1">Event Location</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Search and select your venue
-                </p>
-
-                {/* Search Input */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium block">Search venue or address *</label>
-                  <div className="relative">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10" />
-                      <Input
-                        ref={searchInputRef}
-                        defaultValue={eventData.address || eventData.location}
-                        onChange={(e) => handleSearchInputChange(e.target.value)}
-                        onFocus={() => {
-                          if (searchInputRef.current?.value && searchInputRef.current.value.length >= 2) {
-                            searchLocation(searchInputRef.current.value);
-                            setShowSuggestions(true);
-                          }
-                        }}
-                        onBlur={() => {
-                          setTimeout(() => {
-                            setShowSuggestions(false);
-                          }, 200);
-                        }}
-                        placeholder="Search for venues, streets, or landmarks..."
-                        className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10 pr-10"
-                        disabled={isSubmitting}
-                      />
-                      {isSearching && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Autocomplete Dropdown */}
-                    {showSuggestions && locationSuggestions.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-96 overflow-y-auto">
-                        {locationSuggestions.map((place, index) => {
-                          const icon = getSuggestionIcon(place.place_type, place.properties?.category);
-                          const primaryText = place.text;
-                          const secondaryText = place.place_name.replace(place.text + ', ', '');
-                          
-                          return (
-                            <button
-                              key={place.id || index}
-                              onClick={() => handleLocationSelect(place)}
-                              className="w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b border-border last:border-b-0 flex items-start gap-3"
-                              type="button"
-                            >
-                              <span className="text-xl mt-0.5 flex-shrink-0">{icon}</span>
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium text-foreground truncate">
-                                  {primaryText}
-                                </div>
-                                <div className="text-sm text-muted-foreground truncate">
-                                  {secondaryText}
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Start typing to search for venues, streets, or landmarks
+                <div>
+                  <h3 className="text-lg font-semibold mb-1">Event Location</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Search and select your venue
                   </p>
                 </div>
 
-                {/* Map */}
+                {/* Search Input with Autocomplete */}
+                <div className="relative">
+                  <label className="text-sm font-medium mb-2 block">Search venue or address *</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      ref={searchInputRef}
+                      value={eventData.location}
+                      onChange={handleInputChange}
+                      onFocus={() => {
+                        if (eventData.location && locationSuggestions.length === 0) {
+                          searchLocation(eventData.location);
+                        }
+                        setShowSuggestions(true);
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => setShowSuggestions(false), 200);
+                      }}
+                      placeholder="Search streets, venues, or addresses in Namibia..."
+                      className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10"
+                      disabled={isSubmitting}
+                    />
+                    {isSearching && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Autocomplete Dropdown - LIMITED TO 3 with GREY BACKGROUND */}
+                  {showSuggestions && locationSuggestions.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-lg border border-border">
+                      {locationSuggestions.map((place, index) => {
+                        const icon = getSuggestionIcon(place.place_type, place.properties?.category);
+                        const primaryText = place.text;
+                        const secondaryText = place.place_name.replace(place.text + ', ', '');
+                        
+                        return (
+                          <button
+                            key={place.id || index}
+                            onClick={() => handleLocationSelect(place)}
+                            className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                          >
+                            <span className="text-muted-foreground mt-0.5 flex-shrink-0">
+                              {icon}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-foreground truncate">
+                                {primaryText}
+                              </div>
+                              <div className="text-sm text-muted-foreground truncate">
+                                {secondaryText}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Map - PERSISTENT */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium">Map View</label>
-                    <button 
-                      className="text-xs text-muted-foreground hover:text-primary"
-                      onClick={() => {
-                        if (map1.current) {
-                          map1.current.flyTo({
-                            center: [eventData.coordinates.lng, eventData.coordinates.lat],
-                            zoom: 14,
-                            duration: 500
-                          });
-                        }
-                      }}
-                    >
-                      Recenter
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+                        onClick={() => {
+                          if (map1.current) {
+                            map1.current.flyTo({
+                              center: [eventData.coordinates.lng, eventData.coordinates.lat],
+                              zoom: 15
+                            });
+                          }
+                        }}
+                      >
+                        <Navigation className="w-3 h-3" />
+                        Recenter
+                      </button>
+                    </div>
                   </div>
                   <div className="relative w-full h-80 rounded-xl overflow-hidden border border-border">
                     {isMapLoading && (
                       <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 z-10">
                         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                        <span className="ml-2 text-sm">Loading map...</span>
                       </div>
                     )}
                     <div
                       ref={mapContainer1}
                       className="w-full h-full"
                     />
-                    <div className="absolute top-3 left-3 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs">
-                      Drag marker or click map to adjust
+                    <div className="absolute top-3 left-3 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs border border-border">
+                      Drag marker to adjust location
                     </div>
                   </div>
                 </div>
 
                 {/* Venue Details */}
                 {selectedVenueDetails && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <label className="text-sm font-medium">Venue Details</label>
                     <div className="border border-border rounded-xl p-4 bg-card">
                       <div className="flex items-start gap-3">
@@ -1269,10 +1343,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                           </p>
                         </div>
                         <button 
-                          className="text-xs text-primary hover:underline flex-shrink-0"
+                          className="text-xs text-primary hover:underline whitespace-nowrap"
                           onClick={() => {
                             searchInputRef.current?.focus();
-                            searchInputRef.current?.select();
                             setShowSuggestions(true);
                           }}
                         >
@@ -1285,20 +1358,59 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               </div>
             )}
 
-            {/* Step 4: Check-In Radius */}
+            {/* Step 4: Check-In Radius - REMOVED GIANT DISPLAY BOX */}
             {step === 4 && (
               <div className="space-y-6 animate-fade-in">
-                <h3 className="text-lg font-semibold mb-1">Check-In Radius</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Set how close attendees must be to check in
-                </p>
+                <div>
+                  <h3 className="text-lg font-semibold mb-1">Check-In Radius</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Set how close attendees must be to check in
+                  </p>
+                </div>
 
-                {/* Radius Slider */}
+                {/* Map with Radius - PERSISTENT */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium">Geofence Area</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium" style={{ color: eventData.themeColor }}>
+                        Radius: {eventData.geofenceRadius}m
+                      </span>
+                      <button 
+                        className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+                        onClick={() => {
+                          if (map2.current) {
+                            map2.current.flyTo({
+                              center: [eventData.coordinates.lng, eventData.coordinates.lat],
+                              zoom: 14
+                            });
+                          }
+                        }}
+                      >
+                        <Navigation className="w-3 h-3" />
+                        Recenter
+                      </button>
+                    </div>
+                  </div>
+                  <div className="relative w-full h-80 rounded-xl overflow-hidden border border-border">
+                    {isMapLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 z-10">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                      </div>
+                    )}
+                    <div
+                      ref={mapContainer2}
+                      className="w-full h-full"
+                    />
+                  </div>
+                </div>
+
+                {/* Radius Slider - ONLY slider with value */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium">Adjust Radius</label>
                     <span 
-                      className="text-lg font-bold px-3 py-1 rounded-lg bg-card"
+                      className="text-lg font-bold"
                       style={{ color: eventData.themeColor }}
                     >
                       {eventData.geofenceRadius}m
@@ -1318,34 +1430,13 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     <span>150m</span>
                     <span>300m</span>
                   </div>
+                </div>
+
+                {/* Helper Text */}
+                <div className="border border-border rounded-xl p-4 bg-card">
                   <p className="text-sm text-muted-foreground">
                     💡 <span className="font-medium">Recommended:</span> 50-100m for most venues
                   </p>
-                </div>
-
-                {/* Map */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium">Geofence Area</label>
-                    <span className="text-xs text-muted-foreground">
-                      Drag marker to adjust location
-                    </span>
-                  </div>
-                  <div className="relative w-full h-80 rounded-xl overflow-hidden border border-border">
-                    {isMapLoading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 z-10">
-                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                        <span className="ml-2 text-sm">Loading map...</span>
-                      </div>
-                    )}
-                    <div
-                      ref={mapContainer2}
-                      className="w-full h-full"
-                    />
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs border border-border">
-                      Radius: {eventData.geofenceRadius}m
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
@@ -1353,100 +1444,155 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             {/* Step 5: Review & Publish */}
             {step === 5 && (
               <div className="space-y-6 animate-fade-in">
-                <h3 className="text-lg font-semibold mb-1">Review Your Event</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Check everything before publishing
-                </p>
+                <div>
+                  <h3 className="text-lg font-semibold mb-1">Review Your Event</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Check everything before publishing
+                  </p>
+                </div>
 
                 {/* Event Preview */}
-                <div className="border border-border rounded-xl overflow-hidden bg-card">
-                  <div className="p-4 border-b border-border">
-                    <p className="text-sm font-medium mb-2">Event Preview</p>
-                    <div className="border border-border rounded-lg overflow-hidden">
-                      <div className="h-32 bg-gradient-to-r from-primary/10 to-primary/5 flex items-center justify-center relative">
-                        {imageFiles.length > 0 ? (
-                          <img
-                            src={eventData.images[0]}
-                            alt="Event preview"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <Image className="w-12 h-12 text-muted-foreground" />
-                        )}
-                        {videoFile && (
-                          <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                            Video
-                          </div>
-                        )}
-                      </div>
-                      <div className="p-3">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1">
-                            <p className="font-medium truncate">{eventData.name}</p>
-                            <p className="text-sm text-muted-foreground truncate">
-                              {eventData.date} at {eventData.time}
-                            </p>
-                          </div>
-                          <span 
-                            className="px-2 py-1 text-xs rounded ml-2"
-                            style={{ 
-                              backgroundColor: `${eventData.themeColor}20`,
-                              color: eventData.themeColor
-                            }}
-                          >
-                            {categories.find(c => c.value === eventData.category)?.label || eventData.category}
-                          </span>
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Event Preview</label>
+                  <div className="border border-border rounded-xl overflow-hidden bg-card">
+                    {/* Event Card Preview */}
+                    <div className="p-4 border-b border-border">
+                      <p className="text-sm font-medium mb-2">Event Card</p>
+                      <div className="border border-border rounded-lg overflow-hidden">
+                        <div className="h-32 bg-gradient-to-r from-primary/10 to-primary/5 flex items-center justify-center relative">
+                          {imageFiles.length > 0 ? (
+                            <img
+                              src={eventData.images[0]}
+                              alt="Event preview"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Image className="w-12 h-12 text-muted-foreground" />
+                          )}
+                          {videoFile && (
+                            <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                              Video
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <MapPin className="w-3 h-3 mr-1" />
-                          <span className="truncate">{eventData.location}</span>
+                        <div className="p-3">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <p className="font-medium truncate">{eventData.name}</p>
+                              <p className="text-sm text-muted-foreground truncate">
+                                {eventData.date} at {eventData.time}
+                              </p>
+                            </div>
+                            <span 
+                              className="px-2 py-1 text-xs rounded ml-2"
+                              style={{ 
+                                backgroundColor: `${eventData.themeColor}20`,
+                                color: eventData.themeColor
+                              }}
+                            >
+                              {eventData.category}
+                            </span>
+                          </div>
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <MapPin className="w-3 h-3 mr-1" />
+                            <span className="truncate">{eventData.location}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Event Details Preview */}
+                    <div className="p-4">
+                      <p className="text-sm font-medium mb-2">Event Details</p>
+                      <div className="space-y-3 text-sm">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                          <span>{eventData.date} at {eventData.time}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-muted-foreground" />
+                          <span>{eventData.location}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-4 h-4 text-muted-foreground" />
+                          <span>{eventData.ticketType === 'free' ? 'Free' : `${eventData.currency} ${eventData.price}`}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Map className="w-4 h-4 text-muted-foreground" />
+                          <span>Check-in radius: {eventData.geofenceRadius}m</span>
                         </div>
                       </div>
                     </div>
                   </div>
-                  
-                  {/* Edit Sections */}
-                  <div className="p-4 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">Basic Info</span>
+                </div>
+
+                {/* Edit Sections */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Event Information</label>
+                  <div className="border border-border rounded-xl overflow-hidden">
+                    {/* Basic Info */}
+                    <div className="p-4 border-b border-border">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Basic Info</span>
+                        </div>
+                        <button 
+                          onClick={() => setStep(1)}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          Edit
+                        </button>
                       </div>
-                      <button 
-                        onClick={() => setStep(1)}
-                        className="text-xs text-primary hover:underline flex items-center gap-1"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                        Edit
-                      </button>
+                      <div className="space-y-1 text-sm">
+                        <p><span className="text-muted-foreground">Name:</span> {eventData.name}</p>
+                        <p><span className="text-muted-foreground">Category:</span> {eventData.category}</p>
+                        <p><span className="text-muted-foreground">Date:</span> {eventData.date} at {eventData.time}</p>
+                        <p><span className="text-muted-foreground">Access:</span> {eventData.ticketType === 'free' ? 'Free' : `Paid (${eventData.currency} ${eventData.price})`}</p>
+                      </div>
                     </div>
                     
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Camera className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">Media</span>
+                    {/* Media */}
+                    <div className="p-4 border-b border-border">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Camera className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Media</span>
+                        </div>
+                        <button 
+                          onClick={() => setStep(2)}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          Edit
+                        </button>
                       </div>
-                      <button 
-                        onClick={() => setStep(2)}
-                        className="text-xs text-primary hover:underline flex items-center gap-1"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                        Edit
-                      </button>
+                      <div className="space-y-1 text-sm">
+                        <p><span className="text-muted-foreground">Photos:</span> {imageFiles.length}</p>
+                        <p><span className="text-muted-foreground">Video:</span> {videoFile ? 'Yes' : 'No'}</p>
+                      </div>
                     </div>
                     
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <MapIcon className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">Location & Check-In</span>
+                    {/* Location */}
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <MapIcon className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Location</span>
+                        </div>
+                        <button 
+                          onClick={() => setStep(3)}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          Edit
+                        </button>
                       </div>
-                      <button 
-                        onClick={() => setStep(3)}
-                        className="text-xs text-primary hover:underline flex items-center gap-1"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                        Edit
-                      </button>
+                      <div className="space-y-1 text-sm">
+                        <p><span className="text-muted-foreground">Venue:</span> {eventData.location}</p>
+                        <p><span className="text-muted-foreground">Check-in radius:</span> {eventData.geofenceRadius}m</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1486,7 +1632,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 <div className="flex gap-3 w-full max-w-sm">
                   <Button 
                     variant="outline" 
-                    className="flex-1 rounded-lg h-12"
+                    className="flex-1 rounded-lg h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
                     onClick={copyCode}
                   >
                     <Copy className="w-4 h-4 mr-2" />
@@ -1494,7 +1640,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="flex-1 rounded-lg h-12"
+                    className="flex-1 rounded-lg h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                    onClick={handleDownloadQR}
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Save QR
@@ -1505,7 +1652,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           </div>
         </div>
 
-        {/* Footer */}
+        {/* Footer - Redesigned to be compact */}
         {step < 6 && (
           <div className="border-t border-border bg-background p-4 shrink-0">
             <div className="flex gap-3">
@@ -1522,7 +1669,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               )}
               {step < 5 ? (
                 <Button
-                  className="flex-1 rounded-lg h-11 font-medium"
+                  className={cn(
+                    "flex-1 rounded-lg h-11 font-medium",
+                    step === 1 && !isStep1Valid && "opacity-50 cursor-not-allowed",
+                    step === 2 && imageFiles.length === 0 && "opacity-50 cursor-not-allowed",
+                    step === 3 && !isStep3Valid && "opacity-50 cursor-not-allowed"
+                  )}
                   onClick={() => setStep(step + 1)}
                   disabled={
                     isSubmitting ||
