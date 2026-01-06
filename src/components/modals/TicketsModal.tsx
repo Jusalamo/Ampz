@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { X, QrCode, Calendar, MapPin, Ticket, Plus, Minus, Clock } from 'lucide-react';
+import { X, QrCode, Calendar, MapPin, Ticket, Plus, Minus, Clock, Star, Filter } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Ticket as TicketType, Event } from '@/lib/types';
+import { useNavigate } from 'react-router-dom';
 
 interface TicketsModalProps {
   isOpen: boolean;
@@ -12,17 +13,48 @@ interface TicketsModalProps {
 }
 
 type Tab = 'active' | 'purchase' | 'history';
+type PurchaseFilter = 'all' | 'week' | 'month' | 'free';
 
 export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
-  const { tickets, events, addTicket, currency } = useApp();
+  const navigate = useNavigate();
+  const { tickets, events, addTicket, currency, user } = useApp();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('active');
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [viewingQR, setViewingQR] = useState<TicketType | null>(null);
+  const [purchaseFilter, setPurchaseFilter] = useState<PurchaseFilter>('all');
 
   const activeTickets = tickets.filter(t => t.status === 'active');
-  const historyTickets = tickets;
+  const historyTickets = tickets.filter(t => t.status !== 'active');
+  const bookmarkedEvents = events.filter(e => user?.bookmarkedEvents.includes(e.id));
+  const featuredEvents = events.filter(e => e.isFeatured);
+
+  // Filter events for purchase tab
+  const getFilteredPurchaseEvents = () => {
+    const now = new Date();
+    const oneWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const oneMonth = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    let filtered = events.filter(e => {
+      const eventDate = new Date(e.date);
+      return eventDate >= now;
+    });
+
+    switch (purchaseFilter) {
+      case 'week':
+        filtered = filtered.filter(e => new Date(e.date) <= oneWeek);
+        break;
+      case 'month':
+        filtered = filtered.filter(e => new Date(e.date) <= oneMonth);
+        break;
+      case 'free':
+        filtered = filtered.filter(e => e.price === 0);
+        break;
+    }
+
+    return filtered;
+  };
 
   const getCurrencySymbol = () => {
     switch (currency) {
@@ -62,6 +94,10 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
     setActiveTab('active');
   };
 
+  const getEventForTicket = (ticket: TicketType) => {
+    return events.find(e => e.id === ticket.eventId);
+  };
+
   if (!isOpen) return null;
 
   // QR Code View
@@ -75,8 +111,8 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
           </button>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center p-5">
-          <div className="w-64 h-64 bg-card rounded-2xl flex items-center justify-center mb-6 border border-border">
-            <QrCode className="w-48 h-48 text-primary" />
+          <div className="w-64 h-64 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+            <QrCode className="w-48 h-48 text-black" />
           </div>
           <h3 className="text-xl font-bold mb-2">{viewingQR.eventName}</h3>
           <p className="text-muted-foreground mb-4">{viewingQR.quantity} ticket(s)</p>
@@ -101,24 +137,37 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="flex-1 p-5 space-y-6">
+        <div className="flex-1 p-5 space-y-4 overflow-y-auto">
+          {/* Event Header with Image */}
+          <div className="relative h-40 rounded-2xl overflow-hidden">
+            <img 
+              src={selectedEvent.coverImage} 
+              alt={selectedEvent.name}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
+            <div className="absolute bottom-3 left-3 right-3">
+              <h3 className="font-bold text-lg">{selectedEvent.name}</h3>
+              <p className="text-sm text-muted-foreground">{selectedEvent.category}</p>
+            </div>
+          </div>
+
           {/* Event Info */}
-          <div className="glass-card p-4">
-            <h3 className="font-bold text-lg mb-2">{selectedEvent.name}</h3>
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
+          <div className="bg-card rounded-xl p-4 border border-border">
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center gap-3">
+                <Calendar className="w-4 h-4 text-primary" />
                 <span>{selectedEvent.date} at {selectedEvent.time}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4" />
+              <div className="flex items-center gap-3">
+                <MapPin className="w-4 h-4 text-primary" />
                 <span>{selectedEvent.location}</span>
               </div>
             </div>
           </div>
 
           {/* Price */}
-          <div className="glass-card p-4 text-center">
+          <div className="bg-card rounded-xl p-4 text-center border border-border">
             <p className="text-muted-foreground text-sm mb-1">Price per ticket</p>
             <p className="text-3xl font-bold text-primary">
               {selectedEvent.price === 0 ? 'FREE' : `${getCurrencySymbol()}${selectedEvent.price}`}
@@ -126,12 +175,12 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
           </div>
 
           {/* Quantity */}
-          <div className="glass-card p-4">
-            <p className="text-sm font-medium mb-3">Quantity</p>
+          <div className="bg-card rounded-xl p-4 border border-border">
+            <p className="text-sm font-medium mb-3 text-center">Quantity</p>
             <div className="flex items-center justify-center gap-6">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="w-12 h-12 rounded-full bg-card border border-border flex items-center justify-center hover:border-primary transition-colors"
+                className="w-12 h-12 rounded-full bg-background border border-border flex items-center justify-center hover:border-primary transition-colors disabled:opacity-50"
                 disabled={quantity <= 1}
               >
                 <Minus className="w-5 h-5" />
@@ -139,7 +188,7 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
               <span className="text-3xl font-bold w-12 text-center">{quantity}</span>
               <button
                 onClick={() => setQuantity(Math.min(10, quantity + 1))}
-                className="w-12 h-12 rounded-full bg-card border border-border flex items-center justify-center hover:border-primary transition-colors"
+                className="w-12 h-12 rounded-full bg-background border border-border flex items-center justify-center hover:border-primary transition-colors disabled:opacity-50"
                 disabled={quantity >= 10}
               >
                 <Plus className="w-5 h-5" />
@@ -148,7 +197,7 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
           </div>
 
           {/* Total */}
-          <div className="glass-card p-4 flex items-center justify-between">
+          <div className="bg-primary/10 rounded-xl p-4 flex items-center justify-between border border-primary/20">
             <span className="font-medium">Total</span>
             <span className="text-2xl font-bold text-primary">
               {selectedEvent.price === 0 ? 'FREE' : `${getCurrencySymbol()}${selectedEvent.price * quantity}`}
@@ -157,12 +206,12 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
         </div>
 
         <div className="p-4 border-t border-border flex gap-3">
-          <Button variant="outline" className="flex-1" onClick={() => setSelectedEvent(null)}>
+          <Button variant="outline" className="flex-1 h-12" onClick={() => setSelectedEvent(null)}>
             Cancel
           </Button>
-          <Button className="flex-1 gradient-pro glow-purple" onClick={handlePurchase}>
+          <Button className="flex-1 h-12 gradient-pro glow-purple" onClick={handlePurchase}>
             <Ticket className="w-4 h-4 mr-2" />
-            Purchase
+            {selectedEvent.price === 0 ? 'Get Free Ticket' : 'Purchase'}
           </Button>
         </div>
       </div>
@@ -173,7 +222,7 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
     <div className="fixed inset-0 bg-background z-50 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
-        <h2 className="text-lg font-bold">Ticket Box</h2>
+        <h2 className="text-lg font-bold">My Tickets</h2>
         <button onClick={onClose} className="w-10 h-10 rounded-full bg-card flex items-center justify-center">
           <X className="w-5 h-5" />
         </button>
@@ -190,55 +239,80 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
               activeTab === tab ? 'text-primary' : 'text-muted-foreground'
             )}
           >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === 'active' ? 'My Tickets' : tab === 'purchase' ? 'Get Tickets' : 'History'}
             {activeTab === tab && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+            )}
+            {tab === 'active' && activeTickets.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 bg-primary/20 text-primary text-xs rounded-full">
+                {activeTickets.length}
+              </span>
             )}
           </button>
         ))}
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-5">
-        {/* Active Tickets */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {/* Active Tickets - Now with event images */}
         {activeTab === 'active' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {activeTickets.length > 0 ? (
-              activeTickets.map((ticket) => (
-                <div key={ticket.id} className="glass-card p-4">
-                  <div className="flex items-start gap-4">
-                    <button
-                      onClick={() => setViewingQR(ticket)}
-                      className="w-16 h-16 bg-card rounded-xl flex items-center justify-center border border-border hover:border-primary transition-colors flex-shrink-0"
-                    >
-                      <QrCode className="w-10 h-10 text-primary" />
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-bold truncate">{ticket.eventName}</h4>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                        <Calendar className="w-3 h-3" />
-                        <span>{ticket.eventDate}</span>
-                        <Clock className="w-3 h-3 ml-2" />
-                        <span>{ticket.eventTime}</span>
+              activeTickets.map((ticket) => {
+                const event = getEventForTicket(ticket);
+                return (
+                  <div 
+                    key={ticket.id} 
+                    className="bg-card rounded-xl border border-border overflow-hidden"
+                  >
+                    <div className="flex">
+                      {/* Event Image on Left */}
+                      <div className="w-28 h-28 flex-shrink-0">
+                        <img
+                          src={event?.coverImage || '/placeholder.svg'}
+                          alt={ticket.eventName}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                        <MapPin className="w-3 h-3" />
-                        <span className="truncate">{ticket.eventLocation}</span>
-                      </div>
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs text-muted-foreground">
-                          {ticket.quantity} ticket(s)
-                        </span>
-                        <span className="px-2 py-0.5 bg-brand-green/20 text-brand-green text-xs rounded-full">
-                          Active
-                        </span>
+                      
+                      {/* Ticket Info on Right */}
+                      <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
+                        <div>
+                          <h4 className="font-bold text-sm truncate">{ticket.eventName}</h4>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                            <Calendar className="w-3 h-3" />
+                            <span>{ticket.eventDate}</span>
+                            <span className="mx-1">•</span>
+                            <Clock className="w-3 h-3" />
+                            <span>{ticket.eventTime}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                            <MapPin className="w-3 h-3" />
+                            <span className="truncate">{ticket.eventLocation}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-xs text-muted-foreground">
+                            {ticket.quantity} ticket(s)
+                          </span>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() => setViewingQR(ticket)}
+                          >
+                            <QrCode className="w-3 h-3 mr-1" />
+                            Show QR
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
-              <div className="text-center py-12">
+              <div className="text-center py-16">
                 <Ticket className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="font-bold mb-2">No Active Tickets</h3>
                 <p className="text-muted-foreground text-sm mb-4">
@@ -252,69 +326,197 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
           </div>
         )}
 
-        {/* Purchase Tab */}
+        {/* Purchase Tab with Filters */}
         {activeTab === 'purchase' && (
           <div className="space-y-4">
-            {events.map((event) => (
-              <div key={event.id} className="glass-card p-4">
-                <div className="flex items-start gap-4">
-                  <img
-                    src={event.coverImage}
-                    alt={event.name}
-                    className="w-20 h-20 rounded-xl object-cover flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold truncate">{event.name}</h4>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {event.date} • {event.location}
-                    </p>
-                    <div className="flex items-center justify-between mt-3">
-                      <span className="font-bold text-primary">
-                        {event.price === 0 ? 'FREE' : `${getCurrencySymbol()}${event.price}`}
-                      </span>
-                      <Button size="sm" onClick={() => setSelectedEvent(event)}>
-                        Get Ticket
-                      </Button>
-                    </div>
-                  </div>
+            {/* Filter Pills */}
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {[
+                { key: 'all', label: 'All Events' },
+                { key: 'week', label: 'This Week' },
+                { key: 'month', label: 'This Month' },
+                { key: 'free', label: 'Free' },
+              ].map(filter => (
+                <button
+                  key={filter.key}
+                  onClick={() => setPurchaseFilter(filter.key as PurchaseFilter)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all',
+                    purchaseFilter === filter.key
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-card text-muted-foreground border border-border'
+                  )}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Bookmarked Events Section */}
+            {bookmarkedEvents.length > 0 && purchaseFilter === 'all' && (
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+                  <Star className="w-4 h-4 text-primary" />
+                  Bookmarked Events
+                </h3>
+                <div className="space-y-2">
+                  {bookmarkedEvents.slice(0, 3).map((event) => (
+                    <EventPurchaseCard 
+                      key={event.id} 
+                      event={event} 
+                      onSelect={setSelectedEvent}
+                      currencySymbol={getCurrencySymbol()}
+                      isFeatured={false}
+                      isBookmarked={true}
+                    />
+                  ))}
                 </div>
               </div>
-            ))}
+            )}
+
+            {/* Featured Events */}
+            {featuredEvents.length > 0 && purchaseFilter === 'all' && (
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+                  <Star className="w-4 h-4 text-yellow-500" />
+                  Featured Events
+                </h3>
+                <div className="space-y-2">
+                  {featuredEvents.slice(0, 3).map((event) => (
+                    <EventPurchaseCard 
+                      key={event.id} 
+                      event={event} 
+                      onSelect={setSelectedEvent}
+                      currencySymbol={getCurrencySymbol()}
+                      isFeatured={true}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* All Events */}
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground mb-2">
+                {purchaseFilter === 'all' ? 'All Upcoming Events' : 
+                 purchaseFilter === 'week' ? 'Events This Week' :
+                 purchaseFilter === 'month' ? 'Events This Month' : 'Free Events'}
+              </h3>
+              <div className="space-y-2">
+                {getFilteredPurchaseEvents().map((event) => (
+                  <EventPurchaseCard 
+                    key={event.id} 
+                    event={event} 
+                    onSelect={setSelectedEvent}
+                    currencySymbol={getCurrencySymbol()}
+                    isFeatured={event.isFeatured}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
         {/* History Tab */}
         {activeTab === 'history' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {historyTickets.length > 0 ? (
-              historyTickets.map((ticket) => (
-                <div key={ticket.id} className="glass-card p-4 opacity-75">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-bold">{ticket.eventName}</h4>
-                    <span className={cn(
-                      'px-2 py-0.5 text-xs rounded-full',
-                      ticket.status === 'active' && 'bg-brand-green/20 text-brand-green',
-                      ticket.status === 'used' && 'bg-muted text-muted-foreground',
-                      ticket.status === 'cancelled' && 'bg-brand-red/20 text-brand-red'
-                    )}>
-                      {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
-                    </span>
+              historyTickets.map((ticket) => {
+                const event = getEventForTicket(ticket);
+                return (
+                  <div key={ticket.id} className="bg-card rounded-xl border border-border overflow-hidden opacity-75">
+                    <div className="flex">
+                      <div className="w-20 h-20 flex-shrink-0">
+                        <img
+                          src={event?.coverImage || '/placeholder.svg'}
+                          alt={ticket.eventName}
+                          className="w-full h-full object-cover grayscale"
+                        />
+                      </div>
+                      <div className="flex-1 p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="font-bold text-sm truncate">{ticket.eventName}</h4>
+                          <span className={cn(
+                            'px-2 py-0.5 text-xs rounded-full',
+                            ticket.status === 'used' && 'bg-muted text-muted-foreground',
+                            ticket.status === 'cancelled' && 'bg-red-500/20 text-red-500'
+                          )}>
+                            {ticket.status === 'used' ? 'Attended' : 'Cancelled'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {ticket.eventDate} • {ticket.quantity} ticket(s)
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Purchased: {new Date(ticket.purchaseDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {ticket.eventDate} • {ticket.quantity} ticket(s)
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Purchased: {new Date(ticket.purchaseDate).toLocaleDateString()}
-                  </p>
-                </div>
-              ))
+                );
+              })
             ) : (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No ticket history</p>
+              <div className="text-center py-16">
+                <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="font-bold mb-2">No Ticket History</h3>
+                <p className="text-muted-foreground text-sm">
+                  Your past events will appear here
+                </p>
               </div>
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Sub-component for event cards in purchase tab
+function EventPurchaseCard({ 
+  event, 
+  onSelect, 
+  currencySymbol,
+  isFeatured,
+  isBookmarked
+}: { 
+  event: Event; 
+  onSelect: (e: Event) => void;
+  currencySymbol: string;
+  isFeatured?: boolean;
+  isBookmarked?: boolean;
+}) {
+  return (
+    <div className={cn(
+      "bg-card rounded-xl border overflow-hidden",
+      isFeatured ? "border-yellow-500/30" : isBookmarked ? "border-primary/30" : "border-border"
+    )}>
+      <div className="flex">
+        <div className="w-20 h-20 flex-shrink-0 relative">
+          <img
+            src={event.coverImage}
+            alt={event.name}
+            className="w-full h-full object-cover"
+          />
+          {isFeatured && (
+            <div className="absolute top-1 left-1">
+              <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 p-3 min-w-0">
+          <h4 className="font-bold text-sm truncate">{event.name}</h4>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {event.date} • {event.location}
+          </p>
+          <div className="flex items-center justify-between mt-2">
+            <span className="font-bold text-primary text-sm">
+              {event.price === 0 ? 'FREE' : `${currencySymbol}${event.price}`}
+            </span>
+            <Button size="sm" className="h-7 text-xs" onClick={() => onSelect(event)}>
+              Get Ticket
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

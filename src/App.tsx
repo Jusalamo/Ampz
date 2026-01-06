@@ -16,6 +16,8 @@ import Settings from "./pages/Settings";
 import EditProfile from "./pages/EditProfile";
 import PrivacySettings from "./pages/PrivacySettings";
 import Social from "./pages/Social";
+import Activity from "./pages/Activity";
+import EventManager from "./pages/EventManager";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,7 +46,8 @@ function AppRoutes() {
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/event/:id" element={<ProtectedRoute><EventDetail /></ProtectedRoute>} />
       <Route path="/social" element={<ProtectedRoute><Social /></ProtectedRoute>} />
-      
+      <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
+      <Route path="/event-manager" element={<ProtectedRoute><EventManager /></ProtectedRoute>} />
       {/* Settings Routes */}
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/settings/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
