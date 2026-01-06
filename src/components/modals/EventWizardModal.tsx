@@ -3,7 +3,7 @@ import {
   X, ArrowRight, ArrowLeft, MapPin, Check, QrCode, Copy, Download, 
   Upload, Image, Video, Map, Loader2, Search, Calendar, Clock, 
   DollarSign, Palette, ChevronRight, Edit2, Music, Cpu, Users, 
-  Brush, Globe, Camera, Map as MapIcon, Radio, Eye
+  Brush, Globe, Camera, Map as MapIcon, Radio, Eye, Building, Navigation
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,8 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Event } from '@/lib/types';
 
-const MAPBOX_TOKEN = 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg';
+// Mapbox token
+mapboxgl.accessToken = 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg';
 
 interface EventWizardModalProps {
   isOpen: boolean;
@@ -48,6 +49,25 @@ const presetColors = [
   '#10B981', '#F59E0B', '#EF4444', '#6366F1', '#06B6D4'
 ];
 
+// Popular Namibian locations for better suggestions
+const namibianPopularPlaces = [
+  'Windhoek, Namibia',
+  'Swakopmund, Namibia', 
+  'Walvis Bay, Namibia',
+  'Etosha National Park, Namibia',
+  'Sossusvlei, Namibia',
+  'Tsumeb, Namibia',
+  'Oshakati, Namibia',
+  'Rundu, Namibia',
+  'Katima Mulilo, Namibia',
+  'Lüderitz, Namibia',
+  'Henties Bay, Namibia',
+  'Omaruru, Namibia',
+  'Gobabis, Namibia',
+  'Keetmanshoop, Namibia',
+  'Mariental, Namibia'
+];
+
 export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const { addEvent, user } = useApp();
   const { toast } = useToast();
@@ -62,8 +82,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     location: '',
     address: '',
     streetName: '',
-    coordinates: { lat: -22.5609, lng: 17.0658 },
-    geofenceRadius: 50, // Default to 50m
+    coordinates: { lat: -22.5609, lng: 17.0658 }, // Windhoek coordinates
+    geofenceRadius: 50,
     images: [] as string[],
     videos: [] as string[],
     themeColor: '#8B5CF6',
@@ -80,6 +100,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     address: string;
     website?: string;
   } | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   const mapContainer1 = useRef<HTMLDivElement>(null);
   const mapContainer2 = useRef<HTMLDivElement>(null);
@@ -92,12 +113,16 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const videoInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Cleanup URLs when component unmounts or images/videos change
   useEffect(() => {
     return () => {
       eventData.images.forEach(url => URL.revokeObjectURL(url));
       eventData.videos.forEach(url => URL.revokeObjectURL(url));
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -128,38 +153,47 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       setLocationSuggestions([]);
       setShowSuggestions(false);
       setSelectedVenueDetails(null);
+      setIsSearching(false);
     }
   }, [isOpen]);
 
-  // Cleanup maps when modal closes
+  // Initialize and manage maps - FIXED: Maps persist between steps
   useEffect(() => {
-    if (!isOpen) {
-      if (map1.current) {
-        map1.current.remove();
-        map1.current = null;
-        marker1.current = null;
-      }
-      if (map2.current) {
-        map2.current.remove();
-        map2.current = null;
-        marker2.current = null;
-      }
-    }
-  }, [isOpen]);
+    if (!isOpen) return;
 
-  // Initialize map for step 3 (Location)
-  useEffect(() => {
-    if (step === 3 && isOpen && mapContainer1.current && !map1.current) {
+    // Initialize Map 1 for step 3 if needed
+    if (mapContainer1.current && !map1.current) {
       initializeMap(mapContainer1.current, 1);
     }
-  }, [step, isOpen]);
 
-  // Initialize map for step 4 (Radius)
-  useEffect(() => {
-    if (step === 4 && isOpen && mapContainer2.current && !map2.current) {
+    // Initialize Map 2 for step 4 if needed
+    if (mapContainer2.current && !map2.current) {
       initializeMap(mapContainer2.current, 2);
     }
-  }, [step, isOpen]);
+
+    return () => {
+      // Only cleanup maps when modal closes completely
+      if (!isOpen) {
+        if (map1.current) {
+          map1.current.remove();
+          map1.current = null;
+          marker1.current = null;
+        }
+        if (map2.current) {
+          map2.current.remove();
+          map2.current = null;
+          marker2.current = null;
+        }
+      }
+    };
+  }, [isOpen]);
+
+  // Update geofence circle when radius changes
+  useEffect(() => {
+    if (map2.current && map2.current.isStyleLoaded()) {
+      updateGeofenceCircle(map2.current);
+    }
+  }, [eventData.geofenceRadius, eventData.coordinates, step]);
 
   const initializeMap = useCallback((container: HTMLDivElement, mapNumber: 1 | 2) => {
     if (!container) return;
@@ -167,8 +201,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     setIsMapLoading(true);
     
     try {
-      mapboxgl.accessToken = MAPBOX_TOKEN;
-      
       const mapInstance = new mapboxgl.Map({
         container,
         style: 'mapbox://styles/mapbox/streets-v12',
@@ -267,13 +299,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   }, [eventData.themeColor, eventData.coordinates]);
 
-  // Update geofence circle when radius changes
-  useEffect(() => {
-    if (step === 4 && map2.current && map2.current.isStyleLoaded()) {
-      updateGeofenceCircle(map2.current);
-    }
-  }, [eventData.geofenceRadius, eventData.coordinates, step]);
-
   const updateGeofenceCircle = useCallback((mapInstance: mapboxgl.Map) => {
     if (!mapInstance.isStyleLoaded()) return;
 
@@ -352,7 +377,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const reverseGeocode = async (lng: number, lat: number) => {
     try {
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxgl.accessToken}&country=na`
       );
       const data = await response.json();
       if (data.features && data.features.length > 0) {
@@ -380,21 +405,83 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       return;
     }
     
+    setIsSearching(true);
+    
     try {
+      // First, show popular Namibian places that match the query
+      const matchingPopular = namibianPopularPlaces
+        .filter(place => place.toLowerCase().includes(query.toLowerCase()))
+        .map(place => ({
+          text: place.split(',')[0],
+          place_name: place,
+          center: getCoordinatesForPlace(place)
+        }));
+      
+      // Then search Mapbox API for more results
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=NA&types=poi,address`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxgl.accessToken}&country=na&types=poi,address,place&limit=8`
       );
       const data = await response.json();
+      
+      let allSuggestions = [...matchingPopular];
+      
       if (data.features && data.features.length > 0) {
-        setLocationSuggestions(data.features);
-        setShowSuggestions(true);
-      } else {
-        setLocationSuggestions([]);
-        setShowSuggestions(false);
+        // Convert Mapbox features to our format
+        const mapboxSuggestions = data.features.map((place: any) => ({
+          text: place.text,
+          place_name: place.place_name,
+          center: place.center,
+          properties: place.properties
+        }));
+        allSuggestions = [...allSuggestions, ...mapboxSuggestions];
       }
+      
+      // Remove duplicates based on place_name
+      const uniqueSuggestions = allSuggestions.filter((suggestion, index, self) =>
+        index === self.findIndex((s) => s.place_name === suggestion.place_name)
+      );
+      
+      setLocationSuggestions(uniqueSuggestions);
+      setShowSuggestions(true);
     } catch (error) {
       console.error('Search error:', error);
+      // Fallback to popular places
+      const matchingPopular = namibianPopularPlaces
+        .filter(place => place.toLowerCase().includes(query.toLowerCase()))
+        .map(place => ({
+          text: place.split(',')[0],
+          place_name: place,
+          center: getCoordinatesForPlace(place)
+        }));
+      setLocationSuggestions(matchingPopular);
+      setShowSuggestions(true);
+    } finally {
+      setIsSearching(false);
     }
+  };
+
+  // Helper function to get coordinates for popular Namibian places
+  const getCoordinatesForPlace = (placeName: string): [number, number] => {
+    const coordinates: Record<string, [number, number]> = {
+      'Windhoek': [17.0836, -22.5609],
+      'Swakopmund': [14.5269, -22.6743],
+      'Walvis Bay': [14.5037, -22.9589],
+      'Etosha National Park': [15.9066, -18.8559],
+      'Sossusvlei': [15.8026, -24.7358],
+      'Tsumeb': [17.7167, -19.2333],
+      'Oshakati': [15.6833, -17.7833],
+      'Rundu': [19.7667, -17.9167],
+      'Katima Mulilo': [24.2667, -17.5000],
+      'Lüderitz': [15.1558, -26.6478],
+      'Henties Bay': [14.2833, -22.1167],
+      'Omaruru': [15.9333, -21.4333],
+      'Gobabis': [18.9667, -22.4500],
+      'Keetmanshoop': [18.1333, -26.5833],
+      'Mariental': [19.9667, -24.6167]
+    };
+    
+    const placeKey = placeName.split(',')[0].trim();
+    return coordinates[placeKey] || [17.0658, -22.5609]; // Default to Windhoek
   };
 
   const handleLocationSelect = (place: any) => {
@@ -418,7 +505,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     setLocationSuggestions([]);
     setShowSuggestions(false);
     
-    // Update maps if they exist
+    // Update both maps
     if (map1.current) {
       map1.current.flyTo({ center: [lng, lat], zoom: 14 });
       if (marker1.current) {
@@ -434,20 +521,39 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   };
 
+  // Debounced search handler
+  const handleSearchChange = (query: string) => {
+    setEventData({ ...eventData, location: query });
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Set new timeout for debounced search
+    searchTimeoutRef.current = setTimeout(() => {
+      if (query.length >= 2) {
+        searchLocation(query);
+        setShowSuggestions(true);
+      } else {
+        setLocationSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 300);
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
       const newImages = Array.from(files).slice(0, 5 - imageFiles.length);
       setImageFiles(prev => [...prev, ...newImages]);
       
-      // Create preview URLs
       const imageUrls = newImages.map(file => URL.createObjectURL(file));
       setEventData(prev => ({
         ...prev,
         images: [...prev.images, ...imageUrls]
       }));
       
-      // Reset file input
       e.target.value = '';
     }
   };
@@ -455,15 +561,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const handlePrimaryPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files[0]) {
-      // If this is the first photo, treat as primary
-      if (imageFiles.length === 0) {
-        const newFile = files[0];
-        setImageFiles([newFile]);
-        setEventData(prev => ({
-          ...prev,
-          images: [URL.createObjectURL(newFile)]
-        }));
-      }
+      const newFile = files[0];
+      setImageFiles([newFile]);
+      setEventData(prev => ({
+        ...prev,
+        images: [URL.createObjectURL(newFile)]
+      }));
       e.target.value = '';
     }
   };
@@ -473,22 +576,17 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     if (files && files[0]) {
       const newVideo = files[0];
       setVideoFile(newVideo);
-      
-      // Create preview URL
       const videoUrl = URL.createObjectURL(newVideo);
       setEventData(prev => ({
         ...prev,
         videos: [videoUrl]
       }));
-      
       e.target.value = '';
     }
   };
 
   const removeImage = (index: number) => {
-    // Revoke the object URL to prevent memory leaks
     URL.revokeObjectURL(eventData.images[index]);
-    
     setEventData(prev => ({
       ...prev,
       images: prev.images.filter((_, i) => i !== index)
@@ -500,7 +598,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     if (eventData.videos[0]) {
       URL.revokeObjectURL(eventData.videos[0]);
     }
-    
     setEventData(prev => ({
       ...prev,
       videos: []
@@ -523,11 +620,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     try {
       const qrCode = `${eventData.name.replace(/\s+/g, '-').toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
       
-      // In a real app, you would upload files to a server here
-      // For now, we'll use placeholder URLs
       const uploadedImages = await Promise.all(
         imageFiles.map(async (file) => {
-          // Convert to data URL for demo purposes
           return new Promise<string>((resolve) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(reader.result as string);
@@ -607,7 +701,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
   if (!isOpen) return null;
 
-  // Get current date for date input min
   const today = new Date().toISOString().split('T')[0];
 
   return (
@@ -616,9 +709,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         ref={modalRef}
         className="bg-background rounded-2xl flex flex-col w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl border border-border"
       >
-        {/* Header - Redesigned to be compact */}
+        {/* Header */}
         <div className="border-b border-border shrink-0">
-          {/* Row 1: Title and Close */}
           <div className="flex items-center justify-between px-6 h-14">
             <h2 className="text-xl font-semibold">Create Event</h2>
             <button 
@@ -630,7 +722,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             </button>
           </div>
           
-          {/* Row 2: Progress Dots */}
           {step < 6 && (
             <div className="flex justify-center items-center h-10">
               <div className="flex gap-3">
@@ -655,7 +746,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             </div>
           )}
           
-          {/* Row 3: Current Step Title */}
           {step < 6 && (
             <div className="flex justify-center items-center h-8 pb-2">
               <span className="text-sm text-muted-foreground">
@@ -665,7 +755,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           )}
         </div>
 
-        {/* Content - Scrollable area */}
+        {/* Content */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6">
             {/* Step 1: Basic Info */}
@@ -1088,49 +1178,114 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     <Input
                       ref={searchInputRef}
                       value={eventData.location}
-                      onChange={(e) => {
-                        setEventData({ ...eventData, location: e.target.value });
-                        searchLocation(e.target.value);
-                      }}
+                      onChange={(e) => handleSearchChange(e.target.value)}
                       onFocus={() => {
-                        if (eventData.location) {
-                          searchLocation(eventData.location);
+                        if (eventData.location.length >= 2) {
                           setShowSuggestions(true);
                         }
                       }}
-                      placeholder="Central Park Bandshell, New York"
-                      className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10"
+                      placeholder="Windhoek, Swakopmund, Walvis Bay..."
+                      className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10 pr-10"
                       disabled={isSubmitting}
                     />
+                    {isSearching && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
+                    )}
                   </div>
                   
                   {/* Autocomplete Dropdown */}
-                  {showSuggestions && locationSuggestions.length > 0 && (
+                  {showSuggestions && (
                     <div className="absolute z-10 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {locationSuggestions.map((place, index) => (
-                        <button
-                          key={index}
-                          onClick={() => handleLocationSelect(place)}
-                          className="w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b border-border last:border-b-0"
-                        >
-                          <div className="flex items-start gap-3">
-                            <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">
-                                {place.text}
-                              </p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {place.place_name}
-                              </p>
+                      {locationSuggestions.length > 0 ? (
+                        <>
+                          {/* Popular Namibian Places Section */}
+                          {locationSuggestions.filter(s => 
+                            namibianPopularPlaces.some(popular => popular.includes(s.text))
+                          ).length > 0 && (
+                            <div className="px-4 py-2 border-b border-border">
+                              <p className="text-xs font-medium text-muted-foreground">Popular in Namibia</p>
                             </div>
+                          )}
+                          
+                          {locationSuggestions.map((place, index) => {
+                            const isPopular = namibianPopularPlaces.some(popular => 
+                              popular.includes(place.text)
+                            );
+                            return (
+                              <button
+                                key={index}
+                                onClick={() => handleLocationSelect(place)}
+                                className="w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b border-border last:border-b-0"
+                              >
+                                <div className="flex items-start gap-3">
+                                  {isPopular ? (
+                                    <Building className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                                  ) : (
+                                    <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">
+                                      {place.text}
+                                      {isPopular && (
+                                        <span className="ml-2 text-xs px-1.5 py-0.5 bg-primary/10 text-primary rounded">
+                                          Popular
+                                        </span>
+                                      )}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground truncate">
+                                      {place.place_name}
+                                    </p>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                          
+                          {/* View on Map Option */}
+                          <button
+                            onClick={() => {
+                              setShowSuggestions(false);
+                              if (map1.current && searchInputRef.current) {
+                                searchInputRef.current.blur();
+                              }
+                            }}
+                            className="w-full text-left px-4 py-3 hover:bg-accent transition-colors text-sm text-primary font-medium"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Navigation className="w-4 h-4" />
+                              View on map
+                            </div>
+                          </button>
+                        </>
+                      ) : eventData.location.length >= 2 ? (
+                        <div className="px-4 py-8 text-center">
+                          <MapPin className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                          <p className="text-sm text-muted-foreground">No results found</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Try searching for a city or venue in Namibia
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="px-4 py-4">
+                          <p className="text-sm text-muted-foreground mb-2">Try searching for:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {['Windhoek', 'Swakopmund', 'Walvis Bay', 'Etosha'].map((place) => (
+                              <button
+                                key={place}
+                                onClick={() => handleSearchChange(place)}
+                                className="text-xs px-3 py-1.5 rounded-full border border-border hover:border-primary hover:bg-primary/5 transition-colors"
+                              >
+                                {place}
+                              </button>
+                            ))}
                           </div>
-                        </button>
-                      ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
 
-                {/* Map */}
+                {/* Map - FIXED: Map persists now */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium">Map View</label>
@@ -1157,9 +1312,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     <div
                       ref={mapContainer1}
                       className="w-full h-full"
+                      style={{ display: 'block' }}
                     />
                     <div className="absolute top-3 left-3 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs">
-                      Drag marker to adjust
+                      Drag marker to adjust location
                     </div>
                   </div>
                 </div>
@@ -1180,7 +1336,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                           </p>
                         </div>
                         <button 
-                          className="text-xs text-primary hover:underline"
+                          className="text-xs text-primary hover:underline whitespace-nowrap"
                           onClick={() => {
                             searchInputRef.current?.focus();
                             setShowSuggestions(true);
@@ -1213,7 +1369,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   <p className="text-sm text-muted-foreground">Check-in radius</p>
                 </div>
 
-                {/* Map with Radius */}
+                {/* Map with Radius - FIXED: Map persists now */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium">Geofence Area</label>
@@ -1230,6 +1386,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     <div
                       ref={mapContainer2}
                       className="w-full h-full"
+                      style={{ display: 'block' }}
                     />
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs border border-border">
                       Radius: {eventData.geofenceRadius}m
@@ -1322,7 +1479,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                                 color: eventData.themeColor
                               }}
                             >
-                              {eventData.category}
+                              {categories.find(c => c.value === eventData.category)?.label || 'Other'}
                             </span>
                           </div>
                           <div className="flex items-center text-sm text-muted-foreground">
@@ -1379,7 +1536,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       </div>
                       <div className="space-y-1 text-sm">
                         <p><span className="text-muted-foreground">Name:</span> {eventData.name}</p>
-                        <p><span className="text-muted-foreground">Category:</span> {eventData.category}</p>
+                        <p><span className="text-muted-foreground">Category:</span> {categories.find(c => c.value === eventData.category)?.label || 'Other'}</p>
                         <p><span className="text-muted-foreground">Date:</span> {eventData.date} at {eventData.time}</p>
                         <p><span className="text-muted-foreground">Price:</span> {eventData.price === 0 ? 'Free' : `N$${eventData.price}`}</p>
                       </div>
@@ -1484,7 +1641,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           </div>
         </div>
 
-        {/* Footer - Redesigned to be compact */}
+        {/* Footer */}
         {step < 6 && (
           <div className="border-t border-border bg-background p-4 shrink-0">
             <div className="flex gap-3">
