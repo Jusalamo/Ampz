@@ -15,7 +15,7 @@ export default function Events() {
   const [showSubscription, setShowSubscription] = useState(false);
 
   const handleCreateEvent = () => {
-    if (user?.subscription.tier === 'free') {
+    if (user?.subscription?.tier === 'free') {
       toast({
         title: 'Pro Feature',
         description: 'Upgrade to Pro to create events',
