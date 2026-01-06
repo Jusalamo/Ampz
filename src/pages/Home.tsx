@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { QrCode, Map, Plus, Ticket, Calendar, Users, Heart, ChevronRight, ChevronLeft, Bell, Zap, Bookmark, Star } from 'lucide-react';
+import { QrCode, Map, Plus, Ticket, Calendar, Users, Heart, ChevronRight, ChevronLeft, Bell, Zap, Bookmark, Star, Settings } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
 import { CheckInModal } from '@/components/modals/CheckInModal';
@@ -27,26 +27,26 @@ export default function Home() {
   const featuredRef = useRef<HTMLDivElement>(null);
   const myEventsCarouselRef = useRef<HTMLDivElement>(null);
 
-  // Get all user events (created + bookmarked)
-  const createdEvents = events.filter(e => e.organizerId === user?.id);
-  const bookmarkedEvents = events.filter(e => user?.bookmarkedEvents.includes(e.id));
+  // Get all user events (created + bookmarked) - FIXED: added null checks
+  const createdEvents = events?.filter(e => e.organizerId === user?.id) || [];
+  const bookmarkedEvents = events?.filter(e => user?.bookmarkedEvents?.includes(e.id)) || [];
   const myEvents = [...createdEvents, ...bookmarkedEvents];
-  const featuredEvents = events.filter(e => e.isFeatured);
+  const featuredEvents = events?.filter(e => e.isFeatured) || [];
 
   const isHeaderHidden = scrollDirection === 'down' && scrollY > 100;
 
-  // Auto-rotate featured events
+  // Auto-rotate featured events - FIXED: added length check
   useEffect(() => {
-    if (featuredEvents.length <= 1) return;
+    if (!featuredEvents || featuredEvents.length <= 1) return;
     const interval = setInterval(() => {
       setFeaturedIndex((prev) => (prev + 1) % featuredEvents.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, [featuredEvents.length]);
+  }, [featuredEvents]);
 
-  // Scroll to current featured event
+  // Scroll to current featured event - FIXED: added null checks
   useEffect(() => {
-    if (featuredRef.current && featuredEvents.length > 0) {
+    if (featuredRef.current && featuredEvents?.length > 0) {
       const container = featuredRef.current;
       const cardWidth = container.offsetWidth - 40; // Account for padding
       container.scrollTo({
@@ -54,30 +54,45 @@ export default function Home() {
         behavior: 'smooth',
       });
     }
-  }, [featuredIndex, featuredEvents.length]);
+  }, [featuredIndex, featuredEvents?.length]);
 
-  // Handle my events carousel scroll
+  // Handle my events carousel scroll - FIXED: added null checks
   useEffect(() => {
-    if (myEventsCarouselRef.current && myEvents.length > 0) {
+    if (myEventsCarouselRef.current && myEvents?.length > 0) {
       const container = myEventsCarouselRef.current;
-      const cardWidth = container.offsetWidth / 2; // Show 2 cards at a time
+      // Calculate card width based on actual card dimensions (2 cards + gap)
+      const cardWidth = (container.offsetWidth - 12) / 2; // 12px = gap(3px) * 3 (gaps between 2 cards)
       container.scrollTo({
-        left: myEventsIndex * cardWidth,
+        left: myEventsIndex * container.offsetWidth, // Scroll by full container width
         behavior: 'smooth',
       });
     }
-  }, [myEventsIndex, myEvents.length]);
+  }, [myEventsIndex, myEvents?.length]);
 
   const handleCreateEvent = () => {
-    if (user?.subscription.tier === 'free') {
-      toast({ title: 'Pro Feature', description: 'Upgrade to Pro to create events' });
+    if (user?.subscription?.tier === 'free') {
+      toast({ 
+        title: 'Pro Feature', 
+        description: 'Upgrade to Pro to create events' 
+      });
       setShowSubscription(true);
     } else {
       setShowEventWizard(true);
     }
   };
 
-  // Quick actions in 2x2 grid with only 4 items
+  const handleManageEvent = () => {
+    if (createdEvents.length > 0) {
+      navigate('/manage-events');
+    } else {
+      toast({
+        title: 'No events to manage',
+        description: 'Create an event first to manage it',
+      });
+    }
+  };
+
+  // Quick actions in 2x2 grid - UPDATED: Added Manage Events button
   const quickActions = [
     { 
       icon: QrCode, 
@@ -91,14 +106,15 @@ export default function Home() {
       label: 'Create Event', 
       color: 'bg-pink-500', 
       onClick: handleCreateEvent, 
-      pro: user?.subscription.tier === 'free',
+      pro: user?.subscription?.tier === 'free',
       iconSize: 'w-6 h-6'
     },
     { 
-      icon: Map, 
-      label: 'View Map', 
-      color: 'bg-blue-500', 
-      onClick: () => navigate('/events'),
+      icon: Settings, 
+      label: 'Manage Events', 
+      color: 'bg-orange-500', 
+      onClick: handleManageEvent,
+      pro: user?.subscription?.tier === 'free',
       iconSize: 'w-6 h-6'
     },
     { 
@@ -110,7 +126,7 @@ export default function Home() {
     },
   ];
 
-  // Compact stats grid
+  // Compact stats grid - FIXED: added null checks
   const stats = [
     { 
       icon: Calendar, 
@@ -121,14 +137,14 @@ export default function Home() {
     },
     { 
       icon: Users, 
-      value: user?.subscription.tier === 'free' ? 2 : 12, 
+      value: user?.subscription?.tier === 'free' ? 2 : 12, 
       label: 'Matches',
       color: 'text-green-500',
       bgColor: 'bg-green-500/10'
     },
     { 
       icon: Heart, 
-      value: user?.subscription.tier === 'free' ? user?.likesRemaining ?? 10 : '∞', 
+      value: user?.subscription?.tier === 'free' ? (user?.likesRemaining ?? 10) : '∞', 
       label: 'Likes Left',
       color: 'text-pink-500',
       bgColor: 'bg-pink-500/10'
@@ -138,6 +154,24 @@ export default function Home() {
   // Calculate my events carousel items per slide
   const itemsPerSlide = 2;
   const totalMyEventsSlides = Math.ceil(myEvents.length / itemsPerSlide);
+
+  // Handle my events carousel navigation
+  const handleMyEventsPrev = () => {
+    setMyEventsIndex(prev => (prev - 1 + totalMyEventsSlides) % totalMyEventsSlides);
+  };
+
+  const handleMyEventsNext = () => {
+    setMyEventsIndex(prev => (prev + 1) % totalMyEventsSlides);
+  };
+
+  // Handle featured events navigation
+  const handleFeaturedPrev = () => {
+    setFeaturedIndex(prev => (prev - 1 + featuredEvents.length) % featuredEvents.length);
+  };
+
+  const handleFeaturedNext = () => {
+    setFeaturedIndex(prev => (prev + 1) % featuredEvents.length);
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
@@ -157,9 +191,9 @@ export default function Home() {
               <span className="text-xl font-bold">Ampz</span>
             </div>
             <div className="flex items-center gap-3">
-              {user?.subscription.tier !== 'free' && (
+              {user?.subscription?.tier !== 'free' && (
                 <span className="px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full uppercase">
-                  {user?.subscription.tier}
+                  {user?.subscription?.tier}
                 </span>
               )}
               <div className="relative">
@@ -170,11 +204,13 @@ export default function Home() {
                   <Bell className="w-5 h-5" />
                   {unreadNotificationsCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs font-bold flex items-center justify-center text-white">
-                      {unreadNotificationsCount}
+                      {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
                     </span>
                   )}
                 </button>
-                <NotificationsDropdown isOpen={showNotifications} onClose={() => setShowNotifications(false)} />
+                {showNotifications && (
+                  <NotificationsDropdown isOpen={showNotifications} onClose={() => setShowNotifications(false)} />
+                )}
               </div>
             </div>
           </div>
@@ -188,14 +224,17 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary">
               <img 
-                src={user?.profile.profilePhoto || '/default-avatar.png'} 
-                alt={user?.profile.name} 
+                src={user?.profile?.profilePhoto || '/default-avatar.png'} 
+                alt={user?.profile?.name || 'User'} 
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = '/default-avatar.png';
+                }}
               />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Welcome back</p>
-              <h1 className="text-xl font-bold">{user?.profile.name?.split(' ')[0]}</h1>
+              <h1 className="text-xl font-bold">{user?.profile?.name?.split(' ')[0] || 'Guest'}</h1>
             </div>
           </div>
         </div>
@@ -217,7 +256,7 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Quick Actions - 2x2 Grid */}
+        {/* Quick Actions - 2x2 Grid - UPDATED: Now has Manage Events */}
         <div className="mb-8">
           <h2 className="text-lg font-bold mb-3">Quick Actions</h2>
           <div className="grid grid-cols-2 gap-3">
@@ -225,7 +264,7 @@ export default function Home() {
               <button 
                 key={label} 
                 onClick={onClick}
-                className="bg-card rounded-xl p-4 flex flex-col items-center justify-center gap-2 border border-border hover:border-primary transition-all relative group"
+                className="bg-card rounded-xl p-4 flex flex-col items-center justify-center gap-2 border border-border hover:border-primary transition-all relative group active:scale-95"
               >
                 <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", color)}>
                   <Icon className={cn("text-white", iconSize)} />
@@ -239,8 +278,20 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Map Button moved here as a separate section */}
+        <div className="mb-8">
+          <button 
+            onClick={() => navigate('/events')}
+            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl p-4 flex items-center justify-center gap-3 border border-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all active:scale-98"
+          >
+            <Map className="w-6 h-6" />
+            <span className="text-lg font-bold">Explore Events Map</span>
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+
         {/* My Events - Horizontal Carousel */}
-        {myEvents.length > 0 && (
+        {myEvents.length > 0 ? (
           <section className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
@@ -249,7 +300,7 @@ export default function Home() {
               </h2>
               <button 
                 onClick={() => navigate('/events')}
-                className="text-primary text-sm font-medium flex items-center gap-1"
+                className="text-primary text-sm font-medium flex items-center gap-1 hover:underline"
               >
                 See All
                 <ChevronRight className="w-4 h-4" />
@@ -271,13 +322,13 @@ export default function Home() {
                       {myEvents
                         .slice(slideIndex * itemsPerSlide, (slideIndex + 1) * itemsPerSlide)
                         .map((event) => {
-                          const isBookmarked = user?.bookmarkedEvents.includes(event.id);
+                          const isBookmarked = user?.bookmarkedEvents?.includes(event.id);
                           const isCreated = event.organizerId === user?.id;
                           
                           return (
                             <div 
                               key={event.id} 
-                              className="bg-card rounded-xl overflow-hidden border border-border hover:border-primary transition-all group cursor-pointer"
+                              className="bg-card rounded-xl overflow-hidden border border-border hover:border-primary transition-all group cursor-pointer active:scale-98"
                               onClick={() => navigate(`/event/${event.id}`)}
                             >
                               {/* Event Image with Bookmark Badge */}
@@ -286,6 +337,9 @@ export default function Home() {
                                   src={event.coverImage} 
                                   alt={event.name}
                                   className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.src = '/default-event.jpg';
+                                  }}
                                 />
                                 <div className="absolute top-2 right-2">
                                   {isBookmarked && (
@@ -302,7 +356,7 @@ export default function Home() {
                                   </div>
                                 )}
                                 <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                                  {event.attendees} going
+                                  {event.attendees || 0} going
                                 </div>
                               </div>
                               
@@ -313,14 +367,14 @@ export default function Home() {
                                 </h3>
                                 <div className="flex items-center justify-between">
                                   <span className="text-xs text-muted-foreground">
-                                    {event.category}
+                                    {event.category || 'Event'}
                                   </span>
                                   <span className="text-xs font-semibold">
                                     {event.price === 0 ? 'FREE' : `N$${event.price}`}
                                   </span>
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
-                                  {event.location}
+                                  {event.location || 'Location not specified'}
                                 </p>
                               </div>
                             </div>
@@ -335,14 +389,16 @@ export default function Home() {
               {totalMyEventsSlides > 1 && (
                 <>
                   <button
-                    onClick={() => setMyEventsIndex(prev => (prev - 1 + totalMyEventsSlides) % totalMyEventsSlides)}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10"
+                    onClick={handleMyEventsPrev}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10 active:scale-95"
+                    aria-label="Previous events"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => setMyEventsIndex(prev => (prev + 1) % totalMyEventsSlides)}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10"
+                    onClick={handleMyEventsNext}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10 active:scale-95"
+                    aria-label="Next events"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
@@ -359,6 +415,7 @@ export default function Home() {
                             ? "bg-primary w-4" 
                             : "bg-muted w-1.5"
                         )}
+                        aria-label={`Go to slide ${index + 1}`}
                       />
                     ))}
                   </div>
@@ -366,10 +423,24 @@ export default function Home() {
               )}
             </div>
           </section>
+        ) : (
+          <section className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Bookmark className="w-5 h-5 text-primary" />
+                My Events
+              </h2>
+            </div>
+            <div className="bg-card rounded-xl p-8 text-center border border-dashed border-border">
+              <Bookmark className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">No events yet</p>
+              <p className="text-sm text-muted-foreground mt-1">Create or bookmark events to see them here</p>
+            </div>
+          </section>
         )}
 
         {/* Featured Events - Carousel */}
-        {featuredEvents.length > 0 && (
+        {featuredEvents.length > 0 ? (
           <section className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
@@ -378,7 +449,7 @@ export default function Home() {
               </h2>
               <button 
                 onClick={() => navigate('/events')}
-                className="text-primary text-sm font-medium flex items-center gap-1"
+                className="text-primary text-sm font-medium flex items-center gap-1 hover:underline"
               >
                 View All
                 <ChevronRight className="w-4 h-4" />
@@ -397,7 +468,7 @@ export default function Home() {
                     className="flex-shrink-0 w-full snap-start px-1"
                   >
                     <div 
-                      className="bg-card rounded-xl overflow-hidden border border-border hover:border-primary transition-all cursor-pointer"
+                      className="bg-card rounded-xl overflow-hidden border border-border hover:border-primary transition-all cursor-pointer active:scale-98"
                       onClick={() => navigate(`/event/${event.id}`)}
                     >
                       {/* Featured Event Image */}
@@ -406,6 +477,9 @@ export default function Home() {
                           src={event.coverImage} 
                           alt={event.name}
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = '/default-event.jpg';
+                          }}
                         />
                         <div className="absolute top-3 right-3">
                           <div className="px-3 py-1 bg-primary/90 rounded-full text-xs font-bold text-white">
@@ -413,7 +487,7 @@ export default function Home() {
                           </div>
                         </div>
                         <div className="absolute bottom-3 left-3 bg-black/70 text-white text-sm px-3 py-1 rounded">
-                          {event.attendees} going
+                          {event.attendees || 0} going
                         </div>
                       </div>
                       
@@ -428,10 +502,10 @@ export default function Home() {
                         
                         <div className="flex items-center gap-2 mb-3">
                           <span className="px-2 py-1 bg-primary/10 text-primary text-xs font-medium rounded">
-                            {event.category}
+                            {event.category || 'Event'}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {event.date} • {event.time}
+                            {event.date || 'TBA'} • {event.time || 'TBA'}
                           </span>
                         </div>
                         
@@ -443,7 +517,7 @@ export default function Home() {
                         <div className="flex items-center gap-2 pt-3 border-t border-border">
                           <Map className="w-4 h-4 text-muted-foreground" />
                           <span className="text-sm text-muted-foreground line-clamp-1">
-                            {event.location}
+                            {event.location || 'Location not specified'}
                           </span>
                         </div>
                       </div>
@@ -456,14 +530,16 @@ export default function Home() {
               {featuredEvents.length > 1 && (
                 <>
                   <button
-                    onClick={() => setFeaturedIndex(prev => (prev - 1 + featuredEvents.length) % featuredEvents.length)}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10"
+                    onClick={handleFeaturedPrev}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10 active:scale-95"
+                    aria-label="Previous featured event"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => setFeaturedIndex(prev => (prev + 1) % featuredEvents.length)}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10"
+                    onClick={handleFeaturedNext}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10 active:scale-95"
+                    aria-label="Next featured event"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
@@ -480,11 +556,26 @@ export default function Home() {
                             ? "bg-primary w-4" 
                             : "bg-muted w-1.5"
                         )}
+                        aria-label={`Go to slide ${index + 1}`}
                       />
                     ))}
                   </div>
                 </>
               )}
+            </div>
+          </section>
+        ) : (
+          <section className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Star className="w-5 h-5 text-yellow-500" />
+                Featured Events
+              </h2>
+            </div>
+            <div className="bg-card rounded-xl p-8 text-center border border-dashed border-border">
+              <Star className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">No featured events</p>
+              <p className="text-sm text-muted-foreground mt-1">Check back later for featured events</p>
             </div>
           </section>
         )}
