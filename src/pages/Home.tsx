@@ -35,6 +35,9 @@ export default function Home() {
 
   const isHeaderHidden = scrollDirection === 'down' && scrollY > 100;
 
+  // Check if user has Pro or Max subscription
+  const isProUser = user?.subscription?.tier === 'pro' || user?.subscription?.tier === 'max';
+
   // Auto-rotate featured events - FIXED: added length check
   useEffect(() => {
     if (!featuredEvents || featuredEvents.length <= 1) return;
@@ -70,7 +73,7 @@ export default function Home() {
   }, [myEventsIndex, myEvents?.length]);
 
   const handleCreateEvent = () => {
-    if (user?.subscription?.tier === 'free') {
+    if (!isProUser) {
       toast({ 
         title: 'Pro Feature', 
         description: 'Upgrade to Pro to create events' 
@@ -81,14 +84,21 @@ export default function Home() {
     }
   };
 
-  const handleManageEvent = () => {
-    if (createdEvents.length > 0) {
-      navigate('/manage-events');
-    } else {
+  const handleManageEvents = () => {
+    if (!isProUser) {
+      toast({ 
+        title: 'Pro Feature', 
+        description: 'Upgrade to Pro to manage events' 
+      });
+      setShowSubscription(true);
+    } else if (createdEvents.length === 0) {
       toast({
         title: 'No events to manage',
         description: 'Create an event first to manage it',
+        variant: 'destructive'
       });
+    } else {
+      navigate('/manage-events');
     }
   };
 
@@ -99,22 +109,23 @@ export default function Home() {
       label: 'QR Scan', 
       color: 'bg-purple-500', 
       onClick: () => setShowCheckIn(true),
-      iconSize: 'w-6 h-6' 
+      iconSize: 'w-6 h-6',
+      pro: false
     },
     { 
       icon: Plus, 
       label: 'Create Event', 
       color: 'bg-pink-500', 
       onClick: handleCreateEvent, 
-      pro: user?.subscription?.tier === 'free',
+      pro: !isProUser,
       iconSize: 'w-6 h-6'
     },
     { 
       icon: Settings, 
       label: 'Manage Events', 
       color: 'bg-orange-500', 
-      onClick: handleManageEvent,
-      pro: user?.subscription?.tier === 'free',
+      onClick: handleManageEvents,
+      pro: !isProUser,
       iconSize: 'w-6 h-6'
     },
     { 
@@ -122,7 +133,8 @@ export default function Home() {
       label: 'Tickets', 
       color: 'bg-green-500', 
       onClick: () => setShowTickets(true),
-      iconSize: 'w-6 h-6'
+      iconSize: 'w-6 h-6',
+      pro: false
     },
   ];
 
@@ -298,13 +310,24 @@ export default function Home() {
                 <Bookmark className="w-5 h-5 text-primary" />
                 My Events
               </h2>
-              <button 
-                onClick={() => navigate('/events')}
-                className="text-primary text-sm font-medium flex items-center gap-1 hover:underline"
-              >
-                See All
-                <ChevronRight className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                {createdEvents.length > 0 && isProUser && (
+                  <button 
+                    onClick={() => navigate('/manage-events')}
+                    className="text-primary text-sm font-medium flex items-center gap-1 hover:underline"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Manage
+                  </button>
+                )}
+                <button 
+                  onClick={() => navigate('/events')}
+                  className="text-primary text-sm font-medium flex items-center gap-1 hover:underline"
+                >
+                  See All
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             
             <div className="relative">
@@ -434,7 +457,9 @@ export default function Home() {
             <div className="bg-card rounded-xl p-8 text-center border border-dashed border-border">
               <Bookmark className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
               <p className="text-muted-foreground">No events yet</p>
-              <p className="text-sm text-muted-foreground mt-1">Create or bookmark events to see them here</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {isProUser ? 'Create or bookmark events to see them here' : 'Upgrade to Pro to create events'}
+              </p>
             </div>
           </section>
         )}
