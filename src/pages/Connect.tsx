@@ -112,7 +112,9 @@ export default function Connect() {
   const visibleProfiles = connectionProfiles.slice(currentIndex, currentIndex + 2).reverse();
 
   const handleSwipe = useCallback((direction: 'left' | 'right') => {
+    // Handle right swipe (like)
     if (direction === 'right') {
+      // Check if free user has likes remaining
       if (user?.subscription.tier === 'free' && (user.likesRemaining ?? 0) <= 0) {
         toast({
           title: 'Daily Limit Reached',
@@ -122,11 +124,14 @@ export default function Connect() {
         return;
       }
 
+      const profile = connectionProfiles[currentIndex];
+      
+      // Deduct like for free users
       if (user?.subscription.tier === 'free') {
         updateUser({ likesRemaining: (user.likesRemaining ?? 10) - 1 });
       }
 
-      const profile = connectionProfiles[currentIndex];
+      // 70% chance of a match
       if (Math.random() > 0.7) {
         addMatch(profile);
         setMatchModal(profile);
@@ -138,6 +143,7 @@ export default function Connect() {
       }
     }
 
+    // Handle left swipe (pass) or after processing right swipe
     setHistory([...history, currentIndex]);
     setCurrentIndex((prev) => prev + 1);
   }, [user, connectionProfiles, currentIndex, history, addMatch, updateUser, toast]);
@@ -151,6 +157,11 @@ export default function Connect() {
 
   const noMoreProfiles = currentIndex >= connectionProfiles.length;
 
+  // Calculate likes remaining display
+  const likesRemaining = user?.subscription.tier === 'free' 
+    ? (user.likesRemaining ?? 10)
+    : '∞';
+
   return (
     <div className="app-container min-h-screen bg-background pb-nav">
       <div className="px-5 pt-6">
@@ -163,9 +174,8 @@ export default function Connect() {
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10">
             <Heart className="w-4 h-4 text-brand-pink" />
             <span className="text-sm font-medium">
-              {user?.subscription.tier === 'free'
-                ? `${user?.likesRemaining ?? 10}/10`
-                : '∞'}
+              {likesRemaining}
+              {user?.subscription.tier === 'free' ? '/10' : ''}
             </span>
           </div>
         </div>
