@@ -99,7 +99,7 @@ export default function Home() {
         variant: 'destructive'
       });
     } else {
-      navigate('/EventManager";');
+      navigate('/EventManager');
     }
   };
 
