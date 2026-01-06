@@ -1,5 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, ArrowRight, ArrowLeft, MapPin, Check, QrCode, Copy, Download, Upload, Image, Video, Map, Loader2 } from 'lucide-react';
+import { 
+  X, ArrowRight, ArrowLeft, MapPin, Check, QrCode, Copy, Download, 
+  Upload, Image, Video, Map, Loader2, Search, Calendar, Clock, 
+  DollarSign, Palette, ChevronRight, Edit2, Music, Cpu, Users, 
+  Brush, Globe, Camera, Map as MapIcon, Radio, Eye
+} from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -18,7 +23,30 @@ interface EventWizardModalProps {
   onClose: () => void;
 }
 
-const categories = ['Music', 'Tech', 'Party', 'Art', 'Food', 'Sports', 'Other'];
+const categories = [
+  { value: 'music', label: 'Music & Concerts', icon: Music },
+  { value: 'tech', label: 'Tech & Innovation', icon: Cpu },
+  { value: 'party', label: 'Party & Social', icon: Users },
+  { value: 'art', label: 'Art & Culture', icon: Brush },
+  { value: 'food', label: 'Food & Drink', icon: Globe },
+  { value: 'sports', label: 'Sports & Fitness', icon: MapIcon },
+  { value: 'other', label: 'Other', icon: Radio }
+];
+
+const stepTitles = [
+  'Basic Info',
+  'Event Media',
+  'Location & Check-In',
+  'Check-In Radius',
+  'Review & Publish'
+];
+
+const presetColors = [
+  '#8B5CF6', '#EC4899', '#3B82F6', '#10B981', '#F59E0B',
+  '#EF4444', '#8B5CF6', '#EC4899', '#3B82F6', '#10B981',
+  '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#3B82F6',
+  '#10B981', '#F59E0B', '#EF4444', '#6366F1', '#06B6D4'
+];
 
 export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const { addEvent, user } = useApp();
@@ -35,16 +63,23 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     address: '',
     streetName: '',
     coordinates: { lat: -22.5609, lng: 17.0658 },
-    geofenceRadius: 200,
+    geofenceRadius: 50, // Default to 50m
     images: [] as string[],
     videos: [] as string[],
     themeColor: '#8B5CF6',
   });
   const [createdEvent, setCreatedEvent] = useState<Event | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [videoFiles, setVideoFiles] = useState<File[]>([]);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [isMapLoading, setIsMapLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedVenueDetails, setSelectedVenueDetails] = useState<{
+    name: string;
+    address: string;
+    website?: string;
+  } | null>(null);
 
   const mapContainer1 = useRef<HTMLDivElement>(null);
   const mapContainer2 = useRef<HTMLDivElement>(null);
@@ -53,8 +88,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const marker1 = useRef<mapboxgl.Marker | null>(null);
   const marker2 = useRef<mapboxgl.Marker | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const primaryPhotoRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Cleanup URLs when component unmounts or images/videos change
   useEffect(() => {
@@ -79,15 +116,18 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         address: '',
         streetName: '',
         coordinates: { lat: -22.5609, lng: 17.0658 },
-        geofenceRadius: 200,
+        geofenceRadius: 50,
         images: [],
         videos: [],
         themeColor: '#8B5CF6',
       });
       setImageFiles([]);
-      setVideoFiles([]);
+      setVideoFile(null);
       setCreatedEvent(null);
       setIsSubmitting(false);
+      setLocationSuggestions([]);
+      setShowSuggestions(false);
+      setSelectedVenueDetails(null);
     }
   }, [isOpen]);
 
@@ -277,7 +317,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         source: sourceId,
         paint: {
           'fill-color': eventData.themeColor,
-          'fill-opacity': 0.2,
+          'fill-opacity': 0.15,
         },
       });
 
@@ -287,7 +327,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         source: sourceId,
         paint: {
           'line-color': eventData.themeColor,
-          'line-width': 3,
+          'line-width': 2,
           'line-dasharray': [2, 2],
         },
       });
@@ -317,14 +357,16 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       const data = await response.json();
       if (data.features && data.features.length > 0) {
         const place = data.features[0];
-        // Extract street name from place properties
-        const streetName = place.properties?.address || place.text || '';
         setEventData(prev => ({
           ...prev,
           location: place.text || '',
           address: place.place_name || '',
-          streetName: streetName,
+          streetName: place.properties?.address || place.text || '',
         }));
+        setSelectedVenueDetails({
+          name: place.text || '',
+          address: place.place_name || '',
+        });
       }
     } catch (error) {
       console.error('Geocoding error:', error);
@@ -332,48 +374,70 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   };
 
   const searchLocation = async (query: string) => {
-    if (!query.trim()) return;
+    if (!query.trim()) {
+      setLocationSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    
     try {
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=NA&types=address`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=NA&types=poi,address`
       );
       const data = await response.json();
       if (data.features && data.features.length > 0) {
-        const place = data.features[0];
-        const [lng, lat] = place.center;
-        const streetName = place.properties?.address || place.text || '';
-        setEventData(prev => ({
-          ...prev,
-          coordinates: { lat, lng },
-          location: place.text || query,
-          address: place.place_name || '',
-          streetName: streetName,
-        }));
-        
-        // Update both maps if they exist
-        if (map1.current) {
-          map1.current.flyTo({ center: [lng, lat], zoom: 14 });
-          if (marker1.current) {
-            marker1.current.setLngLat([lng, lat]);
-          }
-        }
-        if (map2.current) {
-          map2.current.flyTo({ center: [lng, lat], zoom: 14 });
-          if (marker2.current) {
-            marker2.current.setLngLat([lng, lat]);
-          }
-          updateGeofenceCircle(map2.current);
-        }
+        setLocationSuggestions(data.features);
+        setShowSuggestions(true);
+      } else {
+        setLocationSuggestions([]);
+        setShowSuggestions(false);
       }
     } catch (error) {
       console.error('Search error:', error);
     }
   };
 
+  const handleLocationSelect = (place: any) => {
+    const [lng, lat] = place.center;
+    const venueName = place.text || '';
+    const address = place.place_name || '';
+    
+    setEventData(prev => ({
+      ...prev,
+      coordinates: { lat, lng },
+      location: venueName,
+      address: address,
+      streetName: place.properties?.address || venueName,
+    }));
+    
+    setSelectedVenueDetails({
+      name: venueName,
+      address: address,
+    });
+    
+    setLocationSuggestions([]);
+    setShowSuggestions(false);
+    
+    // Update maps if they exist
+    if (map1.current) {
+      map1.current.flyTo({ center: [lng, lat], zoom: 14 });
+      if (marker1.current) {
+        marker1.current.setLngLat([lng, lat]);
+      }
+    }
+    if (map2.current) {
+      map2.current.flyTo({ center: [lng, lat], zoom: 14 });
+      if (marker2.current) {
+        marker2.current.setLngLat([lng, lat]);
+      }
+      updateGeofenceCircle(map2.current);
+    }
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      const newImages = Array.from(files).slice(0, 10 - imageFiles.length);
+      const newImages = Array.from(files).slice(0, 5 - imageFiles.length);
       setImageFiles(prev => [...prev, ...newImages]);
       
       // Create preview URLs
@@ -388,20 +452,35 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   };
 
+  const handlePrimaryPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files[0]) {
+      // If this is the first photo, treat as primary
+      if (imageFiles.length === 0) {
+        const newFile = files[0];
+        setImageFiles([newFile]);
+        setEventData(prev => ({
+          ...prev,
+          images: [URL.createObjectURL(newFile)]
+        }));
+      }
+      e.target.value = '';
+    }
+  };
+
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files) {
-      const newVideos = Array.from(files).slice(0, 3 - videoFiles.length);
-      setVideoFiles(prev => [...prev, ...newVideos]);
+    if (files && files[0]) {
+      const newVideo = files[0];
+      setVideoFile(newVideo);
       
-      // Create preview URLs
-      const videoUrls = newVideos.map(file => URL.createObjectURL(file));
+      // Create preview URL
+      const videoUrl = URL.createObjectURL(newVideo);
       setEventData(prev => ({
         ...prev,
-        videos: [...prev.videos, ...videoUrls]
+        videos: [videoUrl]
       }));
       
-      // Reset file input
       e.target.value = '';
     }
   };
@@ -417,15 +496,16 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     setImageFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const removeVideo = (index: number) => {
-    // Revoke the object URL to prevent memory leaks
-    URL.revokeObjectURL(eventData.videos[index]);
+  const removeVideo = () => {
+    if (eventData.videos[0]) {
+      URL.revokeObjectURL(eventData.videos[0]);
+    }
     
     setEventData(prev => ({
       ...prev,
-      videos: prev.videos.filter((_, i) => i !== index)
+      videos: []
     }));
-    setVideoFiles(prev => prev.filter((_, i) => i !== index));
+    setVideoFile(null);
   };
 
   const handlePublish = async () => {
@@ -444,7 +524,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       const qrCode = `${eventData.name.replace(/\s+/g, '-').toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
       
       // In a real app, you would upload files to a server here
-      // For now, we'll convert them to data URLs or use placeholder
+      // For now, we'll use placeholder URLs
       const uploadedImages = await Promise.all(
         imageFiles.map(async (file) => {
           // Convert to data URL for demo purposes
@@ -475,7 +555,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         qrCode,
         geofenceRadius: eventData.geofenceRadius,
         customTheme: eventData.themeColor,
-        coverImage: uploadedImages[0] || eventData.images[0] || `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800&auto=format&fit=crop`,
+        coverImage: uploadedImages[0] || `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800&auto=format&fit=crop`,
         images: uploadedImages,
         videos: eventData.videos,
         tags: [eventData.category],
@@ -527,470 +607,826 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
   if (!isOpen) return null;
 
+  // Get current date for date input min
+  const today = new Date().toISOString().split('T')[0];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div 
         ref={modalRef}
         className="bg-background rounded-2xl flex flex-col w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl border border-border"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border shrink-0">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-bold">Create Event</h2>
-            {step < 6 && (
-              <div className="flex gap-1">
+        {/* Header - Redesigned to be compact */}
+        <div className="border-b border-border shrink-0">
+          {/* Row 1: Title and Close */}
+          <div className="flex items-center justify-between px-6 h-14">
+            <h2 className="text-xl font-semibold">Create Event</h2>
+            <button 
+              onClick={onClose} 
+              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+              disabled={isSubmitting}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          
+          {/* Row 2: Progress Dots */}
+          {step < 6 && (
+            <div className="flex justify-center items-center h-10">
+              <div className="flex gap-3">
                 {[1, 2, 3, 4, 5].map((s) => (
-                  <div
-                    key={s}
-                    className={cn(
-                      'w-6 h-2 rounded-full transition-colors',
-                      s <= step ? 'bg-primary' : 'bg-muted'
+                  <div key={s} className="flex items-center">
+                    <div
+                      className={cn(
+                        'w-2 h-2 rounded-full transition-all duration-300',
+                        s < step ? 'bg-primary' : 
+                        s === step ? 'bg-primary w-3 h-3' : 'bg-muted'
+                      )}
+                    />
+                    {s < 5 && (
+                      <div className={cn(
+                        'w-3 h-0.5 mx-1 transition-colors duration-300',
+                        s < step ? 'bg-primary' : 'bg-muted'
+                      )} />
                     )}
-                  />
+                  </div>
                 ))}
               </div>
-            )}
-          </div>
-          <button 
-            onClick={onClose} 
-            className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors hover:scale-105 active:scale-95"
-            disabled={isSubmitting}
-          >
-            <X className="w-5 h-5" />
-          </button>
+            </div>
+          )}
+          
+          {/* Row 3: Current Step Title */}
+          {step < 6 && (
+            <div className="flex justify-center items-center h-8 pb-2">
+              <span className="text-sm text-muted-foreground">
+                {stepTitles[step - 1]}
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Content - Single scrollable area */}
+        {/* Content - Scrollable area */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6">
             {/* Step 1: Basic Info */}
             {step === 1 && (
               <div className="space-y-6 animate-fade-in">
                 <div>
-                  <h3 className="text-2xl font-bold mb-2">Event Details</h3>
-                  <p className="text-muted-foreground">Tell us about your event</p>
+                  <h3 className="text-lg font-semibold mb-4">Event Details</h3>
                 </div>
 
-                <div className="space-y-5">
+                <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium mb-2 block">Event Name *</label>
-                    <Input
-                      value={eventData.name}
-                      onChange={(e) => setEventData({ ...eventData, name: e.target.value })}
-                      placeholder="e.g., Summer Music Festival"
-                      className="h-12 rounded-xl border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                      disabled={isSubmitting}
-                    />
+                    <div className="relative">
+                      <Input
+                        value={eventData.name}
+                        onChange={(e) => setEventData({ ...eventData, name: e.target.value })}
+                        placeholder="Summer Music Festival"
+                        className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary"
+                        disabled={isSubmitting}
+                        maxLength={50}
+                      />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                        {50 - eventData.name.length}
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {50 - eventData.name.length} characters remaining
+                    </p>
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Description</label>
+                    <label className="text-sm font-medium mb-2 block">Description *</label>
                     <Textarea
                       value={eventData.description}
                       onChange={(e) => setEventData({ ...eventData, description: e.target.value })}
                       placeholder="Tell attendees what to expect..."
                       rows={4}
-                      className="rounded-xl border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                      className="rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary"
                       disabled={isSubmitting}
+                      maxLength={500}
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {500 - eventData.description.length} characters remaining
+                    </p>
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium mb-3 block">Category *</label>
-                    <div className="flex flex-wrap gap-2">
-                      {categories.map((cat) => (
-                        <button
-                          key={cat}
-                          onClick={() => setEventData({ ...eventData, category: cat })}
-                          disabled={isSubmitting}
-                          className={cn(
-                            'px-4 py-3 rounded-xl text-sm font-medium transition-all border-2',
-                            eventData.category === cat
-                              ? 'bg-primary text-primary-foreground border-primary'
-                              : 'bg-card border-border hover:border-primary hover:bg-primary/5',
-                            isSubmitting && 'opacity-50 cursor-not-allowed'
-                          )}
-                        >
-                          {cat}
-                        </button>
-                      ))}
+                    <label className="text-sm font-medium mb-2 block">Category *</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {categories.map((cat) => {
+                        const Icon = cat.icon;
+                        return (
+                          <button
+                            key={cat.value}
+                            onClick={() => setEventData({ ...eventData, category: cat.value })}
+                            disabled={isSubmitting}
+                            className={cn(
+                              'flex flex-col items-center justify-center p-3 rounded-lg border transition-all',
+                              eventData.category === cat.value
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:border-primary hover:bg-primary/5'
+                            )}
+                          >
+                            <Icon className="w-5 h-5 mb-1" />
+                            <span className="text-xs font-medium">{cat.label}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-sm font-medium mb-2 block">Date *</label>
-                      <Input
-                        type="date"
-                        value={eventData.date}
-                        onChange={(e) => setEventData({ ...eventData, date: e.target.value })}
-                        className="h-12 rounded-xl border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                        disabled={isSubmitting}
-                      />
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          type="date"
+                          value={eventData.date}
+                          onChange={(e) => setEventData({ ...eventData, date: e.target.value })}
+                          className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10"
+                          disabled={isSubmitting}
+                          min={today}
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className="text-sm font-medium mb-2 block">Time *</label>
-                      <Input
-                        type="time"
-                        value={eventData.time}
-                        onChange={(e) => setEventData({ ...eventData, time: e.target.value })}
-                        className="h-12 rounded-xl border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                        disabled={isSubmitting}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Price (NAD)</label>
-                    <Input
-                      type="number"
-                      value={eventData.price}
-                      onChange={(e) => setEventData({ ...eventData, price: Math.max(0, Number(e.target.value)) })}
-                      placeholder="0 for free events"
-                      className="h-12 rounded-xl border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                      min={0}
-                      disabled={isSubmitting}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium mb-3 block">Theme Color</label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="color"
-                        value={eventData.themeColor}
-                        onChange={(e) => setEventData({ ...eventData, themeColor: e.target.value })}
-                        className="w-12 h-12 cursor-pointer rounded-xl border-2 border-border disabled:cursor-not-allowed"
-                        disabled={isSubmitting}
-                      />
-                      <div className="flex-1">
-                        <span className="text-sm font-medium">{eventData.themeColor}</span>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          This color will be used for your event theme
-                        </p>
+                      <div className="relative">
+                        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          type="time"
+                          value={eventData.time}
+                          onChange={(e) => setEventData({ ...eventData, time: e.target.value })}
+                          className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10"
+                          disabled={isSubmitting}
+                        />
                       </div>
                     </div>
+                  </div>
+
+                  {/* Theme Color Section */}
+                  <div>
+                    <label className="text-sm font-medium mb-3 block">Event Theme Color</label>
+                    {user?.subscription?.tier === 'max' ? (
+                      <div className="space-y-3">
+                        <div className="flex gap-2 flex-wrap">
+                          {presetColors.slice(0, 10).map((color, index) => (
+                            <button
+                              key={index}
+                              onClick={() => setEventData({ ...eventData, themeColor: color })}
+                              className="w-8 h-8 rounded-full border-2 hover:scale-110 transition-transform"
+                              style={{ 
+                                backgroundColor: color,
+                                borderColor: eventData.themeColor === color ? color : 'transparent'
+                              }}
+                              title={color}
+                            />
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="color"
+                            value={eventData.themeColor}
+                            onChange={(e) => setEventData({ ...eventData, themeColor: e.target.value })}
+                            className="w-10 h-10 cursor-pointer rounded-lg border border-border"
+                          />
+                          <div>
+                            <p className="text-sm font-medium">Custom Color</p>
+                            <p className="text-xs text-muted-foreground">
+                              Applied to buttons and accents
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="border border-border rounded-lg p-4 bg-gradient-to-r from-primary/5 to-primary/10">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div 
+                              className="w-8 h-8 rounded-full border-2"
+                              style={{ 
+                                backgroundColor: eventData.themeColor,
+                                borderColor: eventData.themeColor
+                              }}
+                            />
+                            <div>
+                              <p className="text-sm font-medium">Current Theme</p>
+                              <p className="text-xs text-muted-foreground">Purple theme selected</p>
+                            </div>
+                          </div>
+                          <Button size="sm" variant="outline" className="rounded-lg">
+                            Upgrade to Max
+                            <ChevronRight className="w-4 h-4 ml-1" />
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-3">
+                          🎨 Unlock 20+ theme colors and custom color picker with Max subscription
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Ticket Price</label>
+                    <div className="flex items-center gap-4 mb-3">
+                      <button
+                        onClick={() => setEventData({ ...eventData, price: 0 })}
+                        className={cn(
+                          'px-4 py-2 rounded-lg border transition-colors',
+                          eventData.price === 0
+                            ? 'border-primary bg-primary/5 text-primary'
+                            : 'border-border hover:border-primary'
+                        )}
+                      >
+                        Free Event
+                      </button>
+                      <button
+                        onClick={() => setEventData({ ...eventData, price: eventData.price || 25 })}
+                        className={cn(
+                          'px-4 py-2 rounded-lg border transition-colors',
+                          eventData.price > 0
+                            ? 'border-primary bg-primary/5 text-primary'
+                            : 'border-border hover:border-primary'
+                        )}
+                      >
+                        Paid Event
+                      </button>
+                    </div>
+                    {eventData.price > 0 && (
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          type="number"
+                          value={eventData.price}
+                          onChange={(e) => setEventData({ ...eventData, price: Math.max(0, Number(e.target.value)) })}
+                          placeholder="25.00"
+                          className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10"
+                          disabled={isSubmitting}
+                          min={0}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Step 2: Media Upload */}
+            {/* Step 2: Event Media */}
             {step === 2 && (
               <div className="space-y-6 animate-fade-in">
                 <div>
-                  <h3 className="text-2xl font-bold mb-2">Event Media</h3>
-                  <p className="text-muted-foreground">Add photos and videos for your event</p>
+                  <h3 className="text-lg font-semibold mb-1">Add Photos & Videos</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Make your event visually appealing
+                  </p>
                 </div>
 
-                {/* Images Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-sm font-medium">Photos</label>
-                      <p className="text-xs text-muted-foreground">Upload event photos (up to 10)</p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="rounded-xl"
-                      disabled={isSubmitting || imageFiles.length >= 10}
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      Add Photos ({imageFiles.length}/10)
-                    </Button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {eventData.images.map((image, index) => (
-                      <div key={index} className="relative aspect-square group">
+                {/* Primary Event Photo */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium block">Primary Event Photo *</label>
+                  <div 
+                    className={cn(
+                      "border-2 border-dashed rounded-xl h-48 flex flex-col items-center justify-center cursor-pointer transition-colors",
+                      "hover:border-primary hover:bg-primary/5",
+                      imageFiles.length > 0 ? "border-solid" : "border-dashed"
+                    )}
+                    onClick={() => primaryPhotoRef.current?.click()}
+                  >
+                    {imageFiles.length > 0 ? (
+                      <div className="relative w-full h-full">
                         <img
-                          src={image}
-                          alt={`Event ${index + 1}`}
-                          className="w-full h-full object-cover rounded-xl border-2 border-border"
-                          loading="lazy"
+                          src={eventData.images[0]}
+                          alt="Primary event photo"
+                          className="w-full h-full object-cover rounded-xl"
                         />
                         <button
-                          onClick={() => removeImage(index)}
-                          disabled={isSubmitting}
-                          className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeImage(0);
+                          }}
+                          className="absolute top-3 right-3 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
                         >
                           <X className="w-4 h-4" />
                         </button>
                       </div>
-                    ))}
-                    {eventData.images.length === 0 && (
-                      <div className="col-span-full flex flex-col items-center justify-center p-10 border-2 border-dashed border-border rounded-xl">
-                        <Image className="w-16 h-16 text-muted-foreground mb-4" />
-                        <p className="text-sm text-muted-foreground mb-2">No photos added yet</p>
-                        <p className="text-xs text-muted-foreground text-center">
-                          Click "Add Photos" to upload images of your event
+                    ) : (
+                      <>
+                        <Camera className="w-12 h-12 text-muted-foreground mb-3" />
+                        <p className="text-sm font-medium">Click to upload</p>
+                        <p className="text-xs text-muted-foreground mt-1">or drag & drop</p>
+                        <p className="text-xs text-muted-foreground mt-3">
+                          JPG, PNG, WEBP • Max 10MB
                         </p>
-                      </div>
+                      </>
                     )}
                   </div>
-                </div>
-
-                {/* Videos Section */}
-                <div className="space-y-4 pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-sm font-medium">Videos</label>
-                      <p className="text-xs text-muted-foreground">Upload event videos (up to 3)</p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => videoInputRef.current?.click()}
-                      className="rounded-xl"
-                      disabled={isSubmitting || videoFiles.length >= 3}
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      Add Videos ({videoFiles.length}/3)
-                    </Button>
-                    <input
-                      ref={videoInputRef}
-                      type="file"
-                      accept="video/*"
-                      multiple
-                      onChange={handleVideoUpload}
-                      className="hidden"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {eventData.videos.map((video, index) => (
-                      <div key={index} className="relative aspect-video group">
-                        <video
-                          src={video}
-                          className="w-full h-full object-cover rounded-xl border-2 border-border"
-                          controls
-                        />
-                        <button
-                          onClick={() => removeVideo(index)}
-                          disabled={isSubmitting}
-                          className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                    {eventData.videos.length === 0 && (
-                      <div className="col-span-full flex flex-col items-center justify-center p-10 border-2 border-dashed border-border rounded-xl">
-                        <Video className="w-16 h-16 text-muted-foreground mb-4" />
-                        <p className="text-sm text-muted-foreground mb-2">No videos added yet</p>
-                        <p className="text-xs text-muted-foreground text-center">
-                          Click "Add Videos" to upload promotional videos
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Location */}
-            {step === 3 && (
-              <div className="space-y-6 animate-fade-in">
-                <div>
-                  <h3 className="text-2xl font-bold mb-2">Event Location</h3>
-                  <p className="text-muted-foreground">Search or click the map to set location</p>
-                </div>
-
-                <div className="relative">
-                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
-                  <Input
-                    value={eventData.location}
-                    onChange={(e) => setEventData({ ...eventData, location: e.target.value })}
-                    onKeyDown={(e) => e.key === 'Enter' && searchLocation(eventData.location)}
-                    placeholder="Search for a location..."
-                    className="h-12 pl-12 rounded-xl border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                  <p className="text-xs text-muted-foreground">
+                    This photo appears on event cards
+                  </p>
+                  <input
+                    ref={primaryPhotoRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePrimaryPhotoUpload}
+                    className="hidden"
                     disabled={isSubmitting}
                   />
                 </div>
 
-                {eventData.streetName && (
-                  <div className="bg-card p-4 rounded-xl">
-                    <p className="text-sm font-medium">Street Name:</p>
-                    <p className="text-sm text-muted-foreground">{eventData.streetName}</p>
+                {/* Additional Photos */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium">Additional Photos (Optional)</label>
+                    <span className="text-xs text-muted-foreground">
+                      {imageFiles.length - 1}/4
+                    </span>
                   </div>
-                )}
-
-                {eventData.address && (
-                  <div className="bg-card p-4 rounded-xl">
-                    <p className="text-sm font-medium">Full Address:</p>
-                    <p className="text-sm text-muted-foreground">{eventData.address}</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {imageFiles.slice(1).map((_, index) => (
+                      <div key={index} className="relative aspect-square rounded-lg overflow-hidden">
+                        <img
+                          src={eventData.images[index + 1]}
+                          alt={`Additional photo ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          onClick={() => removeImage(index + 1)}
+                          className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    {imageFiles.length < 5 && (
+                      <div 
+                        className="aspect-square rounded-lg border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload className="w-6 h-6 text-muted-foreground" />
+                      </div>
+                    )}
                   </div>
-                )}
-
-                {/* Map Container for Location Selection */}
-                <div className="relative w-full h-[400px] rounded-xl overflow-hidden border-2 border-border">
-                  {isMapLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 z-10">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                      <span className="ml-2 text-sm">Loading map...</span>
-                    </div>
-                  )}
-                  <div
-                    ref={mapContainer1}
-                    className="w-full h-full"
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    disabled={isSubmitting}
                   />
                 </div>
 
-                <div className="text-xs text-muted-foreground text-center p-2">
-                  <p>Tap on the map or drag the marker to set location</p>
-                  <p className="mt-1">Coordinates: {eventData.coordinates.lat.toFixed(4)}, {eventData.coordinates.lng.toFixed(4)}</p>
+                {/* Event Video */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium block">Event Video (Optional)</label>
+                  <div 
+                    className={cn(
+                      "border-2 border-dashed rounded-xl h-32 flex flex-col items-center justify-center cursor-pointer transition-colors",
+                      "hover:border-primary hover:bg-primary/5",
+                      videoFile ? "border-solid" : "border-dashed"
+                    )}
+                    onClick={() => videoInputRef.current?.click()}
+                  >
+                    {videoFile ? (
+                      <div className="relative w-full h-full">
+                        <video
+                          src={eventData.videos[0]}
+                          className="w-full h-full object-cover rounded-xl"
+                        />
+                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                          <Video className="w-8 h-8 text-white" />
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeVideo();
+                          }}
+                          className="absolute top-3 right-3 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <Video className="w-10 h-10 text-muted-foreground mb-2" />
+                        <p className="text-sm font-medium">Upload event video</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          MP4, MOV, WebM • Max 50MB
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Video will auto-play muted on loop
+                  </p>
+                  <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/*"
+                    onChange={handleVideoUpload}
+                    className="hidden"
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                {/* Preview */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium block">Preview</label>
+                  <div className="border border-border rounded-xl p-4 bg-card">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                        <Eye className="w-6 h-6 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Event Card Preview</p>
+                        <p className="text-xs text-muted-foreground">
+                          Shows how your primary photo appears
+                        </p>
+                      </div>
+                    </div>
+                    <div className="border border-border rounded-lg overflow-hidden">
+                      <div className="h-32 bg-gradient-to-r from-primary/10 to-primary/5 flex items-center justify-center">
+                        {imageFiles.length > 0 ? (
+                          <img
+                            src={eventData.images[0]}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Image className="w-12 h-12 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="p-3">
+                        <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                        <div className="h-3 bg-muted rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Step 4: Geofence */}
-            {step === 4 && (
+            {/* Step 3: Location & Check-In */}
+            {step === 3 && (
               <div className="space-y-6 animate-fade-in">
                 <div>
-                  <h3 className="text-2xl font-bold mb-2">Check-in Radius</h3>
-                  <p className="text-muted-foreground">
-                    Set how close attendees need to be to check in
+                  <h3 className="text-lg font-semibold mb-1">Event Location</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Search and select your venue
                   </p>
                 </div>
 
-                <div className="bg-card p-6 rounded-xl text-center">
-                  <p className="text-5xl font-bold mb-2" style={{ color: eventData.themeColor }}>
+                {/* Search Input with Autocomplete */}
+                <div className="relative">
+                  <label className="text-sm font-medium mb-2 block">Search venue or address *</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      ref={searchInputRef}
+                      value={eventData.location}
+                      onChange={(e) => {
+                        setEventData({ ...eventData, location: e.target.value });
+                        searchLocation(e.target.value);
+                      }}
+                      onFocus={() => {
+                        if (eventData.location) {
+                          searchLocation(eventData.location);
+                          setShowSuggestions(true);
+                        }
+                      }}
+                      placeholder="Central Park Bandshell, New York"
+                      className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  
+                  {/* Autocomplete Dropdown */}
+                  {showSuggestions && locationSuggestions.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {locationSuggestions.map((place, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleLocationSelect(place)}
+                          className="w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b border-border last:border-b-0"
+                        >
+                          <div className="flex items-start gap-3">
+                            <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                {place.text}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {place.place_name}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Map */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium">Map View</label>
+                    <button 
+                      className="text-xs text-muted-foreground hover:text-primary"
+                      onClick={() => {
+                        if (map1.current) {
+                          map1.current.flyTo({
+                            center: [eventData.coordinates.lng, eventData.coordinates.lat],
+                            zoom: 14
+                          });
+                        }
+                      }}
+                    >
+                      Recenter
+                    </button>
+                  </div>
+                  <div className="relative w-full h-80 rounded-xl overflow-hidden border border-border">
+                    {isMapLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 z-10">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                      </div>
+                    )}
+                    <div
+                      ref={mapContainer1}
+                      className="w-full h-full"
+                    />
+                    <div className="absolute top-3 left-3 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs">
+                      Drag marker to adjust
+                    </div>
+                  </div>
+                </div>
+
+                {/* Venue Details */}
+                {selectedVenueDetails && (
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium">Venue Details</label>
+                    <div className="border border-border rounded-xl p-4 bg-card">
+                      <div className="flex items-start gap-3">
+                        <MapPin className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {selectedVenueDetails.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {selectedVenueDetails.address}
+                          </p>
+                        </div>
+                        <button 
+                          className="text-xs text-primary hover:underline"
+                          onClick={() => {
+                            searchInputRef.current?.focus();
+                            setShowSuggestions(true);
+                          }}
+                        >
+                          Change
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 4: Check-In Radius */}
+            {step === 4 && (
+              <div className="space-y-6 animate-fade-in">
+                <div>
+                  <h3 className="text-lg font-semibold mb-1">Check-In Radius</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Set how close attendees must be to check in
+                  </p>
+                </div>
+
+                {/* Current Radius Display */}
+                <div className="text-center py-6 border border-border rounded-xl bg-card">
+                  <p className="text-4xl font-bold mb-1" style={{ color: eventData.themeColor }}>
                     {eventData.geofenceRadius}m
                   </p>
                   <p className="text-sm text-muted-foreground">Check-in radius</p>
                 </div>
 
-                <div className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Adjust Radius</span>
-                      <span className="text-lg font-bold px-3 py-1 rounded-lg bg-card" style={{ color: eventData.themeColor }}>
-                        {eventData.geofenceRadius}m
-                      </span>
-                    </div>
-                    <Slider
-                      value={[eventData.geofenceRadius]}
-                      onValueChange={(value) => setEventData({ ...eventData, geofenceRadius: value[0] })}
-                      min={10}
-                      max={500}
-                      step={1}
-                      className="w-full"
-                      disabled={isSubmitting}
-                    />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>10m</span>
-                      <span>250m</span>
-                      <span>500m</span>
-                    </div>
+                {/* Map with Radius */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium">Geofence Area</label>
+                    <span className="text-xs text-muted-foreground">
+                      Drag marker to adjust location
+                    </span>
                   </div>
-
-                  {/* Map Container for Radius Visualization */}
-                  <div className="relative w-full h-[350px] rounded-xl overflow-hidden border-2 border-border">
+                  <div className="relative w-full h-80 rounded-xl overflow-hidden border border-border">
                     {isMapLoading && (
                       <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 z-10">
                         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                        <span className="ml-2 text-sm">Loading map...</span>
                       </div>
                     )}
                     <div
                       ref={mapContainer2}
                       className="w-full h-full"
                     />
-                    <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-lg backdrop-blur-sm border border-white/20">
-                      <Map className="w-4 h-4 inline mr-2" />
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs border border-border">
                       Radius: {eventData.geofenceRadius}m
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-card p-4 rounded-xl">
+                {/* Radius Slider */}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium">Adjust Radius</label>
+                    <span 
+                      className="text-lg font-bold"
+                      style={{ color: eventData.themeColor }}
+                    >
+                      {eventData.geofenceRadius}m
+                    </span>
+                  </div>
+                  <Slider
+                    value={[eventData.geofenceRadius]}
+                    onValueChange={(value) => setEventData({ ...eventData, geofenceRadius: value[0] })}
+                    min={10}
+                    max={300}
+                    step={10}
+                    className="w-full"
+                    disabled={isSubmitting}
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>10m</span>
+                    <span>150m</span>
+                    <span>300m</span>
+                  </div>
+                </div>
+
+                {/* Helper Text */}
+                <div className="border border-border rounded-xl p-4 bg-card">
                   <p className="text-sm text-muted-foreground">
-                    💡 <span className="font-medium">Radius Guide:</span><br/>
-                    • <strong>10-50m</strong>: High security, precise check-in<br/>
-                    • <strong>50-200m</strong>: Standard events, good balance<br/>
-                    • <strong>200-500m</strong>: Large venues, easier check-in
+                    💡 <span className="font-medium">Recommended:</span> 50-100m for most venues
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Step 5: Review */}
+            {/* Step 5: Review & Publish */}
             {step === 5 && (
               <div className="space-y-6 animate-fade-in">
                 <div>
-                  <h3 className="text-2xl font-bold mb-2">Review Your Event</h3>
-                  <p className="text-muted-foreground">Make sure everything looks good</p>
+                  <h3 className="text-lg font-semibold mb-1">Review Your Event</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Check everything before publishing
+                  </p>
                 </div>
 
-                <div className="bg-card p-6 rounded-xl space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Event Name</p>
-                      <p className="font-semibold">{eventData.name}</p>
+                {/* Event Preview */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Event Preview</label>
+                  <div className="border border-border rounded-xl overflow-hidden bg-card">
+                    {/* Event Card Preview */}
+                    <div className="p-4 border-b border-border">
+                      <p className="text-sm font-medium mb-2">Event Card</p>
+                      <div className="border border-border rounded-lg overflow-hidden">
+                        <div className="h-32 bg-gradient-to-r from-primary/10 to-primary/5 flex items-center justify-center relative">
+                          {imageFiles.length > 0 ? (
+                            <img
+                              src={eventData.images[0]}
+                              alt="Event preview"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Image className="w-12 h-12 text-muted-foreground" />
+                          )}
+                          {videoFile && (
+                            <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                              Video
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-3">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <p className="font-medium truncate">{eventData.name}</p>
+                              <p className="text-sm text-muted-foreground truncate">
+                                {eventData.date} at {eventData.time}
+                              </p>
+                            </div>
+                            <span 
+                              className="px-2 py-1 text-xs rounded ml-2"
+                              style={{ 
+                                backgroundColor: `${eventData.themeColor}20`,
+                                color: eventData.themeColor
+                              }}
+                            >
+                              {eventData.category}
+                            </span>
+                          </div>
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <MapPin className="w-3 h-3 mr-1" />
+                            <span className="truncate">{eventData.location}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Category</p>
-                      <span 
-                        className="inline-flex px-3 py-1 rounded-lg text-sm font-medium"
-                        style={{ backgroundColor: `${eventData.themeColor}20`, color: eventData.themeColor }}
-                      >
-                        {eventData.category}
-                      </span>
+                    
+                    {/* Event Details Preview */}
+                    <div className="p-4">
+                      <p className="text-sm font-medium mb-2">Event Details</p>
+                      <div className="space-y-3 text-sm">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                          <span>{eventData.date} at {eventData.time}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-muted-foreground" />
+                          <span>{eventData.location}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-4 h-4 text-muted-foreground" />
+                          <span>{eventData.price === 0 ? 'Free' : `N$${eventData.price}`}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Map className="w-4 h-4 text-muted-foreground" />
+                          <span>Check-in radius: {eventData.geofenceRadius}m</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Date & Time</p>
-                      <p className="font-semibold">{eventData.date} at {eventData.time}</p>
+                {/* Edit Sections */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Event Information</label>
+                  <div className="border border-border rounded-xl overflow-hidden">
+                    {/* Basic Info */}
+                    <div className="p-4 border-b border-border">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Basic Info</span>
+                        </div>
+                        <button 
+                          onClick={() => setStep(1)}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          Edit
+                        </button>
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        <p><span className="text-muted-foreground">Name:</span> {eventData.name}</p>
+                        <p><span className="text-muted-foreground">Category:</span> {eventData.category}</p>
+                        <p><span className="text-muted-foreground">Date:</span> {eventData.date} at {eventData.time}</p>
+                        <p><span className="text-muted-foreground">Price:</span> {eventData.price === 0 ? 'Free' : `N$${eventData.price}`}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Price</p>
-                      <p className="font-semibold">
-                        {eventData.price === 0 ? 'FREE' : `N$${eventData.price}`}
-                      </p>
+                    
+                    {/* Media */}
+                    <div className="p-4 border-b border-border">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Camera className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Media</span>
+                        </div>
+                        <button 
+                          onClick={() => setStep(2)}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          Edit
+                        </button>
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        <p><span className="text-muted-foreground">Photos:</span> {imageFiles.length}</p>
+                        <p><span className="text-muted-foreground">Video:</span> {videoFile ? 'Yes' : 'No'}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Location */}
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <MapIcon className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Location</span>
+                        </div>
+                        <button 
+                          onClick={() => setStep(3)}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          Edit
+                        </button>
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        <p><span className="text-muted-foreground">Venue:</span> {eventData.location}</p>
+                        <p><span className="text-muted-foreground">Check-in radius:</span> {eventData.geofenceRadius}m</p>
+                      </div>
                     </div>
                   </div>
-
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Location</p>
-                    <p className="font-semibold">{eventData.streetName || eventData.location}</p>
-                    {eventData.address && (
-                      <p className="text-sm text-muted-foreground mt-1">{eventData.address}</p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Check-in Radius</p>
-                      <p className="font-semibold">{eventData.geofenceRadius}m</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Media</p>
-                      <p className="font-semibold">
-                        {eventData.images.length} photos, {eventData.videos.length} videos
-                      </p>
-                    </div>
-                  </div>
-
-                  {eventData.description && (
-                    <div className="pt-4 border-t border-border">
-                      <p className="text-sm text-muted-foreground mb-2">Description</p>
-                      <p className="text-sm">{eventData.description}</p>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -1028,7 +1464,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 <div className="flex gap-3 w-full max-w-sm">
                   <Button 
                     variant="outline" 
-                    className="flex-1 rounded-xl h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                    className="flex-1 rounded-lg h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
                     onClick={copyCode}
                   >
                     <Copy className="w-4 h-4 mr-2" />
@@ -1036,7 +1472,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="flex-1 rounded-xl h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                    className="flex-1 rounded-lg h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
                     onClick={handleDownloadQR}
                   >
                     <Download className="w-4 h-4 mr-2" />
@@ -1048,28 +1484,29 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           </div>
         </div>
 
-        {/* CTA Buttons - Fixed at bottom of modal */}
+        {/* Footer - Redesigned to be compact */}
         {step < 6 && (
-          <div className="border-t border-border bg-background/95 backdrop-blur-sm p-6 shrink-0">
-            <div className="flex gap-3 w-full">
+          <div className="border-t border-border bg-background p-4 shrink-0">
+            <div className="flex gap-3">
               {step > 1 && (
                 <Button 
                   variant="outline" 
-                  className="flex-1 rounded-xl h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                  className="flex-1 rounded-lg h-11"
                   onClick={() => setStep(step - 1)}
                   disabled={isSubmitting}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back
+                  Previous
                 </Button>
               )}
               {step < 5 ? (
                 <Button
-                  className="flex-1 rounded-xl h-12 font-medium hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                  className="flex-1 rounded-lg h-11 font-medium"
                   onClick={() => setStep(step + 1)}
                   disabled={
                     isSubmitting ||
                     (step === 1 && !isStep1Valid) ||
+                    (step === 2 && imageFiles.length === 0) ||
                     (step === 3 && !isStep3Valid)
                   }
                   style={{ 
@@ -1077,21 +1514,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     borderColor: eventData.themeColor,
                   }}
                 >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : step === 4 ? (
-                    'Review Event'
-                  ) : (
-                    'Next'
-                  )}
-                  {!isSubmitting && step !== 4 && <ArrowRight className="w-4 h-4 ml-2" />}
+                  {step === 4 ? 'Review Event' : 'Next'}
+                  {step !== 4 && <ArrowRight className="w-4 h-4 ml-2" />}
                 </Button>
               ) : (
                 <Button
-                  className="flex-1 rounded-xl h-12 font-medium hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                  className="flex-1 rounded-lg h-11 font-medium"
                   onClick={handlePublish}
                   disabled={isSubmitting}
                   style={{ 
@@ -1107,22 +1535,19 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   ) : (
                     <>
                       <Check className="w-4 h-4 mr-2" />
-                      Publish Event
+                      Create Event
                     </>
                   )}
                 </Button>
               )}
             </div>
-            <div className="text-xs text-muted-foreground text-center mt-3">
-              Step {step} of 5 • {step === 1 ? 'Basic Info' : step === 2 ? 'Media' : step === 3 ? 'Location' : step === 4 ? 'Radius' : 'Review'}
-            </div>
           </div>
         )}
 
         {step === 6 && (
-          <div className="border-t border-border bg-background/95 backdrop-blur-sm p-6 shrink-0">
+          <div className="border-t border-border bg-background p-4 shrink-0">
             <Button 
-              className="w-full rounded-xl h-12 font-medium hover:scale-[1.02] active:scale-[0.98] transition-transform" 
+              className="w-full rounded-lg h-11 font-medium" 
               onClick={onClose}
               style={{ 
                 backgroundColor: eventData.themeColor,
@@ -1130,11 +1555,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               }}
             >
               <Check className="w-4 h-4 mr-2" />
-              Done • Go to Event Dashboard
+              Go to Event Dashboard
             </Button>
-            <div className="text-xs text-muted-foreground text-center mt-3">
-              Event created successfully! You can now manage it from your dashboard.
-            </div>
           </div>
         )}
       </div>
