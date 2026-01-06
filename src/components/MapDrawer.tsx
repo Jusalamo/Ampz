@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Search, SlidersHorizontal, Plus, MapPin, X, Calendar, Users, Clock, Star } from 'lucide-react';
+import { Search, SlidersHorizontal, Plus, MapPin, X, Calendar, Clock } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { EventCard } from './EventCard';
 import { Input } from './ui/input';
@@ -40,24 +40,28 @@ interface MapDrawerProps {
 
 type DrawerPosition = 'minimum' | 'half' | 'full';
 
+// Updated snap positions - minimum is 25% from bottom (75% of screen height)
 const SNAP_POSITIONS = {
-  minimum: typeof window !== 'undefined' && window.innerWidth < 768 ? 0.85 : 0.92,
-  half: 0.5,
-  full: typeof window !== 'undefined' && window.innerWidth < 768 ? 0.15 : 0.08,
+  minimum: 0.75,   // 25% from bottom - shows most of map, above navbar
+  half: 0.5,       // 50% visible
+  full: 0.08,      // Almost full screen
 };
+
+// Bottom navbar height in percentage (adjust as needed)
+const BOTTOM_NAVBAR_HEIGHT = 0.08; // 8% of screen height
 
 export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const navigate = useNavigate();
   const { events, user } = useApp();
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [drawerPosition, setDrawerPosition] = useState<DrawerPosition>('half');
+  const [drawerPosition, setDrawerPosition] = useState<DrawerPosition>('minimum'); // Start at minimum
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [searchSuggestions, setSearchSuggestions] = useState<Event[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [mapLoading, setMapLoading] = useState(true);
+  const [mapReady, setMapReady] = useState(false);
   
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -98,7 +102,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     }
   }, [search, events]);
 
-  // Initialize map
+  // Initialize map immediately on component mount
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
@@ -113,23 +117,35 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         pitch: 45,
         bearing: -17.6,
         antialias: true,
+        // Pre-load map
+        attributionControl: false,
+        optimizeForTerrain: true,
       });
 
-      map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
-
-      // Add geolocate control
-      const geolocate = new mapboxgl.GeolocateControl({
-        positionOptions: { enableHighAccuracy: true },
-        trackUserLocation: true,
-        showUserLocation: true,
-        showUserHeading: true,
-      });
-      map.current.addControl(geolocate, 'top-right');
-
+      // Hide map loading tiles
       map.current.on('load', () => {
-        setMapLoading(false);
-        // Trigger geolocation on load
-        geolocate.trigger();
+        setMapReady(true);
+        // Add controls after map is loaded
+        map.current!.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+        // Add geolocate control
+        const geolocate = new mapboxgl.GeolocateControl({
+          positionOptions: { enableHighAccuracy: true },
+          trackUserLocation: true,
+          showUserLocation: true,
+          showUserHeading: true,
+        });
+        map.current!.addControl(geolocate, 'top-right');
+        
+        // Auto-trigger geolocation
+        setTimeout(() => {
+          try {
+            geolocate.trigger();
+          } catch (e) {
+            console.log('Geolocation not available');
+          }
+        }, 1000);
+
         updateEventMarkers();
       });
 
@@ -169,18 +185,18 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
     } catch (error) {
       console.error('Failed to initialize map:', error);
-      setMapLoading(false);
-      // You could show a fallback UI here
+      setMapReady(true);
     }
 
     return () => {
-      // Clean up all markers (except user marker handled separately)
-      markersRef.current.forEach(marker => {
-        if (marker !== userMarkerRef.current) {
-          marker.remove();
-        }
-      });
-      markersRef.current = userMarkerRef.current ? [userMarkerRef.current] : [];
+      // Clean up all markers
+      markersRef.current.forEach(marker => marker.remove());
+      markersRef.current = [];
+      
+      if (userMarkerRef.current) {
+        userMarkerRef.current.remove();
+        userMarkerRef.current = null;
+      }
       
       if (popupRef.current) {
         popupRef.current.remove();
@@ -196,12 +212,14 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
   // Update event markers when events change
   useEffect(() => {
-    if (map.current && map.current.isStyleLoaded()) {
+    if (map.current && mapReady) {
       updateEventMarkers();
     }
-  }, [events, selectedCategory, filteredEvents]);
+  }, [events, selectedCategory, filteredEvents, mapReady]);
 
   const updateEventMarkers = () => {
+    if (!map.current || !mapReady) return;
+    
     // Clear existing markers (except user marker)
     markersRef.current.forEach(marker => {
       if (marker !== userMarkerRef.current) {
@@ -253,7 +271,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   };
 
   const addGeofenceCircle = (event: Event) => {
-    if (!map.current || !map.current.isStyleLoaded()) return;
+    if (!map.current || !mapReady) return;
 
     const { lat, lng } = event.coordinates;
     const radiusInKm = event.geofenceRadius / 1000;
@@ -310,7 +328,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   };
 
   const removeGeofenceCircle = () => {
-    if (!map.current) return;
+    if (!map.current || !mapReady) return;
     
     const sourceId = 'geofence-active';
     if (map.current.getLayer(`${sourceId}-fill`)) {
@@ -346,8 +364,9 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   };
 
   const snapToPosition = useCallback((percentage: number): DrawerPosition => {
-    if (percentage > 0.75) return 'minimum';
-    if (percentage > 0.3) return 'half';
+    // Updated thresholds for new positions
+    if (percentage > 0.6) return 'minimum'; // 0.75 -> 0.6 threshold
+    if (percentage > 0.25) return 'half';   // 0.5 -> 0.25 threshold
     return 'full';
   }, []);
 
@@ -361,7 +380,11 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     if (!isDragging) return;
     
     const deltaY = clientY - dragStartY.current;
-    const newTranslate = Math.max(0, Math.min(getDrawerHeight() * 0.92, currentTranslate.current + deltaY));
+    // Limit dragging so drawer never goes below minimum position (75%)
+    const maxTranslate = getDrawerHeight() * SNAP_POSITIONS.minimum;
+    const minTranslate = getDrawerHeight() * SNAP_POSITIONS.full;
+    
+    const newTranslate = Math.max(minTranslate, Math.min(maxTranslate, currentTranslate.current + deltaY));
     setDragOffset(newTranslate - currentTranslate.current);
   };
 
@@ -419,26 +442,23 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const isPro = user?.subscription?.tier === 'pro' || user?.subscription?.tier === 'max';
 
   return (
-    <div className="h-screen w-full relative overflow-hidden">
-      {/* Map Container - Full screen behind everything */}
+    <div className="h-screen w-full relative overflow-hidden bg-black">
+      {/* Map Container - Full screen behind everything, always visible */}
       <div 
         ref={mapContainer} 
         className="absolute inset-0 w-full h-full"
         style={{ zIndex: 0 }}
       />
-
-      {/* Map Loading Overlay */}
-      {mapLoading && (
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <span className="ml-3 text-foreground">Loading map...</span>
-        </div>
-      )}
+      
+      {/* Optional: Map attribution in corner */}
+      <div className="absolute bottom-16 right-2 z-10 text-xs text-white/70 bg-black/30 px-2 py-1 rounded">
+        © Mapbox © OpenStreetMap
+      </div>
 
       {/* Event Card Popup - Shows when event selected on map */}
       {selectedEvent && (
         <div 
-          className="absolute bottom-20 left-4 right-4 z-30 animate-slide-up"
+          className="absolute bottom-24 left-4 right-4 z-30 animate-slide-up"
           style={{ maxWidth: '400px', margin: '0 auto' }}
         >
           <div className="bg-background rounded-2xl shadow-2xl border border-border overflow-hidden">
@@ -492,7 +512,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       <div
         ref={drawerRef}
         className={cn(
-          'absolute left-0 right-0 bg-background rounded-t-3xl shadow-2xl z-20 flex flex-col',
+          'absolute left-0 right-0 bg-background rounded-t-3xl shadow-2xl z-20 flex flex-col border-t border-border',
           isDragging ? '' : 'transition-transform duration-300 ease-out'
         )}
         style={{
@@ -509,7 +529,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
           aria-label={`Drawer position: ${drawerPosition}. Drag to adjust.`}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
-              setDrawerPosition(drawerPosition === 'half' ? 'full' : drawerPosition === 'full' ? 'minimum' : 'half');
+              setDrawerPosition(drawerPosition === 'minimum' ? 'half' : drawerPosition === 'half' ? 'full' : 'minimum');
             }
           }}
           onTouchStart={handleTouchStart}
@@ -519,9 +539,9 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         >
           <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full" />
           <p className="text-xs text-muted-foreground mt-2">
-            {drawerPosition === 'minimum' ? 'Swipe up for events' : 
+            {drawerPosition === 'minimum' ? `${filteredEvents.length} events nearby - Swipe up` : 
              drawerPosition === 'full' ? 'Swipe down for map' : 
-             `${filteredEvents.length} events nearby`}
+             'Swipe up or down'}
           </p>
         </div>
 
@@ -629,12 +649,19 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                 <div className="text-center py-12">
                   <MapPin className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                   <p className="text-muted-foreground">No events found</p>
+                  <p className="text-sm text-muted-foreground/70 mt-1">Try adjusting your search or filters</p>
                 </div>
               )}
             </div>
           </div>
         )}
       </div>
+
+      {/* Bottom Navbar Space (simulated) */}
+      <div 
+        className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/30 to-transparent pointer-events-none z-10"
+        style={{ height: `${BOTTOM_NAVBAR_HEIGHT * 100}%` }}
+      />
 
       {/* Custom CSS for scrollbars */}
       <style jsx>{`
