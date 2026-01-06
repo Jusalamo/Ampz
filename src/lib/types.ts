@@ -73,6 +73,8 @@ export interface Event {
   geofenceRadius: number;
   customTheme: string;
   coverImage: string;
+  images?: string[];
+  videos?: string[];
   tags: string[];
   isFeatured: boolean;
 }
@@ -110,7 +112,7 @@ export interface Message {
   text: string;
   timestamp: string;
   read: boolean;
-  type: 'text' | 'event';
+  type: 'text' | 'event' | 'location' | 'image';
 }
 
 export interface Ticket {

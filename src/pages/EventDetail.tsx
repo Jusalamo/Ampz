@@ -384,14 +384,14 @@ export default function EventDetail() {
           {/* Photos Tab */}
           {activeTab === 'photos' && (
             <div className="min-h-[300px]">
-              <CommunityPhotos eventId={event.id} photos={eventPhotos} compact />
+              <CommunityPhotos eventId={event.id} photos={eventPhotos} />
             </div>
           )}
 
           {/* Comments Tab */}
           {activeTab === 'comments' && (
             <div className="min-h-[300px]">
-              <CommunityComments eventId={event.id} comments={eventComments} compact />
+              <CommunityComments eventId={event.id} comments={eventComments} />
             </div>
           )}
         </div>

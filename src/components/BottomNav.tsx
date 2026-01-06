@@ -1,4 +1,4 @@
-import { Home, Calendar, Users, MessageCircle, User } from 'lucide-react';
+import { Home, Calendar, Zap, Send, User } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/contexts/AppContext';
@@ -6,14 +6,15 @@ import { useApp } from '@/contexts/AppContext';
 const navItems = [
   { icon: Home, label: 'Home', path: '/home' },
   { icon: Calendar, label: 'Events', path: '/events' },
-  { icon: Users, label: 'Connections', path: '/connections' },
-  { icon: MessageCircle, label: 'Matches', path: '/matches' },
+  { icon: Zap, label: 'Connect', path: '/connect' },
+  { icon: Send, label: 'Chats', path: '/matches' },
   { icon: User, label: 'Profile', path: '/profile' },
 ];
 
 export function BottomNav() {
   const location = useLocation();
-  const { unreadMessagesCount } = useApp(); // Changed from unreadNotificationsCount
+  const { matches } = useApp();
+  const unreadMessagesCount = matches.filter(m => m.unread).length;
 
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app h-[68px] bg-background/98 backdrop-blur-xl border-t border-border flex justify-around items-center pb-safe z-50">
@@ -21,7 +22,7 @@ export function BottomNav() {
         const isActive = location.pathname === path || 
           (path === '/home' && location.pathname.startsWith('/home')) ||
           (path === '/events' && location.pathname.startsWith('/events')) ||
-          (path === '/connections' && location.pathname.startsWith('/connections')) ||
+          (path === '/connect' && location.pathname.startsWith('/connect')) ||
           (path === '/matches' && location.pathname.startsWith('/matches')) ||
           (path === '/profile' && location.pathname.startsWith('/profile'));
         

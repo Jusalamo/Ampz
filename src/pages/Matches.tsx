@@ -22,7 +22,8 @@ import {
   Filter,
   SortAsc,
   Menu,
-  Sparkles
+  Sparkles,
+  MapPin
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
