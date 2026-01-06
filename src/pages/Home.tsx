@@ -6,6 +6,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { CheckInModal } from '@/components/modals/CheckInModal';
 import { TicketsModal } from '@/components/modals/TicketsModal';
 import { EventWizardModal } from '@/components/modals/EventWizardModal';
+import { EventManager } from '.@/pages/EventManager';
 import { SubscriptionModal } from '@/components/modals/SubscriptionModal';
 import { NotificationsDropdown } from '@/components/modals/NotificationsDropdown';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
@@ -98,7 +99,7 @@ export default function Home() {
         variant: 'destructive'
       });
     } else {
-      navigate('/manage-events');
+      navigate('/EventManager";');
     }
   };
 
