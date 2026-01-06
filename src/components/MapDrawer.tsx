@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Search, SlidersHorizontal, Plus, MapPin, X, Calendar, Users, Clock, Star } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { EventCard } from './EventCard';
@@ -9,7 +9,29 @@ import { cn } from '@/lib/utils';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-const MAPBOX_TOKEN = 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg';
+// Use environment variable for Mapbox token
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg';
+
+// Type definitions
+interface Coordinates {
+  lng: number;
+  lat: number;
+}
+
+interface Event {
+  id: string;
+  name: string;
+  location: string;
+  category: string;
+  coordinates: Coordinates;
+  coverImage: string;
+  date: string;
+  time: string;
+  price: number;
+  isFeatured?: boolean;
+  customTheme?: string;
+  geofenceRadius: number;
+}
 
 interface MapDrawerProps {
   onCreateEvent: () => void;
@@ -19,9 +41,9 @@ interface MapDrawerProps {
 type DrawerPosition = 'minimum' | 'half' | 'full';
 
 const SNAP_POSITIONS = {
-  minimum: 0.92, // Almost hidden - just handle visible
-  half: 0.5,     // 50% visible
-  full: 0.08,    // Almost full screen (with handle at top)
+  minimum: typeof window !== 'undefined' && window.innerWidth < 768 ? 0.85 : 0.92,
+  half: 0.5,
+  full: typeof window !== 'undefined' && window.innerWidth < 768 ? 0.15 : 0.08,
 };
 
 export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
@@ -32,9 +54,10 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const [drawerPosition, setDrawerPosition] = useState<DrawerPosition>('half');
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
-  const [searchSuggestions, setSearchSuggestions] = useState<typeof events>([]);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [searchSuggestions, setSearchSuggestions] = useState<Event[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [mapLoading, setMapLoading] = useState(true);
   
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -47,13 +70,16 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
   const categories = ['All', 'Music', 'Tech', 'Party', 'Art', 'Food', 'Sports'];
 
-  const filteredEvents = events.filter((event) => {
-    const matchesSearch =
-      event.name.toLowerCase().includes(search.toLowerCase()) ||
-      event.location.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || event.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Memoized filtered events for performance
+  const filteredEvents = useMemo(() => {
+    return events.filter((event) => {
+      const matchesSearch =
+        event.name.toLowerCase().includes(search.toLowerCase()) ||
+        event.location.toLowerCase().includes(search.toLowerCase());
+      const matchesCategory = selectedCategory === 'All' || event.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [events, search, selectedCategory]);
 
   // Handle search suggestions
   useEffect(() => {
@@ -76,54 +102,95 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    mapboxgl.accessToken = MAPBOX_TOKEN;
-    
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center: [17.0658, -22.5609], // Windhoek
-      zoom: 12,
-      pitch: 45,
-      bearing: -17.6,
-      antialias: true,
-    });
+    try {
+      mapboxgl.accessToken = MAPBOX_TOKEN;
+      
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: [17.0658, -22.5609], // Windhoek
+        zoom: 12,
+        pitch: 45,
+        bearing: -17.6,
+        antialias: true,
+      });
 
-    map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+      map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
 
-    // Add geolocate control
-    const geolocate = new mapboxgl.GeolocateControl({
-      positionOptions: { enableHighAccuracy: true },
-      trackUserLocation: true,
-      showUserLocation: true,
-      showUserHeading: true,
-    });
-    map.current.addControl(geolocate, 'top-right');
+      // Add geolocate control
+      const geolocate = new mapboxgl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true,
+        showUserLocation: true,
+        showUserHeading: true,
+      });
+      map.current.addControl(geolocate, 'top-right');
 
-    map.current.on('load', () => {
-      // Trigger geolocation on load
-      geolocate.trigger();
-      updateEventMarkers();
-    });
+      map.current.on('load', () => {
+        setMapLoading(false);
+        // Trigger geolocation on load
+        geolocate.trigger();
+        updateEventMarkers();
+      });
 
-    // Handle map click to close popup
-    map.current.on('click', () => {
-      if (popupRef.current) {
-        popupRef.current.remove();
-        popupRef.current = null;
-        removeGeofenceCircle();
-        setSelectedEvent(null);
-      }
-    });
+      // Handle map click to close popup
+      map.current.on('click', () => {
+        if (popupRef.current) {
+          popupRef.current.remove();
+          popupRef.current = null;
+          removeGeofenceCircle();
+          setSelectedEvent(null);
+        }
+      });
+
+      // Track user location updates
+      map.current.on('locationfound', (e) => {
+        const { lng, lat } = e.coords;
+        
+        // Remove existing user marker
+        if (userMarkerRef.current) {
+          userMarkerRef.current.remove();
+        }
+
+        // Create new user marker
+        const userMarkerEl = document.createElement('div');
+        userMarkerEl.className = 'user-marker';
+        userMarkerEl.innerHTML = `
+          <div class="relative">
+            <div class="w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg"></div>
+            <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 w-12 h-6 bg-blue-500/10 rounded-full blur-sm"></div>
+          </div>
+        `;
+
+        userMarkerRef.current = new mapboxgl.Marker(userMarkerEl)
+          .setLngLat([lng, lat])
+          .addTo(map.current!);
+      });
+
+    } catch (error) {
+      console.error('Failed to initialize map:', error);
+      setMapLoading(false);
+      // You could show a fallback UI here
+    }
 
     return () => {
-      markersRef.current.forEach(marker => marker.remove());
-      markersRef.current = [];
+      // Clean up all markers (except user marker handled separately)
+      markersRef.current.forEach(marker => {
+        if (marker !== userMarkerRef.current) {
+          marker.remove();
+        }
+      });
+      markersRef.current = userMarkerRef.current ? [userMarkerRef.current] : [];
+      
       if (popupRef.current) {
         popupRef.current.remove();
         popupRef.current = null;
       }
-      map.current?.remove();
-      map.current = null;
+      
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
     };
   }, []);
 
@@ -185,7 +252,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     });
   };
 
-  const addGeofenceCircle = (event: any) => {
+  const addGeofenceCircle = (event: Event) => {
     if (!map.current || !map.current.isStyleLoaded()) return;
 
     const { lat, lng } = event.coordinates;
@@ -257,7 +324,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     }
   };
 
-  const handleEventCardClick = (event: any) => {
+  const handleEventCardClick = (event: Event) => {
     navigate(`/event/${event.id}`);
   };
 
@@ -327,6 +394,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     handleDragStart(e.clientY);
   };
 
+  // Mouse event handlers for dragging
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       handleDragMove(e.clientY);
@@ -348,7 +416,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   }, [isDragging, dragOffset]);
 
   const translateY = SNAP_POSITIONS[drawerPosition] * getDrawerHeight() + dragOffset;
-  const isPro = user?.subscription.tier === 'pro' || user?.subscription.tier === 'max';
+  const isPro = user?.subscription?.tier === 'pro' || user?.subscription?.tier === 'max';
 
   return (
     <div className="h-screen w-full relative overflow-hidden">
@@ -358,6 +426,14 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         className="absolute inset-0 w-full h-full"
         style={{ zIndex: 0 }}
       />
+
+      {/* Map Loading Overlay */}
+      {mapLoading && (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <span className="ml-3 text-foreground">Loading map...</span>
+        </div>
+      )}
 
       {/* Event Card Popup - Shows when event selected on map */}
       {selectedEvent && (
@@ -378,6 +454,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                   <button 
                     onClick={closeEventCard}
                     className="w-6 h-6 rounded-full bg-card flex items-center justify-center flex-shrink-0"
+                    aria-label="Close event details"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -400,6 +477,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                     size="sm" 
                     className="h-7 text-xs px-3"
                     onClick={() => handleEventCardClick(selectedEvent)}
+                    aria-label={`View details for ${selectedEvent.name}`}
                   >
                     View Event
                   </Button>
@@ -426,6 +504,14 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         {/* Drawer Handle - Extends to full width */}
         <div
           className="flex flex-col items-center pt-3 pb-2 cursor-grab active:cursor-grabbing select-none"
+          role="button"
+          tabIndex={0}
+          aria-label={`Drawer position: ${drawerPosition}. Drag to adjust.`}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              setDrawerPosition(drawerPosition === 'half' ? 'full' : drawerPosition === 'full' ? 'minimum' : 'half');
+            }
+          }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -454,6 +540,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                   onFocus={() => setShowSuggestions(true)}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                   className="pl-10 h-10 bg-card border-border rounded-xl"
+                  aria-label="Search events"
                 />
                 
                 {/* Search Suggestions Dropdown */}
@@ -468,6 +555,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                           setShowSuggestions(false);
                           handleEventCardClick(event);
                         }}
+                        aria-label={`Select event: ${event.name}`}
                       >
                         <img src={event.coverImage} alt="" className="w-8 h-8 rounded-lg object-cover" />
                         <div className="flex-1 min-w-0">
@@ -483,6 +571,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
               <button
                 onClick={onOpenFilters}
                 className="w-10 h-10 rounded-xl bg-card border border-border flex items-center justify-center hover:border-primary transition-colors"
+                aria-label="Open filters"
               >
                 <SlidersHorizontal className="w-4 h-4" />
               </button>
@@ -491,9 +580,15 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                 <Button
                   size="sm"
                   onClick={onCreateEvent}
-                  className="h-10 px-3 rounded-xl"
+                  className="h-10 px-3 rounded-xl relative"
+                  aria-label="Create new event"
                 >
                   <Plus className="w-4 h-4" />
+                  {user?.createdEvents?.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                      {user.createdEvents.length}
+                    </span>
+                  )}
                 </Button>
               )}
             </div>
@@ -510,6 +605,8 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-card text-muted-foreground hover:text-foreground border border-border'
                   )}
+                  aria-label={`Filter by ${category}`}
+                  aria-pressed={selectedCategory === category}
                 >
                   {category}
                 </button>
@@ -518,7 +615,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
             {/* Events List */}
             <div 
-              className="flex-1 overflow-y-auto space-y-3 pb-24"
+              className="flex-1 overflow-y-auto space-y-3 pb-24 custom-scrollbar"
             >
               {filteredEvents.length > 0 ? (
                 filteredEvents.map((event) => (
@@ -538,6 +635,30 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
           </div>
         )}
       </div>
+
+      {/* Custom CSS for scrollbars */}
+      <style jsx>{`
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #888;
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #555;
+        }
+      `}</style>
     </div>
   );
 }
