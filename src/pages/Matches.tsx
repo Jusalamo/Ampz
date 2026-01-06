@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, KeyboardEvent } from 'react';
+import { useState, useRef, KeyboardEvent } from 'react';
 import { 
   MessageCircle, 
   Search, 
@@ -6,9 +6,8 @@ import {
   Send, 
   Image, 
   Smile, 
-  Mic, 
-  Video, 
   Phone, 
+  Video,
   ArrowLeft,
   Camera,
   Paperclip,
@@ -20,7 +19,6 @@ import {
   Filter,
   Heart,
   User,
-  Clock,
   Calendar,
   MapPin,
   Mail,
@@ -33,81 +31,23 @@ import {
   Flag,
   Shield,
   Sparkles,
-  Zap,
   Handshake,
-  SendHorizonal,
-  ChevronRight,
-  Plus,
-  Eye,
-  EyeOff,
-  Download,
-  ExternalLink,
   MoreHorizontal,
-  Hash,
-  AtSign,
-  Link,
-  FileText,
-  File,
-  Music,
-  Film,
-  Image as ImageIcon,
-  Heart as HeartIcon,
+  Pin,
+  UserMinus,
+  Users as UsersIcon,
   ThumbsUp,
   Fire,
   PartyPopper,
   MessageSquare,
-  Share2,
   Copy,
   Forward,
-  Bookmark,
-  Pin,
-  UserMinus,
-  Users as UsersIcon,
-  Star,
-  Coffee,
-  Beer,
-  Pizza,
-  Plane,
-  Car,
-  Home,
-  Building,
-  Briefcase,
-  GraduationCap,
-  Palette,
-  Music as MusicIcon,
-  Gamepad2,
-  Utensils,
-  Dumbbell,
-  Book,
-  Laptop,
-  Camera as CameraIcon,
-  Globe,
-  Map,
-  Compass,
-  Coffee as CoffeeIcon,
-  Moon,
-  Sun,
-  Cloud,
-  CloudRain,
-  CloudSnow,
-  Wind,
-  Thermometer,
-  Droplets,
-  TreePine,
-  Mountain,
-  Waves,
-  Leaf,
-  Flower2,
-  Cat,
-  Dog,
-  Bird,
-  Fish,
-  Bug,
-  Sparkles as SparklesIcon
+  Plus,
+  Send as SendIcon
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
-import { Match, Message, UserProfile, FriendRequest, Conversation } from '@/lib/types';
+import { Match, Message, FriendRequest, Conversation } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -115,23 +55,17 @@ import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
-import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuPortal,
-  DropdownMenuCheckboxItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
   ContextMenu,
@@ -291,9 +225,6 @@ export default function Matches() {
     },
   ]);
   const [newMessage, setNewMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [showConversationSettings, setShowConversationSettings] = useState(false);
-  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Combine context matches with mock data for now
@@ -426,26 +357,6 @@ export default function Matches() {
       setSelectedConversation(null);
     }
   };
-
-  // Quick add search results
-  const quickAddResults = [
-    {
-      id: 'user7',
-      name: 'Chris Taylor',
-      photo: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Chris',
-      mutualFriends: 3,
-      sharedEvents: ['Tech Meetup', 'Hackathon'],
-    },
-    {
-      id: 'user8',
-      name: 'Lisa Anderson',
-      photo: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lisa',
-      mutualFriends: 1,
-      sharedEvents: ['Art Exhibition'],
-    },
-  ].filter(user => 
-    user.name.toLowerCase().includes(quickAddSearch.toLowerCase())
-  );
 
   return (
     <div className="app-container min-h-screen bg-background pb-nav">
@@ -877,7 +788,7 @@ export default function Matches() {
                       Search in Conversation
                     </DropdownMenuItem>
                     <DropdownMenuItem>
-                      <ImageIcon className="w-4 h-4 mr-2" />
+                      <Image className="w-4 h-4 mr-2" />
                       View Media, Files & Links
                     </DropdownMenuItem>
                     <DropdownMenuItem>
@@ -956,20 +867,35 @@ export default function Matches() {
                     </ContextMenuItem>
                     <ContextMenuSub>
                       <ContextMenuSubTrigger>
-                        <SparklesIcon className="w-4 h-4 mr-2" />
+                        <Sparkles className="w-4 h-4 mr-2" />
                         React
                       </ContextMenuSubTrigger>
                       <ContextMenuSubContent>
                         <div className="flex gap-2 p-2">
-                          {[HeartIcon, ThumbsUp, Fire, PartyPopper].map((Icon, i) => (
-                            <button
-                              key={i}
-                              className="w-8 h-8 rounded-full bg-card flex items-center justify-center hover:bg-card/80"
-                              onClick={() => toast({ title: 'Reaction sent' })}
-                            >
-                              <Icon className="w-5 h-5" />
-                            </button>
-                          ))}
+                          <button
+                            className="w-8 h-8 rounded-full bg-card flex items-center justify-center hover:bg-card/80"
+                            onClick={() => toast({ title: '❤️ Reaction sent' })}
+                          >
+                            <Heart className="w-5 h-5 text-red-500" />
+                          </button>
+                          <button
+                            className="w-8 h-8 rounded-full bg-card flex items-center justify-center hover:bg-card/80"
+                            onClick={() => toast({ title: '👍 Reaction sent' })}
+                          >
+                            <ThumbsUp className="w-5 h-5 text-blue-500" />
+                          </button>
+                          <button
+                            className="w-8 h-8 rounded-full bg-card flex items-center justify-center hover:bg-card/80"
+                            onClick={() => toast({ title: '🔥 Reaction sent' })}
+                          >
+                            <Fire className="w-5 h-5 text-orange-500" />
+                          </button>
+                          <button
+                            className="w-8 h-8 rounded-full bg-card flex items-center justify-center hover:bg-card/80"
+                            onClick={() => toast({ title: '🎉 Reaction sent' })}
+                          >
+                            <PartyPopper className="w-5 h-5 text-yellow-500" />
+                          </button>
                         </div>
                       </ContextMenuSubContent>
                     </ContextMenuSub>
@@ -989,20 +915,6 @@ export default function Matches() {
                   </ContextMenuContent>
                 </ContextMenu>
               ))}
-
-              {/* Typing Indicator */}
-              {isTyping && (
-                <div className="flex justify-start">
-                  <div className="bg-card rounded-2xl rounded-bl-md px-4 py-3">
-                    <div className="flex gap-1">
-                      <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse" />
-                      <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse delay-150" />
-                      <div className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse delay-300" />
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <div ref={messagesEndRef} />
             </ScrollArea>
 
@@ -1146,38 +1058,11 @@ export default function Matches() {
               <div className="space-y-4">
                 <h3 className="font-semibold text-sm text-muted-foreground mb-2">Suggestions</h3>
                 
-                {quickAddResults.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground">No users found</p>
-                  </div>
-                ) : (
-                  quickAddResults.map((user) => (
-                    <div key={user.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-card/50">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={user.photo} />
-                          <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <h4 className="font-semibold">{user.name}</h4>
-                          <div className="text-xs text-muted-foreground">
-                            {user.mutualFriends > 0 && (
-                              <span>{user.mutualFriends} mutual friend{user.mutualFriends !== 1 ? 's' : ''}</span>
-                            )}
-                            {user.sharedEvents.length > 0 && (
-                              <span> • {user.sharedEvents.length} shared event{user.sharedEvents.length !== 1 ? 's' : ''}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <Button size="sm">
-                        <UserPlus className="w-3 h-3 mr-1" />
-                        Add
-                      </Button>
-                    </div>
-                  ))
-                )}
+                {/* Mock results */}
+                <div className="text-center py-8">
+                  <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">Search for users to add as friends</p>
+                </div>
               </div>
             </ScrollArea>
           </div>
