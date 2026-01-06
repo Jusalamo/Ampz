@@ -1,4 +1,4 @@
-i just need you to make the nescessary changes  import { useState, useEffect, useRef, KeyboardEvent } from 'react';
+import { useState, useEffect, useRef, KeyboardEvent } from 'react';
 import { 
   MessageCircle, 
   Search, 
