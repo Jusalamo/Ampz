@@ -138,7 +138,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     // Handle map move to update popup position
     map.current.on('move', () => {
       if (popupRef.current && selectedEvent) {
-        const coordinates = [selectedEvent.coordinates.lng, selectedEvent.coordinates.lat];
+        const coordinates: [number, number] = [selectedEvent.coordinates.lng, selectedEvent.coordinates.lat];
         const pixelPosition = map.current!.project(coordinates);
         
         // Update custom card position if needed
@@ -604,8 +604,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                   <EventCard
                     key={event.id}
                     event={event}
-                    onClick={() => handleEventCardClick(event)} // Direct navigation
-                    showPreview={false} // Don't show preview on hover
+                    onClick={() => handleEventCardClick(event)}
                   />
                 ))
               ) : (

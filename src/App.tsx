@@ -39,6 +39,7 @@ function AppRoutes() {
       <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
       <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
       <Route path="/connect" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
+      <Route path="/connections" element={<Navigate to="/connect" replace />} />
       <Route path="/matches" element={<ProtectedRoute><Matches /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/event/:id" element={<ProtectedRoute><EventDetail /></ProtectedRoute>} />
