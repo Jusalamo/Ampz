@@ -293,12 +293,14 @@ export default function Matches() {
                     : "bg-card hover:bg-card/80"
                 )}
               >
-                Messages
-                {matches.filter(m => m.unread).length > 0 && (
-                  <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                    {matches.filter(m => m.unread).length}
-                  </span>
-                )}
+                <div className="flex items-center justify-center">
+                  Messages
+                  {matches.filter(m => m.unread).length > 0 && (
+                    <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                      {matches.filter(m => m.unread).length}
+                    </span>
+                  )}
+                </div>
               </button>
               <button
                 onClick={() => setActiveTab('requests')}
@@ -309,8 +311,10 @@ export default function Matches() {
                     : "bg-card hover:bg-card/80"
                 )}
               >
-                Requests
-                <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">3</span>
+                <div className="flex items-center justify-center">
+                  Requests
+                  <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">3</span>
+                </div>
               </button>
             </div>
 
@@ -646,28 +650,28 @@ export default function Matches() {
               <div className="flex items-center gap-2 mt-3 overflow-x-auto pb-2">
                 <button
                   type="button"
-                  className="px-3 py-1.5 bg-primary/10 text-primary rounded-full text-xs font-medium flex items-center gap-1"
+                  className="px-3 py-1.5 bg-primary/10 text-primary rounded-full text-xs font-medium flex items-center gap-1 whitespace-nowrap"
                 >
                   <Video className="w-3 h-3" />
                   Video call
                 </button>
                 <button
                   type="button"
-                  className="px-3 py-1.5 bg-card text-foreground rounded-full text-xs font-medium flex items-center gap-1"
+                  className="px-3 py-1.5 bg-card text-foreground rounded-full text-xs font-medium flex items-center gap-1 whitespace-nowrap"
                 >
                   <Image className="w-3 h-3" />
                   Photo
                 </button>
                 <button
                   type="button"
-                  className="px-3 py-1.5 bg-card text-foreground rounded-full text-xs font-medium flex items-center gap-1"
+                  className="px-3 py-1.5 bg-card text-foreground rounded-full text-xs font-medium flex items-center gap-1 whitespace-nowrap"
                 >
                   <Paperclip className="w-3 h-3" />
                   File
                 </button>
                 <button
                   type="button"
-                  className="px-3 py-1.5 bg-card text-foreground rounded-full text-xs font-medium flex items-center gap-1"
+                  className="px-3 py-1.5 bg-card text-foreground rounded-full text-xs font-medium flex items-center gap-1 whitespace-nowrap"
                 >
                   <MapPin className="w-3 h-3" />
                   Location
