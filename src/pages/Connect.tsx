@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Heart, RotateCcw, Sparkles, MapPin, Briefcase, Info, Lock } from 'lucide-react';
+import { X, Heart, RotateCcw, Sparkles, MapPin, Briefcase, Info, Lock, Tag } from 'lucide-react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
@@ -19,7 +19,8 @@ const DESIGN = {
     background: '#1A1A1A',
     card: '#2D2D2D',
     textPrimary: '#FFFFFF',
-    textSecondary: '#B8B8B8'
+    textSecondary: '#B8B8B8',
+    gold: '#D4AF37'
   }
 };
 
@@ -77,63 +78,99 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
       style={{ zIndex: isTop ? 10 : 1 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
     >
-      {/* Original Card Design */}
+      {/* Card with Light Purple Hue */}
       <div 
-        className="w-full h-full rounded-[24px] overflow-hidden relative rotate-[-2deg]"
+        className="w-full h-full rounded-[20px] overflow-hidden relative rotate-[-2deg]"
         style={{
-          background: 'linear-gradient(135deg, #C4B5FD 0%, #E9D5FF 100%)',
+          background: 'linear-gradient(135deg, rgba(196, 181, 253, 0.95) 0%, rgba(233, 213, 255, 0.95) 100%)',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
           border: '2px solid #D4AF37',
-          padding: '16px'
+          position: 'relative'
         }}
       >
+        {/* Overlay for light purple hue */}
+        <div 
+          className="absolute inset-0"
+          style={{
+            background: 'rgba(196, 181, 253, 0.2)',
+            mixBlendMode: 'overlay'
+          }}
+        />
+        
         {/* Profile Photo */}
-        <div className="relative h-[70%] mb-3">
+        <div className="relative h-[65%]">
           <img
             src={profile.photo}
             alt={profile.name}
-            className="w-full h-full object-cover rounded-[20px] border-3 border-white"
+            className="w-full h-full object-cover"
+            style={{
+              borderBottomLeftRadius: '18px',
+              borderBottomRightRadius: '18px'
+            }}
             draggable={false}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-[20px]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
           
-          {/* Info Button */}
+          {/* Info Button - Improved styling */}
           <button
             onClick={(e) => {
               e.stopPropagation();
               onViewProfile();
             }}
-            className="absolute top-3 right-3 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center"
-            style={{ borderRadius: '50%' }}
+            className="absolute top-3 right-3 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md hover:scale-105 transition-transform"
+            style={{
+              background: 'rgba(0, 0, 0, 0.5)',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}
           >
             <Info className="w-5 h-5 text-white" />
           </button>
         </div>
 
-        {/* Simple Info */}
-        <div className="px-1">
+        {/* Simple Info - Only name, age, and tags */}
+        <div className="absolute bottom-0 left-0 right-0 p-4">
           <div className="flex items-center gap-2 mb-2">
-            <h2 className="text-[24px] font-semibold" style={{ color: DESIGN.colors.background }}>
+            <h2 className="text-[24px] font-bold" style={{ color: DESIGN.colors.background }}>
               {profile.name}
             </h2>
-            <span className="text-[24px]" style={{ color: DESIGN.colors.card, opacity: 0.8 }}>
+            <span className="text-[24px] font-medium" style={{ color: DESIGN.colors.card, opacity: 0.9 }}>
               {profile.age}
             </span>
           </div>
           
-          <div className="flex justify-center">
-            <div 
-              className="px-3 py-1.5 rounded-[8px] flex items-center justify-center"
-              style={{
-                background: '#FFFFFF',
-                minHeight: '28px'
-              }}
-            >
-              <span className="text-[13px] font-medium text-center" style={{ color: DESIGN.colors.background }}>
-                {profile.gender || "Preferred not to say"}
-              </span>
+          {/* Tags display - Show first 3 tags */}
+          {profile.interests && profile.interests.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {profile.interests.slice(0, 3).map((interest, index) => (
+                <div 
+                  key={index}
+                  className="px-3 py-1 rounded-full flex items-center"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    backdropFilter: 'blur(10px)'
+                  }}
+                >
+                  <Tag className="w-3 h-3 mr-1" style={{ color: DESIGN.colors.background }} />
+                  <span className="text-[12px] font-medium" style={{ color: DESIGN.colors.background }}>
+                    {interest}
+                  </span>
+                </div>
+              ))}
+              {profile.interests.length > 3 && (
+                <div 
+                  className="px-3 py-1 rounded-full flex items-center"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.7)',
+                    backdropFilter: 'blur(10px)'
+                  }}
+                >
+                  <span className="text-[12px] font-medium" style={{ color: DESIGN.colors.background }}>
+                    +{profile.interests.length - 3}
+                  </span>
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </div>
       </div>
     </motion.div>
@@ -430,8 +467,9 @@ export default function Connect() {
             top: 'auto'
           }}
         >
+          {/* Drag handle */}
           <div className="w-full flex justify-center pt-3">
-            <div className="w-9 h-1 rounded-full bg-gray-400" />
+            <div className="w-9 h-1 rounded-full" style={{ background: DESIGN.colors.textSecondary }} />
           </div>
 
           <motion.div 
@@ -460,7 +498,7 @@ export default function Connect() {
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.2, type: 'spring' }}
                 className="absolute -top-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center z-20 border-2"
-                style={{ background: '#D4AF37', borderColor: DESIGN.colors.card }}
+                style={{ background: DESIGN.colors.gold, borderColor: DESIGN.colors.card }}
               >
                 <Heart className="w-3 h-3 text-white fill-white" />
               </motion.div>
@@ -485,14 +523,16 @@ export default function Connect() {
               You and {matchModal?.name} liked each other
             </motion.p>
             
+            {/* Purple buttons for match modal */}
             <div className="flex gap-3">
               <Button
                 variant="outline"
                 onClick={() => setMatchModal(null)}
-                className="flex-1 h-12 rounded-[12px]"
+                className="flex-1 h-12 rounded-[12px] hover:bg-purple-50 transition-colors"
                 style={{ 
                   borderColor: DESIGN.colors.primary,
-                  color: DESIGN.colors.textPrimary 
+                  color: DESIGN.colors.primary,
+                  background: 'transparent'
                 }}
               >
                 Keep Swiping
@@ -502,10 +542,10 @@ export default function Connect() {
                   setMatchModal(null);
                   navigate('/matches');
                 }}
-                className="flex-1 h-12 rounded-[12px]"
+                className="flex-1 h-12 rounded-[12px] hover:bg-purple-700 transition-colors"
                 style={{ 
                   background: DESIGN.colors.primary,
-                  color: DESIGN.colors.background 
+                  color: DESIGN.colors.background
                 }}
               >
                 Message
@@ -530,13 +570,15 @@ export default function Connect() {
             maxHeight: '90vh'
           }}
         >
+          {/* Drag handle */}
           <div className="w-full flex justify-center pt-3">
-            <div className="w-9 h-1 rounded-full bg-gray-400" />
+            <div className="w-9 h-1 rounded-full" style={{ background: DESIGN.colors.textSecondary }} />
           </div>
 
           <div className="overflow-y-auto max-h-[80vh]">
             {viewingProfile && (
               <>
+                {/* Image with improved close button */}
                 <div className="relative h-56">
                   <img
                     src={viewingProfile.photo}
@@ -544,37 +586,63 @@ export default function Connect() {
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                  
+                  {/* Improved close button */}
+                  <button
+                    onClick={() => setViewingProfile(null)}
+                    className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md hover:scale-105 transition-transform"
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.5)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)'
+                    }}
+                  >
+                    <X className="w-5 h-5 text-white" />
+                  </button>
                 </div>
                 
+                {/* Profile Details */}
                 <div className="p-5 space-y-6">
                   <div>
                     <h2 className="text-[28px] font-bold mb-1" style={{ color: DESIGN.colors.textPrimary }}>
                       {viewingProfile.name}, {viewingProfile.age}
                     </h2>
-                    {viewingProfile.gender && (
-                      <p className="text-[15px] mb-2" style={{ color: DESIGN.colors.textSecondary }}>
-                        {viewingProfile.gender}
-                      </p>
-                    )}
+                    
+                    {/* Occupation */}
                     {viewingProfile.occupation && (
-                      <div className="flex items-center gap-2 mt-2">
+                      <div className="flex items-center gap-2 mb-3">
                         <Briefcase className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
-                        <span className="text-[15px]" style={{ color: DESIGN.colors.primary }}>
+                        <span className="text-[16px]" style={{ color: DESIGN.colors.primary }}>
                           {viewingProfile.occupation}
                         </span>
                       </div>
                     )}
+                    
+                    {/* Gender (if available) */}
+                    {viewingProfile.gender && (
+                      <div className="mb-2">
+                        <div 
+                          className="inline-flex items-center px-3 py-1 rounded-full"
+                          style={{ background: 'rgba(196, 181, 253, 0.1)' }}
+                        >
+                          <span className="text-[14px] font-medium" style={{ color: DESIGN.colors.primary }}>
+                            {viewingProfile.gender}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
+                  {/* About Section */}
                   <div>
                     <h3 className="text-[13px] font-semibold mb-3 uppercase tracking-wider" style={{ color: DESIGN.colors.textSecondary }}>
                       About
                     </h3>
-                    <p className="text-[15px]" style={{ color: DESIGN.colors.textSecondary }}>
+                    <p className="text-[15px] leading-relaxed" style={{ color: DESIGN.colors.textSecondary }}>
                       {viewingProfile.bio}
                     </p>
                   </div>
 
+                  {/* Location Section */}
                   <div>
                     <h3 className="text-[13px] font-semibold mb-3 uppercase tracking-wider" style={{ color: DESIGN.colors.textSecondary }}>
                       Location
@@ -586,10 +654,42 @@ export default function Connect() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Tags/Interests Section */}
+                  {viewingProfile.interests && viewingProfile.interests.length > 0 && (
+                    <div>
+                      <h3 className="text-[13px] font-semibold mb-3 uppercase tracking-wider" style={{ color: DESIGN.colors.textSecondary }}>
+                        Interests
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {viewingProfile.interests.map((interest, index) => (
+                          <div 
+                            key={index}
+                            className="flex items-center px-3 py-1.5 rounded-full"
+                            style={{
+                              background: 'rgba(196, 181, 253, 0.1)',
+                              border: '1px solid rgba(196, 181, 253, 0.3)'
+                            }}
+                          >
+                            <Tag className="w-3 h-3 mr-2" style={{ color: DESIGN.colors.primary }} />
+                            <span className="text-[13px] font-medium" style={{ color: DESIGN.colors.primary }}>
+                              {interest}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Action buttons */}
-                <div className="p-5 border-t" style={{ borderColor: `${DESIGN.colors.textSecondary}20` }}>
+                <div 
+                  className="p-5 border-t"
+                  style={{ 
+                    borderColor: `${DESIGN.colors.textSecondary}20`,
+                    paddingBottom: 'calc(20px + env(safe-area-inset-bottom, 0px))'
+                  }}
+                >
                   <div className="flex gap-3">
                     <Button
                       variant="outline"
@@ -597,10 +697,11 @@ export default function Connect() {
                         setViewingProfile(null);
                         handleSwipe('left');
                       }}
-                      className="flex-1 h-12 rounded-[12px]"
+                      className="flex-1 h-12 rounded-[12px] hover:bg-gray-800 transition-colors"
                       style={{ 
                         borderColor: '#4A4A4A',
-                        color: DESIGN.colors.textPrimary 
+                        color: DESIGN.colors.textPrimary,
+                        background: 'transparent'
                       }}
                     >
                       <X className="w-5 h-5 mr-2" />
@@ -611,10 +712,10 @@ export default function Connect() {
                         setViewingProfile(null);
                         handleSwipe('right');
                       }}
-                      className="flex-1 h-12 rounded-[12px]"
+                      className="flex-1 h-12 rounded-[12px] hover:bg-purple-700 transition-colors"
                       style={{ 
                         background: DESIGN.colors.primary,
-                        color: DESIGN.colors.background 
+                        color: DESIGN.colors.background
                       }}
                     >
                       <Heart className="w-5 h-5 mr-2" />
