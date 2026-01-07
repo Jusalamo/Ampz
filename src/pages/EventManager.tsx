@@ -16,13 +16,7 @@ import {
   CheckCircle,
   Clock,
   TrendingUp,
-  Send,
-  MapPin,
-  Link as LinkIcon,
-  Share2,
-  Bell,
-  Mail,
-  Smartphone
+  Send
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
@@ -30,27 +24,15 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
-import { EventWizardModal } from '@/components/modals/EventWizardModal';
-import { QRCodeModal } from '@/components/modals/QRCodeModal';
 
 type Tab = 'events' | 'attendees' | 'analytics' | 'messages' | 'settings';
 
 export default function EventManager() {
   const navigate = useNavigate();
   const { user, events } = useApp();
-  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('events');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [announcementText, setAnnouncementText] = useState('');
-  const [showEventWizard, setShowEventWizard] = useState(false);
-  const [showQRModal, setShowQRModal] = useState(false);
-  const [selectedEventForQR, setSelectedEventForQR] = useState<any>(null);
-  const [notificationSettings, setNotificationSettings] = useState({
-    emailCheckIn: true,
-    pushNewAttendees: true,
-    weeklyAnalytics: true,
-  });
 
   const userEvents = events.filter(e => e.organizerId === user?.id);
   const selectedEvent = selectedEventId ? events.find(e => e.id === selectedEventId) : null;
@@ -92,120 +74,21 @@ export default function EventManager() {
     { id: '4', name: 'Alex Kim', photo: 'https://i.pravatar.cc/100?img=15', checkedIn: false, ticketType: 'VIP' },
   ];
 
-  const handleCreateEvent = () => {
-    setShowEventWizard(true);
-  };
-
-  const handleViewEvent = (eventId: string) => {
-    navigate(`/event/${eventId}`);
-  };
-
-  const handleEditEvent = (eventId: string) => {
-    toast({
-      title: 'Edit Event',
-      description: 'Edit functionality coming soon!',
-    });
-  };
-
-  const handleGenerateQR = (event: any) => {
-    setSelectedEventForQR(event);
-    setShowQRModal(true);
-  };
-
-  const handleExportAttendees = () => {
-    toast({
-      title: 'Export Started',
-      description: 'CSV download will begin shortly',
-    });
-    
-    // Simulate CSV download
-    setTimeout(() => {
-      toast({
-        title: 'Export Complete',
-        description: 'Attendee list downloaded successfully',
-      });
-    }, 1500);
-  };
-
-  const handleSendAnnouncement = () => {
-    if (!announcementText.trim()) {
-      toast({
-        title: 'Message Required',
-        description: 'Please enter a message to send',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    toast({
-      title: 'Announcement Sent',
-      description: `Message sent to ${mockAttendees.length} attendees`,
-    });
-    setAnnouncementText('');
-  };
-
-  const handleDeleteAllEvents = () => {
-    if (window.confirm('Are you sure you want to delete all events? This action cannot be undone.')) {
-      toast({
-        title: 'Events Deleted',
-        description: 'All events have been deleted',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleToggleNotification = (setting: keyof typeof notificationSettings) => {
-    setNotificationSettings(prev => ({
-      ...prev,
-      [setting]: !prev[setting]
-    }));
-    
-    toast({
-      title: notificationSettings[setting] ? 'Notification Disabled' : 'Notification Enabled',
-      description: `Setting updated successfully`,
-    });
-  };
-
-  const handleShareEvent = (event: any) => {
-    const shareUrl = `${window.location.origin}/event/${event.id}`;
-    
-    if (navigator.share) {
-      navigator.share({
-        title: event.name,
-        text: `Check out ${event.name} on Ampz!`,
-        url: shareUrl,
-      });
-    } else {
-      navigator.clipboard.writeText(shareUrl);
-      toast({
-        title: 'Link Copied',
-        description: 'Event link copied to clipboard',
-      });
-    }
-  };
-
   return (
     <div className="app-container min-h-screen bg-background pb-nav">
       {/* Header */}
       <div className="sticky top-0 z-30 bg-background border-b border-border">
         <div className="flex items-center gap-3 p-4">
-          <button 
-            onClick={() => navigate('/home')} 
-            className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors active:scale-95"
-          >
+          <button onClick={() => navigate(-1)} className="w-10 h-10 rounded-full bg-card flex items-center justify-center">
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">
             <h1 className="text-lg font-bold">Event Manager</h1>
             <p className="text-xs text-muted-foreground">{userEvents.length} events</p>
           </div>
-          <Button 
-            size="sm" 
-            onClick={handleCreateEvent}
-            className="gap-1"
-          >
-            <Plus className="w-4 h-4" />
-            New Event
+          <Button size="sm" onClick={() => navigate('/events')}>
+            <Plus className="w-4 h-4 mr-1" />
+            New
           </Button>
         </div>
 
@@ -222,10 +105,10 @@ export default function EventManager() {
               key={tab.key}
               onClick={() => setActiveTab(tab.key as Tab)}
               className={cn(
-                'px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 active:scale-95',
+                'px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5',
                 activeTab === tab.key
                   ? 'bg-primary text-primary-foreground'
-                  : 'bg-card text-muted-foreground hover:bg-card/80'
+                  : 'bg-card text-muted-foreground'
               )}
             >
               <tab.icon className="w-4 h-4" />
@@ -256,9 +139,6 @@ export default function EventManager() {
                         src={event.coverImage} 
                         alt={event.name}
                         className="w-24 h-24 object-cover"
-                        onError={(e) => {
-                          e.currentTarget.src = '/default-event.jpg';
-                        }}
                       />
                       <div className="flex-1 p-3">
                         <div className="flex items-start justify-between gap-2">
@@ -275,42 +155,31 @@ export default function EventManager() {
                         <p className="text-xs text-muted-foreground mt-1">
                           {event.date} • {event.attendees} attendees
                         </p>
-                        <div className="flex flex-wrap gap-2 mt-2">
+                        <div className="flex gap-2 mt-2">
                           <Button 
                             size="sm" 
                             variant="outline" 
-                            className="h-7 text-xs gap-1"
-                            onClick={() => handleViewEvent(event.id)}
+                            className="h-7 text-xs"
+                            onClick={() => setSelectedEventId(event.id)}
                           >
-                            <Eye className="w-3 h-3" />
+                            <Eye className="w-3 h-3 mr-1" />
                             View
                           </Button>
                           <Button 
                             size="sm" 
                             variant="outline" 
-                            className="h-7 text-xs gap-1"
-                            onClick={() => handleEditEvent(event.id)}
+                            className="h-7 text-xs"
                           >
-                            <Edit className="w-3 h-3" />
+                            <Edit className="w-3 h-3 mr-1" />
                             Edit
                           </Button>
                           <Button 
                             size="sm" 
                             variant="outline" 
-                            className="h-7 text-xs gap-1"
-                            onClick={() => handleGenerateQR(event)}
+                            className="h-7 text-xs"
                           >
-                            <QrCode className="w-3 h-3" />
+                            <QrCode className="w-3 h-3 mr-1" />
                             QR
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="h-7 text-xs gap-1"
-                            onClick={() => handleShareEvent(event)}
-                          >
-                            <Share2 className="w-3 h-3" />
-                            Share
                           </Button>
                         </div>
                       </div>
@@ -325,8 +194,8 @@ export default function EventManager() {
                 <p className="text-muted-foreground text-sm mb-4">
                   Create your first event to get started
                 </p>
-                <Button onClick={handleCreateEvent} className="gap-2">
-                  <Plus className="w-4 h-4" />
+                <Button onClick={() => navigate('/events')}>
+                  <Plus className="w-4 h-4 mr-2" />
                   Create Event
                 </Button>
               </div>
@@ -340,29 +209,18 @@ export default function EventManager() {
             {/* Event Selector */}
             {userEvents.length > 0 && (
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                <button
-                  onClick={() => setSelectedEventId(null)}
-                  className={cn(
-                    'px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all border active:scale-95',
-                    selectedEventId === null
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-card text-muted-foreground border-border hover:bg-card/80'
-                  )}
-                >
-                  All Events
-                </button>
                 {userEvents.map(event => (
                   <button
                     key={event.id}
                     onClick={() => setSelectedEventId(event.id)}
                     className={cn(
-                      'px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all border active:scale-95',
+                      'px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all border',
                       selectedEventId === event.id
                         ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-card text-muted-foreground border-border hover:bg-card/80'
+                        : 'bg-card text-muted-foreground border-border'
                     )}
                   >
-                    {event.name.length > 15 ? `${event.name.substring(0, 15)}...` : event.name}
+                    {event.name}
                   </button>
                 ))}
               </div>
@@ -388,41 +246,16 @@ export default function EventManager() {
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                className="flex-1 gap-2"
-                onClick={handleExportAttendees}
-              >
-                <Download className="w-4 h-4" />
-                Export CSV
-              </Button>
-              <Button 
-                variant="outline" 
-                className="flex-1 gap-2"
-                onClick={() => toast({
-                  title: 'Check-in Page',
-                  description: 'Check-in page would open here',
-                })}
-              >
-                <QrCode className="w-4 h-4" />
-                Check-in Page
-              </Button>
-            </div>
+            {/* Export Button */}
+            <Button variant="outline" className="w-full">
+              <Download className="w-4 h-4 mr-2" />
+              Export Attendee List (CSV)
+            </Button>
 
             {/* Attendees List */}
             <div className="space-y-2">
-              <h3 className="font-semibold text-sm">Attendees ({mockAttendees.length})</h3>
               {mockAttendees.map(attendee => (
-                <div 
-                  key={attendee.id} 
-                  className="bg-card rounded-xl p-3 border border-border flex items-center gap-3 hover:border-primary transition-colors cursor-pointer"
-                  onClick={() => toast({
-                    title: 'Attendee Details',
-                    description: `Viewing ${attendee.name}'s details`,
-                  })}
-                >
+                <div key={attendee.id} className="bg-card rounded-xl p-3 border border-border flex items-center gap-3">
                   <img 
                     src={attendee.photo} 
                     alt={attendee.name}
@@ -482,20 +315,13 @@ export default function EventManager() {
                 {[65, 78, 45, 90, 82, 55, 70].map((val, i) => (
                   <div 
                     key={i}
-                    className="w-8 rounded-t-lg bg-primary/20 group relative cursor-pointer"
+                    className="w-8 rounded-t-lg bg-primary/20"
                     style={{ height: `${val}%` }}
-                    onClick={() => toast({
-                      title: `Day ${i + 1}`,
-                      description: `${val}% check-in rate`,
-                    })}
                   >
                     <div 
-                      className="w-full bg-primary rounded-t-lg transition-all duration-500 hover:bg-primary/80"
+                      className="w-full bg-primary rounded-t-lg transition-all duration-500"
                       style={{ height: `${val}%` }}
                     />
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-foreground text-background text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                      {val}%
-                    </div>
                   </div>
                 ))}
               </div>
@@ -514,11 +340,7 @@ export default function EventManager() {
               <h3 className="font-semibold mb-3">Top Performing Events</h3>
               <div className="space-y-3">
                 {userEvents.slice(0, 3).map((event, i) => (
-                  <div 
-                    key={event.id} 
-                    className="flex items-center gap-3 cursor-pointer hover:bg-background/50 p-2 rounded-lg transition-colors"
-                    onClick={() => handleViewEvent(event.id)}
-                  >
+                  <div key={event.id} className="flex items-center gap-3">
                     <span className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
                       {i + 1}
                     </span>
@@ -526,7 +348,6 @@ export default function EventManager() {
                       <p className="text-sm font-medium truncate">{event.name}</p>
                       <p className="text-xs text-muted-foreground">{event.attendees} attendees</p>
                     </div>
-                    <ChevronLeft className="w-4 h-4 text-muted-foreground rotate-180" />
                   </div>
                 ))}
               </div>
@@ -553,9 +374,9 @@ export default function EventManager() {
                   {userEvents.map(event => (
                     <button
                       key={event.id}
-                      className="px-3 py-2 rounded-lg text-xs font-medium bg-card text-muted-foreground border border-border whitespace-nowrap hover:bg-card/80"
+                      className="px-3 py-2 rounded-lg text-xs font-medium bg-card text-muted-foreground border border-border whitespace-nowrap"
                     >
-                      {event.name.length > 12 ? `${event.name.substring(0, 12)}...` : event.name}
+                      {event.name}
                     </button>
                   ))}
                 </div>
@@ -569,24 +390,10 @@ export default function EventManager() {
                 className="mb-3"
               />
 
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  className="flex-1 gap-2"
-                  onClick={() => setAnnouncementText('')}
-                  disabled={!announcementText.trim()}
-                >
-                  Clear
-                </Button>
-                <Button 
-                  className="flex-1 gap-2" 
-                  onClick={handleSendAnnouncement}
-                  disabled={!announcementText.trim()}
-                >
-                  <Send className="w-4 h-4" />
-                  Send
-                </Button>
-              </div>
+              <Button className="w-full" disabled={!announcementText.trim()}>
+                <Send className="w-4 h-4 mr-2" />
+                Send Announcement
+              </Button>
             </div>
 
             <div className="bg-card p-4 rounded-xl border border-border">
@@ -601,7 +408,7 @@ export default function EventManager() {
                   <button
                     key={i}
                     onClick={() => setAnnouncementText(template)}
-                    className="w-full text-left p-3 rounded-lg bg-background border border-border text-sm hover:border-primary transition-colors active:scale-[0.98]"
+                    className="w-full text-left p-3 rounded-lg bg-background border border-border text-sm hover:border-primary transition-colors"
                   >
                     {template}
                   </button>
@@ -619,23 +426,7 @@ export default function EventManager() {
               <div className="space-y-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block">Default Check-in Radius</label>
-                  <div className="flex gap-2">
-                    <Input 
-                      type="number" 
-                      defaultValue={100} 
-                      className="h-12 flex-1" 
-                      onChange={(e) => {
-                        toast({
-                          title: 'Settings Updated',
-                          description: `Check-in radius set to ${e.target.value}m`,
-                        });
-                      }}
-                    />
-                    <Button variant="outline" className="h-12">
-                      <MapPin className="w-4 h-4 mr-2" />
-                      Set
-                    </Button>
-                  </div>
+                  <Input type="number" defaultValue={100} className="h-12" />
                   <p className="text-xs text-muted-foreground mt-1">Default radius in meters</p>
                 </div>
                 <div>
@@ -644,12 +435,8 @@ export default function EventManager() {
                     {['#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#3B82F6'].map(color => (
                       <button
                         key={color}
-                        className="w-10 h-10 rounded-full border-2 border-border hover:scale-110 transition-transform"
+                        className="w-10 h-10 rounded-full border-2 border-border"
                         style={{ backgroundColor: color }}
-                        onClick={() => toast({
-                          title: 'Theme Updated',
-                          description: `Theme color set to ${color}`,
-                        })}
                       />
                     ))}
                   </div>
@@ -660,71 +447,23 @@ export default function EventManager() {
             <div className="bg-card p-4 rounded-xl border border-border">
               <h3 className="font-semibold mb-4">Notifications</h3>
               <div className="space-y-3">
-                <div 
-                  className="flex items-center justify-between py-2 cursor-pointer"
-                  onClick={() => handleToggleNotification('emailCheckIn')}
-                >
-                  <div className="flex items-center gap-3">
-                    <Mail className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">Email me when someone checks in</span>
+                {[
+                  'Email me when someone checks in',
+                  'Push notifications for new attendees',
+                  'Weekly analytics summary',
+                ].map((setting, i) => (
+                  <div key={i} className="flex items-center justify-between py-2">
+                    <span className="text-sm">{setting}</span>
+                    <div className="w-12 h-6 bg-primary/20 rounded-full relative cursor-pointer">
+                      <div className="absolute right-1 top-1 w-4 h-4 bg-primary rounded-full" />
+                    </div>
                   </div>
-                  <div className={cn(
-                    "w-12 h-6 rounded-full relative transition-colors cursor-pointer",
-                    notificationSettings.emailCheckIn ? "bg-primary" : "bg-muted"
-                  )}>
-                    <div className={cn(
-                      "absolute top-1 w-4 h-4 rounded-full bg-background transition-transform",
-                      notificationSettings.emailCheckIn ? "right-1" : "left-1"
-                    )} />
-                  </div>
-                </div>
-                
-                <div 
-                  className="flex items-center justify-between py-2 cursor-pointer"
-                  onClick={() => handleToggleNotification('pushNewAttendees')}
-                >
-                  <div className="flex items-center gap-3">
-                    <Bell className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">Push notifications for new attendees</span>
-                  </div>
-                  <div className={cn(
-                    "w-12 h-6 rounded-full relative transition-colors cursor-pointer",
-                    notificationSettings.pushNewAttendees ? "bg-primary" : "bg-muted"
-                  )}>
-                    <div className={cn(
-                      "absolute top-1 w-4 h-4 rounded-full bg-background transition-transform",
-                      notificationSettings.pushNewAttendees ? "right-1" : "left-1"
-                    )} />
-                  </div>
-                </div>
-                
-                <div 
-                  className="flex items-center justify-between py-2 cursor-pointer"
-                  onClick={() => handleToggleNotification('weeklyAnalytics')}
-                >
-                  <div className="flex items-center gap-3">
-                    <Smartphone className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">Weekly analytics summary</span>
-                  </div>
-                  <div className={cn(
-                    "w-12 h-6 rounded-full relative transition-colors cursor-pointer",
-                    notificationSettings.weeklyAnalytics ? "bg-primary" : "bg-muted"
-                  )}>
-                    <div className={cn(
-                      "absolute top-1 w-4 h-4 rounded-full bg-background transition-transform",
-                      notificationSettings.weeklyAnalytics ? "right-1" : "left-1"
-                    )} />
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
 
-            <Button 
-              variant="destructive" 
-              className="w-full gap-2"
-              onClick={handleDeleteAllEvents}
-            >
-              <Trash2 className="w-4 h-4" />
+            <Button variant="destructive" className="w-full">
+              <Trash2 className="w-4 h-4 mr-2" />
               Delete All Events
             </Button>
           </div>
@@ -732,21 +471,6 @@ export default function EventManager() {
       </div>
 
       <BottomNav />
-
-      {/* Modals */}
-      <EventWizardModal 
-        isOpen={showEventWizard} 
-        onClose={() => setShowEventWizard(false)} 
-      />
-      
-      <QRCodeModal
-        isOpen={showQRModal}
-        onClose={() => {
-          setShowQRModal(false);
-          setSelectedEventForQR(null);
-        }}
-        event={selectedEventForQR}
-      />
     </div>
   );
 }
