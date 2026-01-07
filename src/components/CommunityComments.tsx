@@ -5,6 +5,39 @@ import { CommunityComment } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
+
+// Design Constants matching the Connect screen
+const DESIGN = {
+  colors: {
+    primary: '#C4B5FD',
+    lavenderLight: '#E9D5FF',
+    accentPink: '#FFB8E6',
+    background: '#1A1A1A',
+    card: '#2D2D2D',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#B8B8B8',
+    border: '#4A4A4A',
+    success: '#10B981'
+  },
+  borderRadius: {
+    card: '24px',
+    inner: '20px',
+    button: '12px',
+    pill: '9999px',
+    small: '8px'
+  },
+  shadows: {
+    card: '0 8px 32px rgba(0, 0, 0, 0.4)',
+    glow: '0 4px 16px rgba(196, 181, 253, 0.4)'
+  },
+  spacing: {
+    section: '24px',
+    element: '16px',
+    small: '8px',
+    inputHeight: '48px'
+  }
+};
 
 interface CommunityCommentsProps {
   eventId: string;
@@ -78,54 +111,125 @@ export function CommunityComments({ eventId, comments }: CommunityCommentsProps)
 
   return (
     <div className="mb-24">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold">Community Chat</h2>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse" />
-          {onlineCount} here
+      {/* Header with online count */}
+      <div className="flex items-center justify-between mb-6">
+        <h2 
+          className="text-[28px] font-bold"
+          style={{ color: DESIGN.colors.textPrimary }}
+        >
+          Community Chat
+        </h2>
+        <div 
+          className="flex items-center gap-3 px-4 py-2 rounded-full"
+          style={{ 
+            background: `${DESIGN.colors.accentPink}20`,
+            borderRadius: DESIGN.borderRadius.pill
+          }}
+        >
+          <div 
+            className="w-3 h-3 rounded-full animate-pulse"
+            style={{ background: DESIGN.colors.success }}
+          />
+          <span 
+            className="text-[14px] font-bold"
+            style={{ color: DESIGN.colors.accentPink }}
+          >
+            {onlineCount} here
+          </span>
         </div>
       </div>
 
-      <div className="glass-card overflow-hidden">
-        <div className="max-h-[400px] overflow-y-auto p-4 space-y-4">
+      {/* Chat Container */}
+      <div 
+        className="overflow-hidden"
+        style={{
+          background: DESIGN.colors.card,
+          borderRadius: DESIGN.borderRadius.card,
+          boxShadow: DESIGN.shadows.card,
+          border: `1px solid ${DESIGN.colors.border}`
+        }}
+      >
+        {/* Messages Area */}
+        <div 
+          className="max-h-[400px] overflow-y-auto p-6 space-y-6"
+          style={{ background: 'rgba(45, 45, 45, 0.95)' }}
+        >
           {rootComments.length === 0 ? (
-            <div className="text-center py-8">
-              <MessageCircle className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No messages yet. Start the conversation!</p>
-            </div>
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center py-12"
+            >
+              <MessageCircle 
+                className="w-16 h-16 mx-auto mb-4"
+                style={{ color: DESIGN.colors.textSecondary, opacity: 0.5 }}
+              />
+              <p 
+                className="text-[15px]"
+                style={{ color: DESIGN.colors.textSecondary }}
+              >
+                No messages yet. Start the conversation!
+              </p>
+            </motion.div>
           ) : (
             rootComments.map((comment) => (
-              <div key={comment.id} className="space-y-3">
-                <div className="flex gap-3">
+              <motion.div 
+                key={comment.id} 
+                className="space-y-4"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                {/* Main Comment */}
+                <div className="flex gap-4">
                   <img
                     src={comment.userPhoto || 'https://i.pravatar.cc/100'}
-                    alt=""
-                    className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                    alt={comment.userName}
+                    className="w-12 h-12 rounded-full object-cover flex-shrink-0 border-2"
+                    style={{ borderColor: DESIGN.colors.primary }}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm">{comment.userName}</span>
-                      <span className="text-xs text-muted-foreground">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span 
+                        className="font-bold text-[15px]"
+                        style={{ color: DESIGN.colors.textPrimary }}
+                      >
+                        {comment.userName}
+                      </span>
+                      <span 
+                        className="text-[12px]"
+                        style={{ color: DESIGN.colors.textSecondary }}
+                      >
                         {getRelativeTime(comment.timestamp)}
                       </span>
                     </div>
-                    <p className="text-sm mt-1 break-words">{comment.text}</p>
-                    <div className="flex items-center gap-4 mt-2">
-                      <button
+                    <p 
+                      className="text-[15px] break-words leading-relaxed"
+                      style={{ color: DESIGN.colors.textSecondary }}
+                    >
+                      {comment.text}
+                    </p>
+                    <div className="flex items-center gap-6 mt-4">
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => likeComment(comment.id)}
-                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        className="flex items-center gap-2"
+                        style={{ color: DESIGN.colors.textSecondary }}
                       >
                         <Heart
                           className={cn(
-                            'w-4 h-4',
+                            'w-5 h-5 transition-colors',
                             comment.isLiked && 'fill-brand-pink text-brand-pink'
                           )}
                         />
-                        {comment.likes}
-                      </button>
+                        <span className="text-[13px] font-medium">
+                          {comment.likes}
+                        </span>
+                      </motion.button>
                       <button
                         onClick={() => handleReply(comment.id, comment.userName)}
-                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        className="text-[13px] font-medium transition-colors hover:text-primary"
+                        style={{ color: DESIGN.colors.textSecondary }}
                       >
                         Reply
                       </button>
@@ -135,78 +239,169 @@ export function CommunityComments({ eventId, comments }: CommunityCommentsProps)
 
                 {/* Replies */}
                 {getCommentReplies(comment.id).map((reply) => (
-                  <div key={reply.id} className="flex gap-3 ml-12 pl-4 border-l border-border">
+                  <motion.div 
+                    key={reply.id} 
+                    className="flex gap-4 ml-16 pl-6"
+                    style={{ 
+                      borderLeft: `2px solid ${DESIGN.colors.primary}30`,
+                      borderRadius: '0 0 0 8px'
+                    }}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
                     <img
                       src={reply.userPhoto || 'https://i.pravatar.cc/100'}
-                      alt=""
-                      className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                      alt={reply.userName}
+                      className="w-10 h-10 rounded-full object-cover flex-shrink-0 border"
+                      style={{ borderColor: DESIGN.colors.lavenderLight }}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm">{reply.userName}</span>
-                        <span className="text-xs text-muted-foreground">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span 
+                          className="font-semibold text-[14px]"
+                          style={{ color: DESIGN.colors.textPrimary }}
+                        >
+                          {reply.userName}
+                        </span>
+                        <span 
+                          className="text-[12px]"
+                          style={{ color: DESIGN.colors.textSecondary }}
+                        >
                           {getRelativeTime(reply.timestamp)}
                         </span>
                       </div>
-                      <p className="text-sm mt-1 break-words">{reply.text}</p>
-                      <button
+                      <p 
+                        className="text-[14px] break-words leading-relaxed"
+                        style={{ color: DESIGN.colors.textSecondary }}
+                      >
+                        {reply.text}
+                      </p>
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => likeComment(reply.id)}
-                        className="flex items-center gap-1 mt-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        className="flex items-center gap-2 mt-3"
+                        style={{ color: DESIGN.colors.textSecondary }}
                       >
                         <Heart
                           className={cn(
-                            'w-4 h-4',
+                            'w-4 h-4 transition-colors',
                             reply.isLiked && 'fill-brand-pink text-brand-pink'
                           )}
                         />
-                        {reply.likes}
-                      </button>
+                        <span className="text-[12px] font-medium">
+                          {reply.likes}
+                        </span>
+                      </motion.button>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             ))
           )}
           <div ref={messagesEndRef} />
         </div>
 
-        <form onSubmit={handleSend} className="p-4 border-t border-border flex gap-3">
-          <Input
-            ref={inputRef}
-            type="text"
-            placeholder={replyTo ? 'Write a reply...' : 'Type a message...'}
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            className="flex-1 h-12 bg-background-secondary border-border"
-          />
-          <button
+        {/* Input Area */}
+        <form 
+          onSubmit={handleSend} 
+          className="p-4 flex gap-3 items-center"
+          style={{ 
+            borderTop: `1px solid ${DESIGN.colors.border}`,
+            background: DESIGN.colors.card
+          }}
+        >
+          <div className="flex-1">
+            <Input
+              ref={inputRef}
+              type="text"
+              placeholder={replyTo ? 'Write a reply...' : 'Type a message...'}
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              className="h-12 rounded-[12px] px-4 border-0"
+              style={{
+                background: DESIGN.colors.background,
+                color: DESIGN.colors.textPrimary,
+                fontSize: '15px'
+              }}
+            />
+          </div>
+          <motion.button
             type="submit"
             disabled={!newMessage.trim()}
-            className="w-12 h-12 rounded-xl gradient-pro flex items-center justify-center disabled:opacity-50"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center justify-center rounded-[12px] disabled:opacity-50"
+            style={{
+              width: '48px',
+              height: '48px',
+              background: DESIGN.colors.primary,
+              boxShadow: DESIGN.shadows.glow
+            }}
           >
-            <Send className="w-5 h-5 text-foreground" />
-          </button>
+            <Send className="w-5 h-5" style={{ color: DESIGN.colors.background }} />
+          </motion.button>
         </form>
       </div>
 
-      {/* Upgrade Prompt */}
+      {/* Upgrade Prompt Modal */}
       <Dialog open={showUpgradePrompt} onOpenChange={setShowUpgradePrompt}>
-        <DialogContent className="bg-background border-border max-w-[350px] text-center">
-          <div className="py-6">
-            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-              <Lock className="w-8 h-8 text-primary" />
+        <DialogContent 
+          className="p-0 border-0 rounded-[20px] max-w-[380px] mx-auto"
+          style={{
+            background: DESIGN.colors.card,
+            border: `1px solid ${DESIGN.colors.border}`,
+            boxShadow: DESIGN.shadows.card
+          }}
+        >
+          <motion.div 
+            className="py-8 px-6 text-center"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          >
+            {/* Icon */}
+            <div 
+              className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+              style={{ 
+                background: `${DESIGN.colors.primary}20`,
+                borderRadius: '50%'
+              }}
+            >
+              <Lock className="w-10 h-10" style={{ color: DESIGN.colors.primary }} />
             </div>
-            <h2 className="text-xl font-bold mb-2">Pro Feature</h2>
-            <p className="text-muted-foreground mb-6">
+            
+            {/* Title */}
+            <h2 
+              className="text-[24px] font-bold mb-3"
+              style={{ color: DESIGN.colors.textPrimary }}
+            >
+              Pro Feature
+            </h2>
+            
+            {/* Description */}
+            <p 
+              className="text-[15px] mb-8"
+              style={{ color: DESIGN.colors.textSecondary }}
+            >
               Upgrade to Pro or Max to participate in community chat.
             </p>
-            <button
+            
+            {/* Upgrade Button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => setShowUpgradePrompt(false)}
-              className="w-full py-3 rounded-xl gradient-pro font-semibold glow-purple"
+              className="w-full py-4 rounded-[12px] font-bold text-[16px]"
+              style={{
+                background: DESIGN.colors.primary,
+                color: DESIGN.colors.background,
+                boxShadow: DESIGN.shadows.glow
+              }}
             >
               Upgrade Now
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
         </DialogContent>
       </Dialog>
     </div>
