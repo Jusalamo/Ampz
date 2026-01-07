@@ -1,4 +1,4 @@
-please finish this code up import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   X, ArrowRight, ArrowLeft, MapPin, Check, QrCode, Copy, Download, 
   Upload, Image, Video, Map, Loader2, Search, Calendar, Clock, 
