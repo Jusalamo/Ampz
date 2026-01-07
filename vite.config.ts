@@ -8,27 +8,22 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    // This ensures all routes are handled by the SPA
+    // Add this for development server
     historyApiFallback: true,
   },
-  plugins: [
-    react(),
-    mode === "development" && componentTagger()
-  ].filter(Boolean),
+  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // For production build
+  // Add this for production build
   build: {
-    outDir: "dist",
+    outDir: 'dist',
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, "index.html"),
+        main: path.resolve(__dirname, 'index.html'),
       },
     },
   },
-  // Ensure proper base path
-  base: "./",
 }));
