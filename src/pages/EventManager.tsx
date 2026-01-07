@@ -18,7 +18,6 @@ import {
   TrendingUp,
   Send,
   MapPin,
-  Link as LinkIcon,
   Share2,
   Bell,
   Mail,
@@ -55,7 +54,7 @@ export default function EventManager() {
   const userEvents = events.filter(e => e.organizerId === user?.id);
   const selectedEvent = selectedEventId ? events.find(e => e.id === selectedEventId) : null;
 
-  const isPro = user?.subscription.tier === 'pro' || user?.subscription.tier === 'max';
+  const isPro = user?.subscription?.tier === 'pro' || user?.subscription?.tier === 'max';
 
   if (!isPro) {
     return (
@@ -739,14 +738,16 @@ export default function EventManager() {
         onClose={() => setShowEventWizard(false)} 
       />
       
-      <QRCodeModal
-        isOpen={showQRModal}
-        onClose={() => {
-          setShowQRModal(false);
-          setSelectedEventForQR(null);
-        }}
-        event={selectedEventForQR}
-      />
+      {showQRModal && selectedEventForQR && (
+        <QRCodeModal
+          isOpen={showQRModal}
+          onClose={() => {
+            setShowQRModal(false);
+            setSelectedEventForQR(null);
+          }}
+          event={selectedEventForQR}
+        />
+      )}
     </div>
   );
 }
