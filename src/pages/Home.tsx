@@ -210,10 +210,10 @@ export default function Home() {
       className="min-h-screen pb-20"
       style={{ background: DESIGN.colors.background, color: DESIGN.colors.textPrimary }}
     >
-      {/* Header */}
+      {/* Header - Fixed size with larger logo */}
       <header 
         className={cn(
-          'fixed top-0 left-0 right-0 z-50 transition-transform duration-300 backdrop-blur-xl',
+          'fixed top-0 left-0 right-0 z-50 transition-transform duration-300 backdrop-blur-xl h-16 flex items-center',
           isHeaderHidden ? '-translate-y-full' : 'translate-y-0'
         )}
         style={{ 
@@ -221,16 +221,16 @@ export default function Home() {
           borderBottom: `1px solid ${DESIGN.colors.textSecondary}20`
         }}
       >
-        <div className="container mx-auto px-4 py-3">
+        <div className="container mx-auto px-4 w-full">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <div 
-                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                className="w-10 h-10 rounded-lg flex items-center justify-center"
                 style={{ background: DESIGN.colors.primary }}
               >
-                <Zap className="w-4 h-4" style={{ color: DESIGN.colors.background }} />
+                <Zap className="w-5 h-5" style={{ color: DESIGN.colors.background }} />
               </div>
-              <span className="text-xl font-bold">Ampz</span>
+              <span className="text-2xl font-bold tracking-tight">Ampz</span>
             </div>
             <div className="flex items-center gap-3">
               {user?.subscription?.tier !== 'free' && (
@@ -247,7 +247,7 @@ export default function Home() {
               <div className="relative">
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
+                  className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
                   style={{ 
                     background: DESIGN.colors.card,
                     border: `1px solid ${DESIGN.colors.textSecondary}20`
@@ -264,7 +264,11 @@ export default function Home() {
                   )}
                 </button>
                 {showNotifications && (
-                  <NotificationsDropdown isOpen={showNotifications} onClose={() => setShowNotifications(false)} />
+                  <NotificationsDropdown 
+                    isOpen={showNotifications} 
+                    onClose={() => setShowNotifications(false)}
+                    swipeable={true}
+                  />
                 )}
               </div>
             </div>
@@ -440,7 +444,7 @@ export default function Home() {
                               }}
                               onClick={() => navigate(`/event/${event.id}`)}
                             >
-                              {/* Event Image with Bookmark Badge */}
+                              {/* Event Image with Bookmark Badge - Same color as section header */}
                               <div className="relative h-32">
                                 <img 
                                   src={event.coverImage} 
@@ -454,7 +458,7 @@ export default function Home() {
                                   {isBookmarked && (
                                     <div 
                                       className="w-8 h-8 rounded-full flex items-center justify-center"
-                                      style={{ background: 'rgba(234, 179, 8, 0.9)' }}
+                                      style={{ background: DESIGN.colors.primary }}
                                     >
                                       <Bookmark className="w-4 h-4 text-white fill-white" />
                                     </div>
@@ -503,56 +507,28 @@ export default function Home() {
                 ))}
               </div>
 
-              {/* Carousel Navigation */}
+              {/* Carousel Navigation - Removed arrows, kept pills */}
               {totalMyEventsSlides > 1 && (
-                <>
-                  <button
-                    onClick={handleMyEventsPrev}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-8 h-8 rounded-full flex items-center justify-center transition-colors z-10 active:scale-95"
-                    style={{ 
-                      background: `${DESIGN.colors.background}80`,
-                      backdropFilter: 'blur(4px)',
-                      border: `1px solid ${DESIGN.colors.textSecondary}20`
-                    }}
-                    aria-label="Previous events"
-                  >
-                    <ChevronLeft className="w-4 h-4" style={{ color: DESIGN.colors.textPrimary }} />
-                  </button>
-                  <button
-                    onClick={handleMyEventsNext}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-8 h-8 rounded-full flex items-center justify-center transition-colors z-10 active:scale-95"
-                    style={{ 
-                      background: `${DESIGN.colors.background}80`,
-                      backdropFilter: 'blur(4px)',
-                      border: `1px solid ${DESIGN.colors.textSecondary}20`
-                    }}
-                    aria-label="Next events"
-                  >
-                    <ChevronRight className="w-4 h-4" style={{ color: DESIGN.colors.textPrimary }} />
-                  </button>
-                  
-                  {/* Dots Indicator */}
-                  <div className="flex justify-center gap-1.5 mt-4">
-                    {Array.from({ length: totalMyEventsSlides }).map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setMyEventsIndex(index)}
-                        className={cn(
-                          "h-1.5 rounded-full transition-all",
-                          index === myEventsIndex 
-                            ? "w-4" 
-                            : "w-1.5"
-                        )}
-                        style={{
-                          backgroundColor: index === myEventsIndex 
-                            ? DESIGN.colors.primary 
-                            : DESIGN.colors.textSecondary
-                        }}
-                        aria-label={`Go to slide ${index + 1}`}
-                      />
-                    ))}
-                  </div>
-                </>
+                <div className="flex justify-center gap-1.5 mt-4">
+                  {Array.from({ length: totalMyEventsSlides }).map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setMyEventsIndex(index)}
+                      className={cn(
+                        "h-1.5 rounded-full transition-all",
+                        index === myEventsIndex 
+                          ? "w-4" 
+                          : "w-1.5"
+                      )}
+                      style={{
+                        backgroundColor: index === myEventsIndex 
+                          ? DESIGN.colors.primary 
+                          : DESIGN.colors.textSecondary
+                      }}
+                      aria-label={`Go to slide ${index + 1}`}
+                    />
+                  ))}
+                </div>
               )}
             </div>
           </section>
@@ -581,7 +557,7 @@ export default function Home() {
           </section>
         )}
 
-        {/* Featured Events - Carousel */}
+        {/* Featured Events - Carousel (Reduced size by 5%) */}
         {featuredEvents.length > 0 ? (
           <section className="mb-6">
             <div className="flex items-center justify-between mb-4">
@@ -610,17 +586,20 @@ export default function Home() {
                     key={event.id} 
                     className="flex-shrink-0 w-full snap-start px-1"
                   >
+                    {/* Reduced card size by 5% (scaled down) */}
                     <div 
-                      className="rounded-xl overflow-hidden transition-all cursor-pointer active:scale-98"
+                      className="transition-all cursor-pointer active:scale-98"
                       style={{ 
                         background: DESIGN.colors.card,
                         border: `1px solid ${DESIGN.colors.textSecondary}20`,
-                        borderRadius: DESIGN.borderRadius.card
+                        borderRadius: DESIGN.borderRadius.card,
+                        transform: 'scale(0.95)',
+                        transformOrigin: 'center'
                       }}
                       onClick={() => navigate(`/event/${event.id}`)}
                     >
-                      {/* Featured Event Image */}
-                      <div className="relative h-48">
+                      {/* Featured Event Image - Adjusted for reduced size */}
+                      <div className="relative h-44">
                         <img 
                           src={event.coverImage} 
                           alt={event.name}
@@ -631,10 +610,13 @@ export default function Home() {
                         />
                         <div className="absolute top-3 right-3">
                           <div 
-                            className="px-3 py-1 rounded-full text-xs font-bold text-white"
-                            style={{ background: `${DESIGN.colors.primary}90` }}
+                            className="w-10 h-10 rounded-full flex items-center justify-center"
+                            style={{ 
+                              background: 'rgba(251, 191, 36, 0.9)',
+                              backdropFilter: 'blur(4px)'
+                            }}
                           >
-                            FEATURED
+                            <Star className="w-5 h-5 text-black fill-black" />
                           </div>
                         </div>
                         <div 
@@ -645,16 +627,16 @@ export default function Home() {
                         </div>
                       </div>
                       
-                      {/* Event Details */}
-                      <div className="p-4">
+                      {/* Event Details - Adjusted padding for reduced size */}
+                      <div className="p-3">
                         <div className="flex items-start justify-between mb-2">
-                          <h3 className="text-lg font-bold line-clamp-1">{event.name}</h3>
+                          <h3 className="text-base font-bold line-clamp-1">{event.name}</h3>
                           <span className="text-sm font-semibold">
                             {event.price === 0 ? 'FREE' : `N$${event.price}`}
                           </span>
                         </div>
                         
-                        <div className="flex items-center gap-2 mb-3">
+                        <div className="flex items-center gap-2 mb-2">
                           <span 
                             className="px-2 py-1 text-xs font-medium rounded"
                             style={{ 
@@ -669,14 +651,14 @@ export default function Home() {
                           </span>
                         </div>
                         
-                        <p className="text-sm line-clamp-2 mb-3" style={{ color: DESIGN.colors.textSecondary }}>
+                        <p className="text-xs line-clamp-2 mb-2" style={{ color: DESIGN.colors.textSecondary }}>
                           {event.description || 'Join this amazing event!'}
                         </p>
                         
                         {/* Location only */}
-                        <div className="flex items-center gap-2 pt-3" style={{ borderTop: `1px solid ${DESIGN.colors.textSecondary}20` }}>
-                          <Map className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
-                          <span className="text-sm line-clamp-1" style={{ color: DESIGN.colors.textSecondary }}>
+                        <div className="flex items-center gap-2 pt-2" style={{ borderTop: `1px solid ${DESIGN.colors.textSecondary}20` }}>
+                          <Map className="w-3 h-3" style={{ color: DESIGN.colors.textSecondary }} />
+                          <span className="text-xs line-clamp-1" style={{ color: DESIGN.colors.textSecondary }}>
                             {event.location || 'Location not specified'}
                           </span>
                         </div>
@@ -686,56 +668,28 @@ export default function Home() {
                 ))}
               </div>
 
-              {/* Featured Events Navigation */}
+              {/* Featured Events Navigation - Removed arrows, kept pills */}
               {featuredEvents.length > 1 && (
-                <>
-                  <button
-                    onClick={handleFeaturedPrev}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-8 h-8 rounded-full flex items-center justify-center transition-colors z-10 active:scale-95"
-                    style={{ 
-                      background: `${DESIGN.colors.background}80`,
-                      backdropFilter: 'blur(4px)',
-                      border: `1px solid ${DESIGN.colors.textSecondary}20`
-                    }}
-                    aria-label="Previous featured event"
-                  >
-                    <ChevronLeft className="w-4 h-4" style={{ color: DESIGN.colors.textPrimary }} />
-                  </button>
-                  <button
-                    onClick={handleFeaturedNext}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-8 h-8 rounded-full flex items-center justify-center transition-colors z-10 active:scale-95"
-                    style={{ 
-                      background: `${DESIGN.colors.background}80`,
-                      backdropFilter: 'blur(4px)',
-                      border: `1px solid ${DESIGN.colors.textSecondary}20`
-                    }}
-                    aria-label="Next featured event"
-                  >
-                    <ChevronRight className="w-4 h-4" style={{ color: DESIGN.colors.textPrimary }} />
-                  </button>
-                  
-                  {/* Dots Indicator */}
-                  <div className="flex justify-center gap-1.5 mt-4">
-                    {featuredEvents.map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setFeaturedIndex(index)}
-                        className={cn(
-                          "h-1.5 rounded-full transition-all",
-                          index === featuredIndex 
-                            ? "w-4" 
-                            : "w-1.5"
-                        )}
-                        style={{
-                          backgroundColor: index === featuredIndex 
-                            ? DESIGN.colors.primary 
-                            : DESIGN.colors.textSecondary
-                        }}
-                        aria-label={`Go to slide ${index + 1}`}
-                      />
-                    ))}
-                  </div>
-                </>
+                <div className="flex justify-center gap-1.5 mt-4">
+                  {featuredEvents.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setFeaturedIndex(index)}
+                      className={cn(
+                        "h-1.5 rounded-full transition-all",
+                        index === featuredIndex 
+                          ? "w-4" 
+                          : "w-1.5"
+                      )}
+                      style={{
+                        backgroundColor: index === featuredIndex 
+                          ? DESIGN.colors.primary 
+                          : DESIGN.colors.textSecondary
+                      }}
+                      aria-label={`Go to slide ${index + 1}`}
+                    />
+                  ))}
+                </div>
               )}
             </div>
           </section>
