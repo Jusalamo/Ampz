@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Search, SlidersHorizontal, Plus, MapPin, X, Calendar, Clock } from 'lucide-react';
+import { Search, SlidersHorizontal, Plus, MapPin, X, Calendar, Clock, Heart } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { EventCard } from './EventCard';
 import { Input } from './ui/input';
@@ -8,6 +8,34 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { motion } from 'framer-motion';
+
+// Design Constants
+const DESIGN = {
+  colors: {
+    primary: '#C4B5FD',
+    lavenderLight: '#E9D5FF',
+    accentPink: '#FFB8E6',
+    background: '#1A1A1A',
+    card: '#2D2D2D',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#B8B8B8'
+  },
+  typography: {
+    h1: '28px',
+    h2: '24px',
+    h3: '22px',
+    body: '14px',
+    small: '13px',
+    caption: '13px'
+  },
+  borderRadius: {
+    large: '24px',
+    medium: '20px',
+    small: '12px',
+    pill: '9999px'
+  }
+};
 
 // Use environment variable for Mapbox token
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg';
@@ -110,7 +138,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/streets-v12',
+        style: 'mapbox://styles/mapbox/dark-v11',
         center: [17.0658, -22.5609], // Windhoek
         zoom: 12,
         pitch: 45,
@@ -154,8 +182,6 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
           clearEventSelection();
         }
       });
-
-      // Note: Mapbox uses geolocate control for user location tracking
 
     } catch (error) {
       console.error('Failed to initialize map:', error);
@@ -218,7 +244,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       markerEl.innerHTML = `
         <div class="relative transform transition-transform duration-200 hover:scale-110">
           <div class="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 border-white"
-               style="background-color: ${event.customTheme || '#8B5CF6'};">
+               style="background-color: ${event.customTheme || DESIGN.colors.primary};">
             ${event.isFeatured ? 
               '<svg class="w-5 h-5 text-yellow-300" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>' : 
               '<div class="w-4 h-4 bg-white/40 rounded-full"></div>'}
@@ -270,23 +296,30 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     cardEl.style.zIndex = '1000';
     
     cardEl.innerHTML = `
-      <div class="bg-background rounded-2xl shadow-2xl border border-border overflow-hidden">
+      <div class="rounded-[20px] shadow-2xl border overflow-hidden" style="
+        background: ${DESIGN.colors.card};
+        border-color: ${DESIGN.colors.primary}40;
+      ">
         <div class="flex items-start gap-3 p-3">
           <img 
             src="${event.coverImage}" 
             alt="${event.name}"
-            class="w-20 h-20 rounded-xl object-cover flex-shrink-0"
+            class="w-20 h-20 rounded-[12px] object-cover flex-shrink-0"
+            style="border: 2px solid ${DESIGN.colors.primary}"
           />
           <div class="flex-1 min-w-0 py-1">
             <div class="flex items-start justify-between gap-2">
-              <h3 class="font-bold text-sm line-clamp-1">${event.name}</h3>
-              <button class="w-6 h-6 rounded-full bg-card flex items-center justify-center flex-shrink-0 close-3d-card">
+              <h3 class="font-bold text-[14px] line-clamp-1" style="color: ${DESIGN.colors.textPrimary}">
+                ${event.name}
+              </h3>
+              <button class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 close-3d-card"
+                style="background: ${DESIGN.colors.card}; color: ${DESIGN.colors.textSecondary}; border: 1px solid ${DESIGN.colors.textSecondary}20">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
               </button>
             </div>
-            <div class="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+            <div class="flex items-center gap-2 text-[12px] mt-1" style="color: ${DESIGN.colors.textSecondary}">
               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
               </svg>
@@ -296,7 +329,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
               </svg>
               <span>${event.time}</span>
             </div>
-            <div class="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+            <div class="flex items-center gap-2 text-[12px] mt-1" style="color: ${DESIGN.colors.textSecondary}">
               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -304,10 +337,11 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
               <span class="line-clamp-1">${event.location}</span>
             </div>
             <div class="flex items-center justify-between mt-2">
-              <span class="text-xs font-semibold" style="color: ${event.customTheme || '#8B5CF6'}">
+              <span class="text-[12px] font-semibold" style="color: ${event.customTheme || DESIGN.colors.primary}">
                 ${event.price === 0 ? 'FREE' : `N$${event.price}`}
               </span>
-              <button class="h-7 px-3 text-xs bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors view-event-btn">
+              <button class="h-7 px-3 text-[12px] rounded-[8px] font-medium view-event-btn"
+                style="background: ${event.customTheme || DESIGN.colors.primary}; color: ${DESIGN.colors.background}">
                 View Event
               </button>
             </div>
@@ -389,7 +423,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         type: 'fill',
         source: sourceId,
         paint: {
-          'fill-color': event.customTheme || '#8B5CF6',
+          'fill-color': event.customTheme || DESIGN.colors.primary,
           'fill-opacity': 0.15,
         },
       });
@@ -399,7 +433,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         type: 'line',
         source: sourceId,
         paint: {
-          'line-color': event.customTheme || '#8B5CF6',
+          'line-color': event.customTheme || DESIGN.colors.primary,
           'line-width': 2,
           'line-dasharray': [2, 1],
         },
@@ -512,7 +546,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const isPro = user?.subscription?.tier === 'pro' || user?.subscription?.tier === 'max';
 
   return (
-    <div className="h-screen w-full relative overflow-hidden bg-black">
+    <div className="h-screen w-full relative overflow-hidden" style={{ background: DESIGN.colors.background }}>
       {/* Map Container - Full screen behind everything */}
       <div 
         ref={mapContainer} 
@@ -521,7 +555,8 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       />
       
       {/* Map attribution */}
-      <div className="absolute bottom-4 right-2 z-10 text-xs text-white/70 bg-black/30 px-2 py-1 rounded">
+      <div className="absolute bottom-4 right-2 z-10 text-[12px] px-2 py-1 rounded"
+        style={{ color: `${DESIGN.colors.textSecondary}`, background: `${DESIGN.colors.background}40` }}>
         © Mapbox © OpenStreetMap
       </div>
 
@@ -529,18 +564,24 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       <div
         ref={drawerRef}
         className={cn(
-          'absolute left-0 right-0 bg-background rounded-t-3xl shadow-2xl z-20 flex flex-col border-t border-border',
+          'absolute left-0 right-0 z-20 flex flex-col',
           isDragging ? '' : 'transition-transform duration-300 ease-out'
         )}
         style={{
           height: '100%',
           transform: `translateY(${translateY}px)`,
           touchAction: 'none',
+          background: DESIGN.colors.background,
+          borderTopLeftRadius: DESIGN.borderRadius.large,
+          borderTopRightRadius: DESIGN.borderRadius.large,
+          borderTop: `1px solid ${DESIGN.colors.textSecondary}20`,
+          boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.4)'
         }}
       >
         {/* Drawer Handle - Always visible at top when drawer is up */}
         <div
-          className="flex flex-col items-center pt-3 pb-2 cursor-grab active:cursor-grabbing select-none bg-background rounded-t-3xl"
+          className="flex flex-col items-center pt-3 pb-2 cursor-grab active:cursor-grabbing select-none"
+          style={{ background: DESIGN.colors.background }}
           role="button"
           tabIndex={0}
           aria-label={`Drawer position: ${drawerPosition}. Drag to adjust.`}
@@ -554,8 +595,8 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
           onTouchEnd={handleTouchEnd}
           onMouseDown={handleMouseDown}
         >
-          <div className="w-12 h-1.5 bg-muted-foreground/30 rounded-full" />
-          <p className="text-xs text-muted-foreground mt-2">
+          <div className="w-12 h-1.5 rounded-full" style={{ background: `${DESIGN.colors.textSecondary}30` }} />
+          <p className="text-[13px] mt-2" style={{ color: DESIGN.colors.textSecondary }}>
             {drawerPosition === 'minimum' ? `${filteredEvents.length} events nearby - Swipe up` : 
              drawerPosition === 'full' ? 'Swipe down for map' : 
              'Swipe up or down'}
@@ -568,7 +609,8 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
             {/* Search and Create Row */}
             <div className="flex items-center gap-2 mb-3">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" 
+                  style={{ color: DESIGN.colors.textSecondary }} />
                 <Input
                   type="text"
                   placeholder="Search events..."
@@ -576,17 +618,28 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                   onChange={(e) => setSearch(e.target.value)}
                   onFocus={() => setShowSuggestions(true)}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  className="pl-10 h-10 bg-card border-border rounded-xl"
+                  className="pl-10 h-10 rounded-[12px]"
+                  style={{
+                    background: DESIGN.colors.card,
+                    borderColor: `${DESIGN.colors.textSecondary}30`,
+                    color: DESIGN.colors.textPrimary
+                  }}
                   aria-label="Search events"
                 />
                 
                 {/* Search Suggestions Dropdown */}
                 {showSuggestions && searchSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-xl shadow-lg z-50 overflow-hidden">
+                  <div className="absolute top-full left-0 right-0 mt-1 rounded-[12px] shadow-lg z-50 overflow-hidden"
+                    style={{
+                      background: DESIGN.colors.card,
+                      border: `1px solid ${DESIGN.colors.textSecondary}20`
+                    }}>
                     {searchSuggestions.map(event => (
-                      <button
+                      <motion.button
                         key={event.id}
-                        className="w-full px-3 py-2 text-left hover:bg-card flex items-center gap-2"
+                        className="w-full px-3 py-2 text-left flex items-center gap-2"
+                        style={{ color: DESIGN.colors.textPrimary }}
+                        whileHover={{ background: `${DESIGN.colors.primary}15` }}
                         onMouseDown={() => {
                           setSearch(event.name);
                           setShowSuggestions(false);
@@ -594,12 +647,15 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                         }}
                         aria-label={`Select event: ${event.name}`}
                       >
-                        <img src={event.coverImage} alt="" className="w-8 h-8 rounded-lg object-cover" />
+                        <img src={event.coverImage} alt="" className="w-8 h-8 rounded-[8px] object-cover" 
+                          style={{ border: `1px solid ${DESIGN.colors.primary}40` }} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{event.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{event.date} • {event.location}</p>
+                          <p className="text-[14px] font-medium truncate">{event.name}</p>
+                          <p className="text-[12px] truncate" style={{ color: DESIGN.colors.textSecondary }}>
+                            {event.date} • {event.location}
+                          </p>
                         </div>
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
                 )}
@@ -607,46 +663,71 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
               
               <button
                 onClick={onOpenFilters}
-                className="w-10 h-10 rounded-xl bg-card border border-border flex items-center justify-center hover:border-primary transition-colors"
+                className="w-10 h-10 rounded-[12px] flex items-center justify-center hover:border-primary transition-colors"
+                style={{
+                  background: DESIGN.colors.card,
+                  border: `1px solid ${DESIGN.colors.textSecondary}30`,
+                  color: DESIGN.colors.textPrimary
+                }}
                 aria-label="Open filters"
               >
                 <SlidersHorizontal className="w-4 h-4" />
               </button>
               
               {isPro && (
-                <Button
-                  size="sm"
+                <motion.button
                   onClick={onCreateEvent}
-                  className="h-10 px-3 rounded-xl relative"
+                  className="h-10 px-3 rounded-[12px] relative font-medium"
+                  style={{
+                    background: DESIGN.colors.primary,
+                    color: DESIGN.colors.background
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   aria-label="Create new event"
                 >
                   <Plus className="w-4 h-4" />
                   {user?.createdEvents?.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 text-[12px] rounded-full w-5 h-5 flex items-center justify-center"
+                      style={{
+                        background: DESIGN.colors.accentPink,
+                        color: DESIGN.colors.background
+                      }}>
                       {user.createdEvents.length}
                     </span>
                   )}
-                </Button>
+                </motion.button>
               )}
             </div>
 
             {/* Category Pills */}
             <div className="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-1">
               {categories.map((category) => (
-                <button
+                <motion.button
                   key={category}
                   onClick={() => setSelectedCategory(category)}
                   className={cn(
-                    'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all',
-                    selectedCategory === category
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-card text-muted-foreground hover:text-foreground border border-border'
+                    'px-4 py-2 rounded-full text-[13px] font-medium whitespace-nowrap transition-all'
                   )}
+                  style={
+                    selectedCategory === category
+                      ? {
+                          background: DESIGN.colors.primary,
+                          color: DESIGN.colors.background
+                        }
+                      : {
+                          background: DESIGN.colors.card,
+                          color: DESIGN.colors.textSecondary,
+                          border: `1px solid ${DESIGN.colors.textSecondary}30`
+                        }
+                  }
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   aria-label={`Filter by ${category}`}
                   aria-pressed={selectedCategory === category}
                 >
                   {category}
-                </button>
+                </motion.button>
               ))}
             </div>
 
@@ -660,20 +741,22 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                     key={event.id}
                     event={event}
                     onClick={() => handleEventCardClick(event)}
+                    design={DESIGN}
                   />
                 ))
               ) : (
                 <div className="text-center py-12">
-                  <MapPin className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-muted-foreground">No events found</p>
-                  <p className="text-sm text-muted-foreground/70 mt-1">Try adjusting your search or filters</p>
+                  <MapPin className="w-12 h-12 mx-auto mb-3" style={{ color: DESIGN.colors.textSecondary }} />
+                  <p className="mb-1" style={{ color: DESIGN.colors.textSecondary }}>No events found</p>
+                  <p className="text-[13px]" style={{ color: `${DESIGN.colors.textSecondary}70` }}>
+                    Try adjusting your search or filters
+                  </p>
                 </div>
               )}
             </div>
           </div>
         )}
       </div>
-
     </div>
   );
 }
