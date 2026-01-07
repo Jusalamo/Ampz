@@ -1,12 +1,12 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Heart, RotateCcw, Sparkles, MapPin, Briefcase, Info, Zap, Lock, AlertCircle, Users, Calendar, Tag } from 'lucide-react';
+import { X, Heart, RotateCcw, Sparkles, MapPin, Briefcase, Info, ChevronDown, Eye, EyeOff, Zap, Lock, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
 import { ConnectionProfile } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -169,7 +169,7 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
           background: 'linear-gradient(135deg, #C4B5FD 0%, #E9D5FF 100%)',
           boxShadow: DESIGN_SYSTEM.shadows.card,
           border: '2px solid #D4AF37',
-          padding: '20px'
+          padding: '16px' // Reduced padding for smaller card
         }}
       >
         {/* Swipe Hints */}
@@ -179,13 +179,13 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
-              className="absolute top-8 left-8 z-20 px-6 py-3 border-4 border-[#C4B5FD] rounded-xl rotate-[-20deg]"
+              className="absolute top-6 left-6 z-20 px-4 py-2 border-4 border-[#C4B5FD] rounded-xl rotate-[-20deg]"
               style={{
                 background: DESIGN_SYSTEM.colors.background.dark,
                 borderColor: DESIGN_SYSTEM.colors.interactive.border
               }}
             >
-              <span className="text-[32px] font-bold" style={{ color: DESIGN_SYSTEM.colors.primary.lavender }}>
+              <span className="text-[24px] font-bold" style={{ color: DESIGN_SYSTEM.colors.primary.lavender }}>
                 LIKE
               </span>
             </motion.div>
@@ -195,13 +195,13 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
-              className="absolute top-8 right-8 z-20 px-6 py-3 border-4 border-[#4A4A4A] rounded-xl rotate-[20deg]"
+              className="absolute top-6 right-6 z-20 px-4 py-2 border-4 border-[#4A4A4A] rounded-xl rotate-[20deg]"
               style={{
                 background: DESIGN_SYSTEM.colors.background.dark,
                 borderColor: DESIGN_SYSTEM.colors.interactive.no
               }}
             >
-              <span className="text-[32px] font-bold" style={{ color: DESIGN_SYSTEM.colors.text.secondary }}>
+              <span className="text-[24px] font-bold" style={{ color: DESIGN_SYSTEM.colors.text.secondary }}>
                 PASS
               </span>
             </motion.div>
@@ -209,17 +209,17 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
         </AnimatePresence>
         
         {/* Profile Photo */}
-        <div className="relative h-[70%] mb-[16px]">
+        <div className="relative h-[65%] mb-3"> {/* Increased height percentage for photo */}
           <img
             src={profile.photo}
             alt={profile.name}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover rounded-[18px]" /* Slightly smaller radius */
             style={{
-              borderRadius: '20px',
-              border: '3px solid #FFFFFF'
+              border: '2px solid #FFFFFF' /* Thinner border */
             }}
             draggable={false}
           />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-[18px]" />
           
           {/* View Profile Button */}
           <button
@@ -227,68 +227,52 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
               e.stopPropagation();
               onViewProfile();
             }}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center hover:bg-black/60 transition-colors"
+            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center hover:bg-black/60 transition-colors"
             style={{ borderRadius: DESIGN_SYSTEM.borderRadius.round }}
           >
-            <Info className="w-5 h-5 text-white" />
+            <Info className="w-4 h-4 text-white" />
           </button>
         </div>
 
-        {/* Profile Info - Simplified to just name, age, gender */}
-        <div className="text-[#1A1A1A]">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <h2 
-                className="text-[28px] font-semibold"
-                style={{ fontFamily: DESIGN_SYSTEM.typography.fonts.subheading }}
-              >
-                {profile.name}
-              </h2>
-              <span 
-                className="text-[28px] font-normal"
-                style={{ color: DESIGN_SYSTEM.colors.background.card }}
-              >
-                {profile.age}
-              </span>
-            </div>
-            <div 
-              className="px-3 py-1.5 rounded-full text-[12px] font-medium"
-              style={{
-                background: DESIGN_SYSTEM.colors.background.dark,
-                color: DESIGN_SYSTEM.colors.text.primary
-              }}
+        {/* Profile Info - SIMPLIFIED: Only name, age, gender */}
+        <div className="text-[#1A1A1A] px-1">
+          <div className="flex items-center gap-2 mb-2">
+            <h2 
+              className="text-[20px] font-semibold" /* Reduced font size */
+              style={{ fontFamily: DESIGN_SYSTEM.typography.fonts.subheading }}
             >
-              {profile.gender || 'Prefer not to say'}
-            </div>
+              {profile.name}
+            </h2>
+            <span 
+              className="text-[20px] opacity-80" /* Reduced font size */
+              style={{ color: DESIGN_SYSTEM.colors.background.card }}
+            >
+              {profile.age}
+            </span>
           </div>
           
-          {/* Tags/Interests - Simplified version */}
-          <div className="flex flex-wrap gap-2">
-            {profile.interests.slice(0, 3).map((interest) => (
-              <span
-                key={interest}
-                className="px-3 py-1.5 text-[12px] font-medium rounded-full"
-                style={{
-                  background: DESIGN_SYSTEM.colors.background.dark,
-                  color: DESIGN_SYSTEM.colors.text.primary,
-                  borderRadius: DESIGN_SYSTEM.borderRadius.round
-                }}
-              >
-                {interest}
-              </span>
-            ))}
-            {profile.interests.length > 3 && (
+          {/* Gender/Identity - Centered badge */}
+          <div className="flex justify-center">
+            <div 
+              className="px-3 py-1 rounded-full flex items-center justify-center min-h-[24px]"
+              style={{
+                background: '#FFFFFF',
+                borderRadius: DESIGN_SYSTEM.borderRadius.small
+              }}
+            >
               <span 
-                className="px-3 py-1.5 text-[12px] font-medium rounded-full"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  color: DESIGN_SYSTEM.colors.text.primary,
-                  borderRadius: DESIGN_SYSTEM.borderRadius.round
+                className="text-[12px] font-medium text-center"
+                style={{ 
+                  color: DESIGN_SYSTEM.colors.background.dark,
+                  lineHeight: '1.2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
               >
-                +{profile.interests.length - 3}
+                {profile.gender || "Preferred not to say"}
               </span>
-            )}
+            </div>
           </div>
         </div>
       </div>
@@ -318,9 +302,16 @@ export default function Connect() {
   const visibleProfiles = availableProfiles.slice(currentIndex, currentIndex + 2).reverse();
   const noMoreProfiles = currentIndex >= availableProfiles.length;
 
-  // Get current event name from the current profile
-  const currentProfile = availableProfiles[currentIndex];
-  const eventName = currentProfile?.eventName || 'Current Event';
+  // Get current event name for header
+  const currentEventName = useMemo(() => {
+    if (isDemo && availableProfiles.length > 0) {
+      return availableProfiles[0].eventName || "Windhoek Jazz Night";
+    }
+    if (tickets.length > 0) {
+      return tickets[0].eventName || "Current Event";
+    }
+    return "Connect";
+  }, [isDemo, availableProfiles, tickets]);
 
   // Check if user has any active events to connect at
   const hasActiveEvents = isDemo || tickets.length > 0;
@@ -429,7 +420,7 @@ export default function Connect() {
 
   return (
     <div 
-      className="app-container min-h-screen pb-nav"
+      className="app-container pb-nav"
       style={{
         background: DESIGN_SYSTEM.colors.background.gradient,
         maxWidth: '430px',
@@ -437,375 +428,378 @@ export default function Connect() {
         padding: DESIGN_SYSTEM.spacing.lg,
         minHeight: '100vh',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        justifyContent: 'space-between'
       }}
     >
-      {/* Header with Event Name */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 
-            className="text-[24px] font-bold mb-1"
-            style={{ 
-              color: DESIGN_SYSTEM.colors.text.primary,
-              fontFamily: DESIGN_SYSTEM.typography.fonts.heading
-            }}
-          >
-            {eventName}
-          </h1>
-          <p 
-            className="text-[14px]"
-            style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
-          >
-            {availableProfiles.length - currentIndex} people to discover
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Likes Counter */}
-          <div 
-            className="flex items-center gap-2 px-4 py-2 rounded-full border"
-            style={{
-              background: `linear-gradient(135deg, ${DESIGN_SYSTEM.colors.accent.pink}20 0%, ${DESIGN_SYSTEM.colors.primary.lavender}20 100%)`,
-              borderColor: `${DESIGN_SYSTEM.colors.accent.pink}30`,
-              borderRadius: DESIGN_SYSTEM.borderRadius.round
-            }}
-          >
-            <Heart className="w-4 h-4" style={{ color: DESIGN_SYSTEM.colors.accent.pink }} />
-            <span className="text-sm font-bold" style={{ color: DESIGN_SYSTEM.colors.accent.pink }}>
-              {likesRemaining}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Card Stack - Optimized height to fit screen */}
-      <div className="relative flex-1 min-h-[400px] max-h-[460px] w-full mx-auto mb-4">
-        {noMoreProfiles ? (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="absolute inset-0 flex items-center justify-center"
-          >
-            <div className="text-center px-4">
-              <div 
-                className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"
-                style={{
-                  background: `${DESIGN_SYSTEM.colors.primary.lavender}20`,
-                  borderRadius: DESIGN_SYSTEM.borderRadius.round
-                }}
-              >
-                <Heart className="w-12 h-12" style={{ color: DESIGN_SYSTEM.colors.primary.lavender }} />
-              </div>
-              <h3 
-                className="text-[28px] font-bold mb-3"
-                style={{ 
-                  color: DESIGN_SYSTEM.colors.text.primary,
-                  fontFamily: DESIGN_SYSTEM.typography.fonts.heading
-                }}
-              >
-                That's Everyone!
-              </h3>
-              <p 
-                className="text-sm mb-6"
-                style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
-              >
-                Check back later for more connections, or attend more events to meet new people.
-              </p>
-              <Button 
-                onClick={() => navigate('/events')} 
-                variant="outline" 
-                className="rounded-xl"
-                style={{
-                  borderColor: DESIGN_SYSTEM.colors.primary.lavender,
-                  color: DESIGN_SYSTEM.colors.primary.lavender,
-                  borderRadius: DESIGN_SYSTEM.borderRadius.large
-                }}
-              >
-                Find More Events
-              </Button>
-            </div>
-          </motion.div>
-        ) : (
-          <AnimatePresence mode="popLayout">
-            {visibleProfiles.map((profile, index) => (
-              <ProfileCard
-                key={profile.id}
-                profile={profile}
-                onSwipe={handleSwipe}
-                isTop={index === visibleProfiles.length - 1}
-                onViewProfile={() => setViewingProfile(profile)}
-              />
-            ))}
-          </AnimatePresence>
-        )}
-      </div>
-
-      {/* Action Buttons - Fixed at bottom */}
-      <div className="pt-4">
-        {!noMoreProfiles && (
-          <>
-            <div className="flex justify-center items-center gap-6 mb-3">
-              {/* Pass Button */}
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => handleSwipe('left')}
-                className="flex items-center justify-center shadow-lg transition-all"
-                style={{
-                  width: '72px',
-                  height: '72px',
-                  background: DESIGN_SYSTEM.colors.interactive.no,
-                  color: DESIGN_SYSTEM.colors.text.primary,
-                  borderRadius: DESIGN_SYSTEM.borderRadius.round,
-                  boxShadow: DESIGN_SYSTEM.shadows.button
-                }}
-              >
-                <X className="w-8 h-8" />
-              </motion.button>
-
-              {/* Undo Button */}
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleUndo}
-                disabled={history.length === 0}
-                className={cn(
-                  "flex items-center justify-center shadow-lg transition-all",
-                  history.length === 0 && "opacity-30 cursor-not-allowed"
-                )}
-                style={{
-                  width: '56px',
-                  height: '56px',
-                  background: 'transparent',
-                  color: DESIGN_SYSTEM.colors.text.secondary,
-                  borderRadius: DESIGN_SYSTEM.borderRadius.round,
-                  border: `2px solid ${DESIGN_SYSTEM.colors.text.secondary}`
-                }}
-              >
-                <RotateCcw className="w-5 h-5" />
-              </motion.button>
-
-              {/* Like Button */}
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => handleSwipe('right')}
-                className="flex items-center justify-center shadow-xl transition-all"
-                style={{
-                  width: '72px',
-                  height: '72px',
-                  background: DESIGN_SYSTEM.colors.interactive.yes,
-                  color: DESIGN_SYSTEM.colors.background.dark,
-                  borderRadius: DESIGN_SYSTEM.borderRadius.round,
-                  boxShadow: `0 4px 16px ${DESIGN_SYSTEM.colors.accent.pink}40`,
-                  fontWeight: 600,
-                  fontSize: '18px'
-                }}
-              >
-                <Heart className="w-8 h-8" />
-              </motion.button>
-            </div>
-
-            {/* Umm Button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="mx-auto block"
-              style={{
-                background: 'transparent',
-                color: DESIGN_SYSTEM.colors.text.secondary,
-                fontSize: '14px',
-                fontStyle: 'italic',
-                border: 'none'
-              }}
-            >
-              Maybe Later
-            </motion.button>
-          </>
-        )}
-      </div>
-
-      {/* Match Modal */}
-      <Dialog open={!!matchModal} onOpenChange={() => setMatchModal(null)}>
-        <DialogContent 
-          className="text-center p-0 overflow-hidden border-0"
-          style={{
-            background: DESIGN_SYSTEM.colors.background.card,
-            maxWidth: '350px',
-            borderRadius: DESIGN_SYSTEM.borderRadius.xlarge,
-            boxShadow: DESIGN_SYSTEM.shadows.elevated,
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)'
-          }}
-        >
-          <motion.div 
-            className="py-8 px-6"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-          >
-            <div className="relative w-28 h-28 mx-auto mb-6">
-              <motion.div 
-                className="absolute inset-0 rounded-full"
-                style={{
-                  background: `linear-gradient(135deg, ${DESIGN_SYSTEM.colors.accent.pink} 0%, ${DESIGN_SYSTEM.colors.primary.lavender} 100%)`
-                }}
-                animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0.2, 0.5] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              />
-              <img
-                src={matchModal?.photo}
-                alt={matchModal?.name}
-                className="w-full h-full rounded-full object-cover border-4 relative z-10"
-                style={{
-                  borderColor: DESIGN_SYSTEM.colors.background.card,
-                  borderRadius: DESIGN_SYSTEM.borderRadius.round
-                }}
-              />
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, type: 'spring' }}
-                className="absolute -top-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center z-20 border-4"
-                style={{
-                  background: DESIGN_SYSTEM.colors.accent.gold,
-                  borderColor: DESIGN_SYSTEM.colors.background.card,
-                  borderRadius: DESIGN_SYSTEM.borderRadius.round
-                }}
-              >
-                <Heart className="w-5 h-5 text-white fill-white" />
-              </motion.div>
-            </div>
-            
-            <motion.h2 
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.1 }}
-              className="text-[32px] font-bold mb-2"
+      <div>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 
+              className="text-[28px] font-bold mb-1" /* Smaller font size */
               style={{ 
-                fontFamily: DESIGN_SYSTEM.typography.fonts.decorative,
-                color: DESIGN_SYSTEM.colors.text.primary
+                color: DESIGN_SYSTEM.colors.text.primary,
+                fontFamily: DESIGN_SYSTEM.typography.fonts.heading
               }}
             >
-              It's a Match!
-            </motion.h2>
-            <motion.p 
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="mb-6"
+              {currentEventName}
+            </h1>
+            <p 
+              className="text-[12px]" /* Smaller font size */
               style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
             >
-              You and {matchModal?.name} liked each other
-            </motion.p>
-            
-            <motion.div 
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="flex gap-3"
+              {availableProfiles.length - currentIndex} people here
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Likes Counter */}
+            <div 
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full border"
+              style={{
+                background: `linear-gradient(135deg, ${DESIGN_SYSTEM.colors.accent.pink}20 0%, ${DESIGN_SYSTEM.colors.primary.lavender}20 100%)`,
+                borderColor: `${DESIGN_SYSTEM.colors.accent.pink}30`,
+                borderRadius: DESIGN_SYSTEM.borderRadius.round
+              }}
             >
-              <Button
-                variant="outline"
-                onClick={() => setMatchModal(null)}
-                className="flex-1 h-12"
-                style={{
-                  borderRadius: DESIGN_SYSTEM.borderRadius.large,
-                  borderColor: DESIGN_SYSTEM.colors.primary.lavender,
-                  color: DESIGN_SYSTEM.colors.primary.lavender
-                }}
-              >
-                Keep Swiping
-              </Button>
-              <Button
-                onClick={() => {
-                  setMatchModal(null);
-                  navigate('/matches');
-                }}
-                className="flex-1 h-12"
-                style={{
-                  background: DESIGN_SYSTEM.colors.primary.lavender,
-                  color: DESIGN_SYSTEM.colors.background.dark,
-                  borderRadius: DESIGN_SYSTEM.borderRadius.large,
-                  fontWeight: 600
-                }}
-              >
-                Send Message
-              </Button>
-            </motion.div>
-          </motion.div>
-        </DialogContent>
-      </Dialog>
+              <Heart className="w-3 h-3" style={{ color: DESIGN_SYSTEM.colors.accent.pink }} />
+              <span className="text-xs font-bold" style={{ color: DESIGN_SYSTEM.colors.accent.pink }}>
+                {likesRemaining}
+              </span>
+            </div>
+          </div>
+        </div>
 
-      {/* Profile Info Modal - Fixed positioning and layout */}
+        {/* Card Stack - Reduced height to prevent scrolling */}
+        <div className="relative h-[380px] w-full mx-auto mb-4">
+          {noMoreProfiles ? (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="absolute inset-0 flex items-center justify-center"
+            >
+              <div className="text-center px-4">
+                <div 
+                  className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
+                  style={{
+                    background: `${DESIGN_SYSTEM.colors.primary.lavender}20`,
+                    borderRadius: DESIGN_SYSTEM.borderRadius.round
+                  }}
+                >
+                  <Heart className="w-10 h-10" style={{ color: DESIGN_SYSTEM.colors.primary.lavender }} />
+                </div>
+                <h3 
+                  className="text-[22px] font-bold mb-2"
+                  style={{ 
+                    color: DESIGN_SYSTEM.colors.text.primary,
+                    fontFamily: DESIGN_SYSTEM.typography.fonts.heading
+                  }}
+                >
+                  That's Everyone!
+                </h3>
+                <p 
+                  className="text-xs mb-4"
+                  style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+                >
+                  Check back later for more connections.
+                </p>
+                <Button 
+                  onClick={() => navigate('/events')} 
+                  variant="outline" 
+                  className="rounded-xl text-sm"
+                  style={{
+                    borderColor: DESIGN_SYSTEM.colors.primary.lavender,
+                    color: DESIGN_SYSTEM.colors.primary.lavender,
+                    borderRadius: DESIGN_SYSTEM.borderRadius.large,
+                    padding: '8px 16px'
+                  }}
+                >
+                  Find More Events
+                </Button>
+              </div>
+            </motion.div>
+          ) : (
+            <AnimatePresence mode="popLayout">
+              {visibleProfiles.map((profile, index) => (
+                <ProfileCard
+                  key={profile.id}
+                  profile={profile}
+                  onSwipe={handleSwipe}
+                  isTop={index === visibleProfiles.length - 1}
+                  onViewProfile={() => setViewingProfile(profile)}
+                />
+              ))}
+            </AnimatePresence>
+          )}
+        </div>
+
+        {/* Action Buttons with adjusted spacing */}
+        {!noMoreProfiles && (
+          <div className="flex justify-center items-center gap-4 mb-2">
+            {/* Pass Button */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => handleSwipe('left')}
+              className="flex items-center justify-center shadow-lg transition-all"
+              style={{
+                width: '64px',
+                height: '64px',
+                background: DESIGN_SYSTEM.colors.interactive.no,
+                color: DESIGN_SYSTEM.colors.text.primary,
+                borderRadius: DESIGN_SYSTEM.borderRadius.round,
+                boxShadow: DESIGN_SYSTEM.shadows.button
+              }}
+            >
+              <X className="w-6 h-6" />
+            </motion.button>
+
+            {/* Undo Button */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleUndo}
+              disabled={history.length === 0}
+              className={cn(
+                "flex items-center justify-center shadow-lg transition-all",
+                history.length === 0 && "opacity-30 cursor-not-allowed"
+              )}
+              style={{
+                width: '48px',
+                height: '48px',
+                background: 'transparent',
+                color: DESIGN_SYSTEM.colors.text.secondary,
+                borderRadius: DESIGN_SYSTEM.borderRadius.round,
+                border: `2px solid ${DESIGN_SYSTEM.colors.text.secondary}`
+              }}
+            >
+              <RotateCcw className="w-4 h-4" />
+            </motion.button>
+
+            {/* Like Button */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => handleSwipe('right')}
+              className="flex items-center justify-center shadow-xl transition-all"
+              style={{
+                width: '64px',
+                height: '64px',
+                background: DESIGN_SYSTEM.colors.interactive.yes,
+                color: DESIGN_SYSTEM.colors.background.dark,
+                borderRadius: DESIGN_SYSTEM.borderRadius.round,
+                boxShadow: `0 4px 16px ${DESIGN_SYSTEM.colors.accent.pink}40`,
+                fontWeight: 600,
+                fontSize: '16px'
+              }}
+            >
+              <Heart className="w-6 h-6" />
+            </motion.button>
+          </div>
+        )}
+
+        {/* Umm Button - Smaller */}
+        {!noMoreProfiles && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="mx-auto block text-sm" /* Smaller font */
+            style={{
+              background: 'transparent',
+              color: DESIGN_SYSTEM.colors.text.secondary,
+              fontSize: '13px',
+              fontStyle: 'italic',
+              border: 'none',
+              padding: '4px',
+              marginBottom: '16px' /* Add margin before bottom nav */
+            }}
+          >
+            Maybe Later
+          </motion.button>
+        )}
+
+        {/* Match Modal */}
+        <Dialog open={!!matchModal} onOpenChange={() => setMatchModal(null)}>
+          <DialogContent 
+            className="text-center p-0 overflow-hidden border-0"
+            style={{
+              background: DESIGN_SYSTEM.colors.background.card,
+              maxWidth: '320px',
+              borderRadius: DESIGN_SYSTEM.borderRadius.xlarge,
+              boxShadow: DESIGN_SYSTEM.shadows.elevated,
+              margin: '20px'
+            }}
+          >
+            <motion.div 
+              className="py-6 px-4"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            >
+              {/* Celebration Animation */}
+              <div className="relative w-24 h-24 mx-auto mb-4">
+                <motion.div 
+                  className="absolute inset-0 rounded-full"
+                  style={{
+                    background: `linear-gradient(135deg, ${DESIGN_SYSTEM.colors.accent.pink} 0%, ${DESIGN_SYSTEM.colors.primary.lavender} 100%)`
+                  }}
+                  animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0.2, 0.5] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+                <img
+                  src={matchModal?.photo}
+                  alt={matchModal?.name}
+                  className="w-full h-full rounded-full object-cover border-4 relative z-10"
+                  style={{
+                    borderColor: DESIGN_SYSTEM.colors.background.card,
+                    borderRadius: DESIGN_SYSTEM.borderRadius.round
+                  }}
+                />
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: 'spring' }}
+                  className="absolute -top-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center z-20 border-4"
+                  style={{
+                    background: DESIGN_SYSTEM.colors.accent.gold,
+                    borderColor: DESIGN_SYSTEM.colors.background.card,
+                    borderRadius: DESIGN_SYSTEM.borderRadius.round
+                  }}
+                >
+                  <Heart className="w-3 h-3 text-white fill-white" />
+                </motion.div>
+              </div>
+              
+              <motion.h2 
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="text-[24px] font-bold mb-2"
+                style={{ 
+                  fontFamily: DESIGN_SYSTEM.typography.fonts.decorative,
+                  color: DESIGN_SYSTEM.colors.text.primary
+                }}
+              >
+                It's a Match!
+              </motion.h2>
+              <motion.p 
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="mb-4 text-sm"
+                style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+              >
+                You and {matchModal?.name} liked each other
+              </motion.p>
+              
+              <motion.div 
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="flex gap-2"
+              >
+                <Button
+                  variant="outline"
+                  onClick={() => setMatchModal(null)}
+                  className="flex-1 h-10 text-sm"
+                  style={{
+                    borderRadius: DESIGN_SYSTEM.borderRadius.medium,
+                    borderColor: DESIGN_SYSTEM.colors.primary.lavender,
+                    color: DESIGN_SYSTEM.colors.primary.lavender
+                  }}
+                >
+                  Keep Swiping
+                </Button>
+                <Button
+                  onClick={() => {
+                    setMatchModal(null);
+                    navigate('/matches');
+                  }}
+                  className="flex-1 h-10 text-sm"
+                  style={{
+                    background: DESIGN_SYSTEM.colors.primary.lavender,
+                    color: DESIGN_SYSTEM.colors.background.dark,
+                    borderRadius: DESIGN_SYSTEM.borderRadius.medium,
+                    fontWeight: 600
+                  }}
+                >
+                  Message
+                </Button>
+              </motion.div>
+            </motion.div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Profile View Modal - FIXED to fit properly */}
       <Dialog open={!!viewingProfile} onOpenChange={() => setViewingProfile(null)}>
         <DialogContent 
-          className="p-0 overflow-hidden max-h-[85vh]"
+          className="p-0 overflow-hidden max-h-[85vh] flex flex-col"
           style={{
             background: DESIGN_SYSTEM.colors.background.card,
-            maxWidth: '400px',
+            maxWidth: '380px',
+            width: '90vw',
             borderRadius: DESIGN_SYSTEM.borderRadius.xlarge,
             boxShadow: DESIGN_SYSTEM.shadows.elevated,
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            overflowY: 'auto'
+            margin: '20px auto'
           }}
         >
           {viewingProfile && (
-            <div className="relative">
-              {/* Close Button */}
-              <DialogClose className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center hover:bg-black/60 transition-colors">
-                <X className="w-5 h-5 text-white" />
-              </DialogClose>
-              
-              <div className="relative h-64">
-                <img
-                  src={viewingProfile.photo}
-                  alt={viewingProfile.name}
-                  className="w-full h-full object-cover"
-                />
-                <div 
-                  className="absolute inset-0"
-                  style={{
-                    background: 'linear-gradient(to top, rgba(45, 45, 45, 0.95) 0%, rgba(45, 45, 45, 0.5) 30%, transparent 70%)'
-                  }}
-                />
-                <div className="absolute bottom-6 left-6 right-6">
-                  <h2 
-                    className="text-[32px] font-bold mb-1"
-                    style={{ 
-                      color: DESIGN_SYSTEM.colors.text.primary,
-                      fontFamily: DESIGN_SYSTEM.typography.fonts.subheading
+            <div className="flex flex-col h-full">
+              {/* Close button at top */}
+              <button
+                onClick={() => setViewingProfile(null)}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center z-10 hover:bg-black/60 transition-colors"
+                style={{ borderRadius: DESIGN_SYSTEM.borderRadius.round }}
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+
+              <div className="overflow-y-auto flex-1">
+                <div className="relative h-48">
+                  <img
+                    src={viewingProfile.photo}
+                    alt={viewingProfile.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <div 
+                    className="absolute inset-0"
+                    style={{
+                      background: 'linear-gradient(to top, rgba(45, 45, 45, 0.9) 0%, rgba(45, 45, 45, 0.3) 50%, transparent 100%)'
                     }}
-                  >
-                    {viewingProfile.name}, {viewingProfile.age}
-                  </h2>
-                  {viewingProfile.gender && (
-                    <p 
-                      className="text-[16px] mb-2"
-                      style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
-                    >
-                      {viewingProfile.gender}
-                    </p>
-                  )}
-                  {viewingProfile.occupation && (
-                    <p 
-                      className="text-[16px] flex items-center gap-2"
-                      style={{ color: DESIGN_SYSTEM.colors.primary.lavender }}
-                    >
-                      <Briefcase className="w-4 h-4" />
-                      {viewingProfile.occupation}
-                    </p>
-                  )}
+                  />
                 </div>
-              </div>
-              
-              <div className="p-6 space-y-6">
-                {/* Bio Section */}
-                {viewingProfile.bio && (
+                
+                <div className="p-5 space-y-4">
+                  <div>
+                    <h2 
+                      className="text-[24px] font-bold mb-1"
+                      style={{ 
+                        color: DESIGN_SYSTEM.colors.text.primary,
+                        fontFamily: DESIGN_SYSTEM.typography.fonts.subheading
+                      }}
+                    >
+                      {viewingProfile.name}, {viewingProfile.age}
+                    </h2>
+                    {viewingProfile.gender && (
+                      <p 
+                        className="text-[14px]"
+                        style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+                      >
+                        {viewingProfile.gender}
+                      </p>
+                    )}
+                    {viewingProfile.occupation && (
+                      <p 
+                        className="text-[14px] flex items-center gap-2 mt-1"
+                        style={{ color: DESIGN_SYSTEM.colors.primary.lavender }}
+                      >
+                        <Briefcase className="w-3 h-3" />
+                        {viewingProfile.occupation}
+                      </p>
+                    )}
+                  </div>
+
                   <div>
                     <h3 
                       className="text-sm font-semibold mb-2"
@@ -817,72 +811,74 @@ export default function Connect() {
                       className="text-sm"
                       style={{ 
                         color: DESIGN_SYSTEM.colors.text.secondary,
-                        lineHeight: 1.8
+                        lineHeight: 1.6
                       }}
                     >
                       {viewingProfile.bio}
                     </p>
                   </div>
-                )}
 
-                {/* Location Section */}
-                <div>
-                  <h3 
-                    className="text-sm font-semibold mb-2"
-                    style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
-                  >
-                    Location
-                  </h3>
-                  <p 
-                    className="text-sm flex items-center gap-2"
-                    style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
-                  >
-                    <MapPin className="w-4 h-4" style={{ color: DESIGN_SYSTEM.colors.primary.lavender }} />
-                    {viewingProfile.location}
-                  </p>
-                </div>
-                
-                {/* Interests Section */}
-                <div>
-                  <h3 
-                    className="text-sm font-semibold mb-2"
-                    style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
-                  >
-                    Interests
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {viewingProfile.interests.map((interest) => (
-                      <span
-                        key={interest}
-                        className="px-3 py-1.5 text-xs font-medium rounded-full"
-                        style={{
-                          background: `${DESIGN_SYSTEM.colors.primary.lavender}20`,
-                          color: DESIGN_SYSTEM.colors.primary.lavender,
-                          borderRadius: DESIGN_SYSTEM.borderRadius.small
-                        }}
-                      >
-                        {interest}
-                      </span>
-                    ))}
+                  <div>
+                    <h3 
+                      className="text-sm font-semibold mb-2"
+                      style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+                    >
+                      Location
+                    </h3>
+                    <p 
+                      className="text-sm flex items-center gap-2"
+                      style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+                    >
+                      <MapPin className="w-3 h-3" style={{ color: DESIGN_SYSTEM.colors.primary.lavender }} />
+                      {viewingProfile.location}
+                    </p>
                   </div>
+                  
+                  {viewingProfile.interests && viewingProfile.interests.length > 0 && (
+                    <div>
+                      <h3 
+                        className="text-sm font-semibold mb-2"
+                        style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+                      >
+                        Interests
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {viewingProfile.interests.map((interest) => (
+                          <span
+                            key={interest}
+                            className="px-2 py-1 text-xs font-medium rounded-full"
+                            style={{
+                              background: `${DESIGN_SYSTEM.colors.primary.lavender}20`,
+                              color: DESIGN_SYSTEM.colors.primary.lavender,
+                              borderRadius: DESIGN_SYSTEM.borderRadius.small
+                            }}
+                          >
+                            {interest}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-4">
+              </div>
+
+              {/* Action buttons at bottom - FIXED positioning */}
+              <div className="p-4 border-t" style={{ borderColor: `${DESIGN_SYSTEM.colors.text.secondary}20` }}>
+                <div className="flex gap-3">
                   <Button
                     variant="outline"
                     onClick={() => {
                       setViewingProfile(null);
                       handleSwipe('left');
                     }}
-                    className="flex-1 h-12"
+                    className="flex-1 h-10"
                     style={{
-                      borderRadius: DESIGN_SYSTEM.borderRadius.large,
+                      borderRadius: DESIGN_SYSTEM.borderRadius.medium,
                       borderColor: DESIGN_SYSTEM.colors.interactive.no,
                       color: DESIGN_SYSTEM.colors.text.primary
                     }}
                   >
-                    <X className="w-5 h-5 mr-2" />
+                    <X className="w-4 h-4 mr-2" />
                     Pass
                   </Button>
                   <Button
@@ -890,15 +886,15 @@ export default function Connect() {
                       setViewingProfile(null);
                       handleSwipe('right');
                     }}
-                    className="flex-1 h-12"
+                    className="flex-1 h-10"
                     style={{
                       background: DESIGN_SYSTEM.colors.primary.lavender,
                       color: DESIGN_SYSTEM.colors.background.dark,
-                      borderRadius: DESIGN_SYSTEM.borderRadius.large,
+                      borderRadius: DESIGN_SYSTEM.borderRadius.medium,
                       fontWeight: 600
                     }}
                   >
-                    <Heart className="w-5 h-5 mr-2" />
+                    <Heart className="w-4 h-4 mr-2" />
                     Like
                   </Button>
                 </div>
@@ -908,6 +904,8 @@ export default function Connect() {
         </DialogContent>
       </Dialog>
 
+      {/* Add spacing before bottom nav */}
+      <div className="mb-4"></div>
       <BottomNav />
     </div>
   );
