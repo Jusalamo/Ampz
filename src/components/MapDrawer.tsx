@@ -34,6 +34,10 @@ const DESIGN = {
     medium: '20px',
     small: '12px',
     pill: '9999px'
+  },
+  shadows: {
+    card: '0 8px 32px rgba(0, 0, 0, 0.4)',
+    button: '0 4px 16px rgba(0, 0, 0, 0.3)'
   }
 };
 
@@ -138,7 +142,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/dark-v11',
+        style: 'mapbox://styles/mapbox/streets-v12',
         center: [17.0658, -22.5609], // Windhoek
         zoom: 12,
         pitch: 45,
@@ -299,6 +303,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       <div class="rounded-[20px] shadow-2xl border overflow-hidden" style="
         background: ${DESIGN.colors.card};
         border-color: ${DESIGN.colors.primary}40;
+        box-shadow: ${DESIGN.shadows.card};
       ">
         <div class="flex items-start gap-3 p-3">
           <img 
@@ -312,7 +317,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
               <h3 class="font-bold text-[14px] line-clamp-1" style="color: ${DESIGN.colors.textPrimary}">
                 ${event.name}
               </h3>
-              <button class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 close-3d-card"
+              <button class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 close-3d-card hover:scale-110 transition-transform"
                 style="background: ${DESIGN.colors.card}; color: ${DESIGN.colors.textSecondary}; border: 1px solid ${DESIGN.colors.textSecondary}20">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -340,7 +345,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
               <span class="text-[12px] font-semibold" style="color: ${event.customTheme || DESIGN.colors.primary}">
                 ${event.price === 0 ? 'FREE' : `N$${event.price}`}
               </span>
-              <button class="h-7 px-3 text-[12px] rounded-[8px] font-medium view-event-btn"
+              <button class="h-7 px-3 text-[12px] rounded-[8px] font-medium view-event-btn hover:opacity-90 transition-opacity"
                 style="background: ${event.customTheme || DESIGN.colors.primary}; color: ${DESIGN.colors.background}">
                 View Event
               </button>
@@ -555,8 +560,11 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       />
       
       {/* Map attribution */}
-      <div className="absolute bottom-4 right-2 z-10 text-[12px] px-2 py-1 rounded"
-        style={{ color: `${DESIGN.colors.textSecondary}`, background: `${DESIGN.colors.background}40` }}>
+      <div className="absolute bottom-4 right-2 z-10 text-[12px] px-2 py-1 rounded backdrop-blur-sm"
+        style={{ 
+          color: DESIGN.colors.textPrimary,
+          background: 'rgba(0, 0, 0, 0.4)'
+        }}>
         © Mapbox © OpenStreetMap
       </div>
 
@@ -575,13 +583,17 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
           borderTopLeftRadius: DESIGN.borderRadius.large,
           borderTopRightRadius: DESIGN.borderRadius.large,
           borderTop: `1px solid ${DESIGN.colors.textSecondary}20`,
-          boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.4)'
+          boxShadow: DESIGN.shadows.card
         }}
       >
         {/* Drawer Handle - Always visible at top when drawer is up */}
         <div
           className="flex flex-col items-center pt-3 pb-2 cursor-grab active:cursor-grabbing select-none"
-          style={{ background: DESIGN.colors.background }}
+          style={{ 
+            background: DESIGN.colors.background,
+            borderTopLeftRadius: DESIGN.borderRadius.large,
+            borderTopRightRadius: DESIGN.borderRadius.large
+          }}
           role="button"
           tabIndex={0}
           aria-label={`Drawer position: ${drawerPosition}. Drag to adjust.`}
@@ -618,11 +630,11 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                   onChange={(e) => setSearch(e.target.value)}
                   onFocus={() => setShowSuggestions(true)}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  className="pl-10 h-10 rounded-[12px]"
+                  className="pl-10 h-10 rounded-[12px] border-0 focus:ring-2"
                   style={{
                     background: DESIGN.colors.card,
-                    borderColor: `${DESIGN.colors.textSecondary}30`,
-                    color: DESIGN.colors.textPrimary
+                    color: DESIGN.colors.textPrimary,
+                    boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.3)'
                   }}
                   aria-label="Search events"
                 />
@@ -632,7 +644,8 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                   <div className="absolute top-full left-0 right-0 mt-1 rounded-[12px] shadow-lg z-50 overflow-hidden"
                     style={{
                       background: DESIGN.colors.card,
-                      border: `1px solid ${DESIGN.colors.textSecondary}20`
+                      border: `1px solid ${DESIGN.colors.textSecondary}20`,
+                      boxShadow: DESIGN.shadows.card
                     }}>
                     {searchSuggestions.map(event => (
                       <motion.button
@@ -661,32 +674,36 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                 )}
               </div>
               
-              <button
+              <motion.button
                 onClick={onOpenFilters}
-                className="w-10 h-10 rounded-[12px] flex items-center justify-center hover:border-primary transition-colors"
+                className="w-10 h-10 rounded-[12px] flex items-center justify-center"
                 style={{
                   background: DESIGN.colors.card,
                   border: `1px solid ${DESIGN.colors.textSecondary}30`,
                   color: DESIGN.colors.textPrimary
                 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 aria-label="Open filters"
               >
                 <SlidersHorizontal className="w-4 h-4" />
-              </button>
+              </motion.button>
               
               {isPro && (
                 <motion.button
                   onClick={onCreateEvent}
-                  className="h-10 px-3 rounded-[12px] relative font-medium"
+                  className="h-10 px-3 rounded-[12px] relative font-medium flex items-center gap-1"
                   style={{
                     background: DESIGN.colors.primary,
-                    color: DESIGN.colors.background
+                    color: DESIGN.colors.background,
+                    boxShadow: DESIGN.shadows.button
                   }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   aria-label="Create new event"
                 >
                   <Plus className="w-4 h-4" />
+                  <span className="text-[13px]">Create</span>
                   {user?.createdEvents?.length > 0 && (
                     <span className="absolute -top-1 -right-1 text-[12px] rounded-full w-5 h-5 flex items-center justify-center"
                       style={{
@@ -713,7 +730,8 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                     selectedCategory === category
                       ? {
                           background: DESIGN.colors.primary,
-                          color: DESIGN.colors.background
+                          color: DESIGN.colors.background,
+                          boxShadow: DESIGN.shadows.button
                         }
                       : {
                           background: DESIGN.colors.card,
@@ -733,7 +751,11 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
             {/* Events List */}
             <div 
-              className="flex-1 overflow-y-auto space-y-3 pb-24 custom-scrollbar"
+              className="flex-1 overflow-y-auto space-y-3 pb-24"
+              style={{
+                scrollbarWidth: 'thin',
+                scrollbarColor: `${DESIGN.colors.primary} ${DESIGN.colors.card}`
+              }}
             >
               {filteredEvents.length > 0 ? (
                 filteredEvents.map((event) => (
@@ -746,8 +768,14 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                 ))
               ) : (
                 <div className="text-center py-12">
-                  <MapPin className="w-12 h-12 mx-auto mb-3" style={{ color: DESIGN.colors.textSecondary }} />
-                  <p className="mb-1" style={{ color: DESIGN.colors.textSecondary }}>No events found</p>
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 200 }}
+                  >
+                    <MapPin className="w-12 h-12 mx-auto mb-3" style={{ color: DESIGN.colors.textSecondary }} />
+                  </motion.div>
+                  <p className="text-[14px] mb-1" style={{ color: DESIGN.colors.textSecondary }}>No events found</p>
                   <p className="text-[13px]" style={{ color: `${DESIGN.colors.textSecondary}70` }}>
                     Try adjusting your search or filters
                   </p>
