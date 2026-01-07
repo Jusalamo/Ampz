@@ -1,57 +1,62 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Heart, RotateCcw, Sparkles, MapPin, Briefcase, Info, Zap, Lock, AlertCircle, Calendar, Users, Music } from 'lucide-react';
+import { X, Heart, RotateCcw, Sparkles, MapPin, Briefcase, Info, Zap, Lock, AlertCircle, Users, Calendar, Tag } from 'lucide-react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
 import { ConnectionProfile } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-// Design System Constants - Simplified purple theme
+// Design System Constants from JSON
 const DESIGN_SYSTEM = {
   colors: {
     primary: {
-      purple: '#8B5CF6',
-      purpleLight: '#C4B5FD',
-      purpleDark: '#7C3AED'
+      lavender: '#C4B5FD',
+      lavenderLight: '#E9D5FF',
+      lavenderDark: '#A78BFA'
     },
     background: {
-      dark: '#0F0F23',
-      card: '#1A1A2E',
-      gradient: 'linear-gradient(180deg, #0F0F23 0%, #1A1A2E 100%)'
+      dark: '#1A1A1A',
+      card: '#2D2D2D',
+      gradient: 'linear-gradient(180deg, #1A1A1A 0%, #2D2D2D 100%)'
     },
     text: {
       primary: '#FFFFFF',
-      secondary: '#B0B0D0',
-      accent: '#8B5CF6'
+      secondary: '#B8B8B8',
+      accent: '#C4B5FD'
     },
     accent: {
-      pink: '#EC4899',
-      teal: '#2DD4BF',
-      gold: '#F59E0B'
+      pink: '#FFB8E6',
+      gold: '#D4AF37',
+      goldLight: '#E8C878'
     },
     interactive: {
-      yes: '#EC4899',
+      yes: '#FFB8E6',
       no: '#4A4A4A',
-      border: '#8B5CF6'
+      border: '#C4B5FD'
     }
   },
   typography: {
     fonts: {
-      heading: "'Inter', sans-serif",
-      body: "'Inter', sans-serif"
+      heading: "'Playfair Display', 'Georgia', serif",
+      subheading: "'Poppins', 'Inter', sans-serif",
+      body: "'Inter', 'Roboto', sans-serif",
+      decorative: "'Pacifico', 'Brush Script MT', cursive"
     },
     sizes: {
-      h1: '32px',
-      h2: '24px',
-      h3: '20px',
-      body: '14px',
+      h1: '48px',
+      h2: '36px',
+      h3: '28px',
+      h4: '24px',
+      body: '16px',
+      caption: '14px',
       small: '12px'
     },
     weights: {
+      light: 300,
       regular: 400,
       medium: 500,
       semibold: 600,
@@ -59,19 +64,43 @@ const DESIGN_SYSTEM = {
     }
   },
   spacing: {
+    xs: '4px',
     sm: '8px',
     md: '16px',
     lg: '24px',
-    xl: '32px'
+    xl: '32px',
+    xxl: '48px',
+    xxxl: '64px'
   },
   borderRadius: {
+    small: '8px',
     medium: '16px',
     large: '24px',
+    xlarge: '32px',
     round: '50%'
   },
   shadows: {
-    card: '0 8px 32px rgba(139, 92, 246, 0.15)',
-    button: '0 4px 16px rgba(139, 92, 246, 0.3)'
+    card: '0 8px 32px rgba(0, 0, 0, 0.4)',
+    button: '0 4px 16px rgba(196, 181, 253, 0.3)',
+    elevated: '0 12px 48px rgba(0, 0, 0, 0.5)'
+  },
+  animations: {
+    cardSwipe: {
+      duration: '300ms',
+      easing: 'cubic-bezier(0.4, 0.0, 0.2, 1)'
+    },
+    buttonHover: {
+      duration: '200ms',
+      easing: 'ease-in-out'
+    },
+    fadeIn: {
+      duration: '400ms',
+      easing: 'ease-out'
+    },
+    slideUp: {
+      duration: '500ms',
+      easing: 'cubic-bezier(0.16, 1, 0.3, 1)'
+    }
   }
 };
 
@@ -114,12 +143,12 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
       dragElastic={0.7}
       onDrag={handleDrag}
       onDragEnd={handleDragEnd}
-      initial={{ scale: isTop ? 1 : 0.95, y: isTop ? 0 : 10 }}
+      initial={{ scale: isTop ? 1 : 0.95, y: isTop ? 0 : 20, opacity: isTop ? 1 : 0.7 }}
       animate={{ 
         scale: isTop ? 1 : 0.95, 
-        y: isTop ? 0 : 10,
-        opacity: isTop ? 1 : 0.8,
-        rotateZ: isTop ? -1.5 : 0
+        y: isTop ? 0 : 20,
+        opacity: isTop ? 1 : 0.7,
+        rotateZ: isTop ? -2 : 0
       }}
       exit={{ x: exitX, opacity: 0, rotateZ: exitX > 0 ? 15 : -15 }}
       whileDrag={{ cursor: 'grabbing' }}
@@ -130,17 +159,17 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
       transition={{ 
         type: 'spring', 
         stiffness: 300, 
-        damping: 25 
+        damping: 30 
       }}
     >
-      {/* Profile Card Container - Simplified */}
+      {/* Profile Card Container with Design System Styles */}
       <div 
-        className="w-full h-full overflow-hidden relative cursor-grab active:cursor-grabbing"
+        className="w-full h-full rounded-[24px] overflow-hidden relative"
         style={{
-          borderRadius: DESIGN_SYSTEM.borderRadius.large,
+          background: 'linear-gradient(135deg, #C4B5FD 0%, #E9D5FF 100%)',
           boxShadow: DESIGN_SYSTEM.shadows.card,
-          border: `1px solid ${DESIGN_SYSTEM.colors.primary.purple}30`,
-          background: DESIGN_SYSTEM.colors.background.card
+          border: '2px solid #D4AF37',
+          padding: '20px'
         }}
       >
         {/* Swipe Hints */}
@@ -150,13 +179,15 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
-              className="absolute top-6 left-6 z-20 px-4 py-2 rounded-xl"
+              className="absolute top-8 left-8 z-20 px-6 py-3 border-4 border-[#C4B5FD] rounded-xl rotate-[-20deg]"
               style={{
-                background: DESIGN_SYSTEM.colors.interactive.yes,
-                transform: 'rotate(-8deg)'
+                background: DESIGN_SYSTEM.colors.background.dark,
+                borderColor: DESIGN_SYSTEM.colors.interactive.border
               }}
             >
-              <span className="text-lg font-bold text-white">LIKE</span>
+              <span className="text-[32px] font-bold" style={{ color: DESIGN_SYSTEM.colors.primary.lavender }}>
+                LIKE
+              </span>
             </motion.div>
           )}
           {showHint === 'pass' && (
@@ -164,75 +195,98 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
-              className="absolute top-6 right-6 z-20 px-4 py-2 rounded-xl"
+              className="absolute top-8 right-8 z-20 px-6 py-3 border-4 border-[#4A4A4A] rounded-xl rotate-[20deg]"
               style={{
-                background: DESIGN_SYSTEM.colors.interactive.no,
-                transform: 'rotate(8deg)'
+                background: DESIGN_SYSTEM.colors.background.dark,
+                borderColor: DESIGN_SYSTEM.colors.interactive.no
               }}
             >
-              <span className="text-lg font-bold text-white">PASS</span>
+              <span className="text-[32px] font-bold" style={{ color: DESIGN_SYSTEM.colors.text.secondary }}>
+                PASS
+              </span>
             </motion.div>
           )}
         </AnimatePresence>
         
         {/* Profile Photo */}
-        <div className="relative h-[340px]">
+        <div className="relative h-[70%] mb-[16px]">
           <img
             src={profile.photo}
             alt={profile.name}
             className="w-full h-full object-cover"
+            style={{
+              borderRadius: '20px',
+              border: '3px solid #FFFFFF'
+            }}
             draggable={false}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
           
-          {/* Info Button */}
+          {/* View Profile Button */}
           <button
             onClick={(e) => {
               e.stopPropagation();
               onViewProfile();
             }}
-            className="absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center backdrop-blur-sm hover:scale-110 transition-transform"
-            style={{
-              background: 'rgba(26, 26, 46, 0.8)',
-              border: `1px solid ${DESIGN_SYSTEM.colors.primary.purple}`
-            }}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center hover:bg-black/60 transition-colors"
+            style={{ borderRadius: DESIGN_SYSTEM.borderRadius.round }}
           >
-            <Info className="w-4 h-4" style={{ color: DESIGN_SYSTEM.colors.primary.purple }} />
+            <Info className="w-5 h-5 text-white" />
           </button>
         </div>
 
-        {/* Minimal Profile Info - Only Name, Age, Gender */}
-        <div className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
+        {/* Profile Info - Simplified to just name, age, gender */}
+        <div className="text-[#1A1A1A]">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
               <h2 
-                className="text-xl font-bold mb-1"
-                style={{ 
-                  color: DESIGN_SYSTEM.colors.text.primary,
-                  fontFamily: DESIGN_SYSTEM.typography.fonts.heading
-                }}
+                className="text-[28px] font-semibold"
+                style={{ fontFamily: DESIGN_SYSTEM.typography.fonts.subheading }}
               >
-                {profile.name}, {profile.age}
+                {profile.name}
               </h2>
-              {profile.gender && (
-                <p 
-                  className="text-sm"
-                  style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
-                >
-                  {profile.gender}
-                </p>
-              )}
-            </div>
-            {profile.isPublic && (
               <span 
-                className="px-2 py-1 text-xs font-medium rounded"
+                className="text-[28px] font-normal"
+                style={{ color: DESIGN_SYSTEM.colors.background.card }}
+              >
+                {profile.age}
+              </span>
+            </div>
+            <div 
+              className="px-3 py-1.5 rounded-full text-[12px] font-medium"
+              style={{
+                background: DESIGN_SYSTEM.colors.background.dark,
+                color: DESIGN_SYSTEM.colors.text.primary
+              }}
+            >
+              {profile.gender || 'Prefer not to say'}
+            </div>
+          </div>
+          
+          {/* Tags/Interests - Simplified version */}
+          <div className="flex flex-wrap gap-2">
+            {profile.interests.slice(0, 3).map((interest) => (
+              <span
+                key={interest}
+                className="px-3 py-1.5 text-[12px] font-medium rounded-full"
                 style={{
-                  background: `${DESIGN_SYSTEM.colors.accent.teal}20`,
-                  color: DESIGN_SYSTEM.colors.accent.teal,
-                  border: `1px solid ${DESIGN_SYSTEM.colors.accent.teal}40`
+                  background: DESIGN_SYSTEM.colors.background.dark,
+                  color: DESIGN_SYSTEM.colors.text.primary,
+                  borderRadius: DESIGN_SYSTEM.borderRadius.round
                 }}
               >
-                Checked In
+                {interest}
+              </span>
+            ))}
+            {profile.interests.length > 3 && (
+              <span 
+                className="px-3 py-1.5 text-[12px] font-medium rounded-full"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: DESIGN_SYSTEM.colors.text.primary,
+                  borderRadius: DESIGN_SYSTEM.borderRadius.round
+                }}
+              >
+                +{profile.interests.length - 3}
               </span>
             )}
           </div>
@@ -244,7 +298,7 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
 
 export default function Connect() {
   const navigate = useNavigate();
-  const { connectionProfiles, user, addMatch, updateUser, tickets, isDemo, events } = useApp();
+  const { connectionProfiles, user, addMatch, updateUser, tickets, isDemo } = useApp();
   const { toast } = useToast();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [history, setHistory] = useState<number[]>([]);
@@ -256,6 +310,7 @@ export default function Connect() {
     if (isDemo) {
       return connectionProfiles;
     }
+    // In production, only show profiles from events user has tickets for
     const userEventIds = tickets.map(t => t.eventId);
     return connectionProfiles.filter(p => userEventIds.includes(p.eventId));
   }, [connectionProfiles, tickets, isDemo]);
@@ -263,17 +318,16 @@ export default function Connect() {
   const visibleProfiles = availableProfiles.slice(currentIndex, currentIndex + 2).reverse();
   const noMoreProfiles = currentIndex >= availableProfiles.length;
 
-  // Get current event info
+  // Get current event name from the current profile
   const currentProfile = availableProfiles[currentIndex];
-  const currentEvent = currentProfile?.eventId 
-    ? events.find(e => e.id === currentProfile.eventId)
-    : null;
+  const eventName = currentProfile?.eventName || 'Current Event';
 
   // Check if user has any active events to connect at
   const hasActiveEvents = isDemo || tickets.length > 0;
 
   const handleSwipe = useCallback((direction: 'left' | 'right') => {
     if (direction === 'right') {
+      // Check like limits
       if (user?.subscription.tier === 'free' && (user.likesRemaining ?? 0) <= 0) {
         toast({
           title: 'Daily Limit Reached',
@@ -285,10 +339,12 @@ export default function Connect() {
 
       const profile = availableProfiles[currentIndex];
       
+      // Deduct like for free users
       if (user?.subscription.tier === 'free') {
         updateUser({ likesRemaining: (user.likesRemaining ?? 10) - 1 });
       }
 
+      // Match logic (70% chance in demo)
       if (Math.random() > 0.7) {
         addMatch(profile);
         setMatchModal(profile);
@@ -320,26 +376,27 @@ export default function Connect() {
   if (!hasActiveEvents) {
     return (
       <div 
-        className="min-h-screen pb-nav flex flex-col"
+        className="app-container min-h-screen pb-nav"
         style={{
           background: DESIGN_SYSTEM.colors.background.gradient,
           minHeight: '100vh'
         }}
       >
-        <div className="flex-1 flex flex-col items-center justify-center px-6">
+        <div className="flex flex-col items-center justify-center min-h-[80vh] px-6">
           <div 
-            className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
+            className="w-24 h-24 rounded-full flex items-center justify-center mb-6"
             style={{
-              background: `${DESIGN_SYSTEM.colors.primary.purple}20`,
+              background: `${DESIGN_SYSTEM.colors.primary.lavender}20`,
               borderRadius: DESIGN_SYSTEM.borderRadius.round
             }}
           >
-            <Lock className="w-10 h-10" style={{ color: DESIGN_SYSTEM.colors.primary.purple }} />
+            <Lock className="w-12 h-12" style={{ color: DESIGN_SYSTEM.colors.primary.lavender }} />
           </div>
           <h2 
             className="text-2xl font-bold mb-3 text-center"
             style={{ 
               color: DESIGN_SYSTEM.colors.text.primary,
+              fontFamily: DESIGN_SYSTEM.typography.fonts.subheading
             }}
           >
             Check In to Connect
@@ -348,15 +405,17 @@ export default function Connect() {
             className="text-center mb-6 max-w-xs"
             style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
           >
-            Get tickets and check in to an event to start connecting with people!
+            To start connecting with people, you need to be checked in at an event. 
+            Get tickets and check in to see who's there!
           </p>
           <Button 
             onClick={() => navigate('/events')} 
-            className="rounded-full px-8" 
+            className="rounded-xl" 
             size="lg"
             style={{
-              background: DESIGN_SYSTEM.colors.primary.purple,
-              color: 'white',
+              background: DESIGN_SYSTEM.colors.primary.lavender,
+              color: DESIGN_SYSTEM.colors.background.dark,
+              borderRadius: DESIGN_SYSTEM.borderRadius.large
             }}
           >
             <Sparkles className="w-5 h-5 mr-2" />
@@ -370,214 +429,200 @@ export default function Connect() {
 
   return (
     <div 
-      className="min-h-screen pb-nav flex flex-col"
+      className="app-container min-h-screen pb-nav"
       style={{
         background: DESIGN_SYSTEM.colors.background.gradient,
         maxWidth: '430px',
         margin: '0 auto',
-        padding: `${DESIGN_SYSTEM.spacing.lg} ${DESIGN_SYSTEM.spacing.md}`,
-        minHeight: '100vh'
+        padding: DESIGN_SYSTEM.spacing.lg,
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column'
       }}
     >
       {/* Header with Event Name */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            {currentEvent ? (
-              <>
-                <h1 
-                  className="text-xl font-bold truncate"
-                  style={{ 
-                    color: DESIGN_SYSTEM.colors.text.primary,
-                  }}
-                >
-                  {currentEvent.name}
-                </h1>
-                <div className="flex items-center gap-2 mt-1">
-                  <Calendar className="w-3 h-3" style={{ color: DESIGN_SYSTEM.colors.primary.purple }} />
-                  <p 
-                    className="text-xs truncate"
-                    style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
-                  >
-                    {availableProfiles.length - currentIndex} people here
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <h1 
-                  className="text-xl font-bold"
-                  style={{ 
-                    color: DESIGN_SYSTEM.colors.text.primary,
-                  }}
-                >
-                  Connect
-                </h1>
-                <p 
-                  className="text-xs mt-1"
-                  style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
-                >
-                  Find people at your events
-                </p>
-              </>
-            )}
-          </div>
-          
-          {/* Likes Counter */}
-          <div 
-            className="flex items-center gap-2 px-3 py-2 rounded-full"
-            style={{
-              background: `${DESIGN_SYSTEM.colors.primary.purple}15`,
-              border: `1px solid ${DESIGN_SYSTEM.colors.primary.purple}30`
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h1 
+            className="text-[24px] font-bold mb-1"
+            style={{ 
+              color: DESIGN_SYSTEM.colors.text.primary,
+              fontFamily: DESIGN_SYSTEM.typography.fonts.heading
             }}
           >
-            <Heart className="w-4 h-4" style={{ color: DESIGN_SYSTEM.colors.primary.purple }} />
-            <span className="text-sm font-bold" style={{ color: DESIGN_SYSTEM.colors.primary.purple }}>
+            {eventName}
+          </h1>
+          <p 
+            className="text-[14px]"
+            style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+          >
+            {availableProfiles.length - currentIndex} people to discover
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Likes Counter */}
+          <div 
+            className="flex items-center gap-2 px-4 py-2 rounded-full border"
+            style={{
+              background: `linear-gradient(135deg, ${DESIGN_SYSTEM.colors.accent.pink}20 0%, ${DESIGN_SYSTEM.colors.primary.lavender}20 100%)`,
+              borderColor: `${DESIGN_SYSTEM.colors.accent.pink}30`,
+              borderRadius: DESIGN_SYSTEM.borderRadius.round
+            }}
+          >
+            <Heart className="w-4 h-4" style={{ color: DESIGN_SYSTEM.colors.accent.pink }} />
+            <span className="text-sm font-bold" style={{ color: DESIGN_SYSTEM.colors.accent.pink }}>
               {likesRemaining}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Card Stack - Fits snugly */}
-      <div className="relative flex-1 mb-4 min-h-0">
-        <div className="relative h-[400px] w-full mx-auto">
-          {noMoreProfiles ? (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="absolute inset-0 flex items-center justify-center"
-            >
-              <div className="text-center px-4">
-                <div 
-                  className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-                  style={{
-                    background: `${DESIGN_SYSTEM.colors.primary.purple}15`,
-                    borderRadius: DESIGN_SYSTEM.borderRadius.round
-                  }}
-                >
-                  <Heart className="w-10 h-10" style={{ color: DESIGN_SYSTEM.colors.primary.purple }} />
-                </div>
-                <h3 
-                  className="text-lg font-bold mb-3"
-                  style={{ 
-                    color: DESIGN_SYSTEM.colors.text.primary,
-                  }}
-                >
-                  That's Everyone!
-                </h3>
-                <p 
-                  className="text-sm mb-6"
-                  style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
-                >
-                  Check back later or attend more events
-                </p>
-                <Button 
-                  onClick={() => navigate('/events')} 
-                  variant="outline" 
-                  className="rounded-full px-6"
-                  style={{
-                    borderColor: DESIGN_SYSTEM.colors.primary.purple,
-                    color: DESIGN_SYSTEM.colors.primary.purple,
-                  }}
-                >
-                  Find Events
-                </Button>
+      {/* Card Stack - Optimized height to fit screen */}
+      <div className="relative flex-1 min-h-[400px] max-h-[460px] w-full mx-auto mb-4">
+        {noMoreProfiles ? (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute inset-0 flex items-center justify-center"
+          >
+            <div className="text-center px-4">
+              <div 
+                className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"
+                style={{
+                  background: `${DESIGN_SYSTEM.colors.primary.lavender}20`,
+                  borderRadius: DESIGN_SYSTEM.borderRadius.round
+                }}
+              >
+                <Heart className="w-12 h-12" style={{ color: DESIGN_SYSTEM.colors.primary.lavender }} />
               </div>
-            </motion.div>
-          ) : (
-            <AnimatePresence mode="popLayout">
-              {visibleProfiles.map((profile, index) => (
-                <ProfileCard
-                  key={profile.id}
-                  profile={profile}
-                  onSwipe={handleSwipe}
-                  isTop={index === visibleProfiles.length - 1}
-                  onViewProfile={() => setViewingProfile(profile)}
-                />
-              ))}
-            </AnimatePresence>
-          )}
-        </div>
+              <h3 
+                className="text-[28px] font-bold mb-3"
+                style={{ 
+                  color: DESIGN_SYSTEM.colors.text.primary,
+                  fontFamily: DESIGN_SYSTEM.typography.fonts.heading
+                }}
+              >
+                That's Everyone!
+              </h3>
+              <p 
+                className="text-sm mb-6"
+                style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+              >
+                Check back later for more connections, or attend more events to meet new people.
+              </p>
+              <Button 
+                onClick={() => navigate('/events')} 
+                variant="outline" 
+                className="rounded-xl"
+                style={{
+                  borderColor: DESIGN_SYSTEM.colors.primary.lavender,
+                  color: DESIGN_SYSTEM.colors.primary.lavender,
+                  borderRadius: DESIGN_SYSTEM.borderRadius.large
+                }}
+              >
+                Find More Events
+              </Button>
+            </div>
+          </motion.div>
+        ) : (
+          <AnimatePresence mode="popLayout">
+            {visibleProfiles.map((profile, index) => (
+              <ProfileCard
+                key={profile.id}
+                profile={profile}
+                onSwipe={handleSwipe}
+                isTop={index === visibleProfiles.length - 1}
+                onViewProfile={() => setViewingProfile(profile)}
+              />
+            ))}
+          </AnimatePresence>
+        )}
       </div>
 
-      {/* Action Buttons */}
-      {!noMoreProfiles && (
-        <div className="flex justify-center items-center gap-6 mb-2">
-          {/* Pass Button */}
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => handleSwipe('left')}
-            className="flex items-center justify-center"
-            style={{
-              width: '64px',
-              height: '64px',
-              background: DESIGN_SYSTEM.colors.interactive.no,
-              color: DESIGN_SYSTEM.colors.text.primary,
-              borderRadius: DESIGN_SYSTEM.borderRadius.round,
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
-            }}
-          >
-            <X className="w-6 h-6" />
-          </motion.button>
+      {/* Action Buttons - Fixed at bottom */}
+      <div className="pt-4">
+        {!noMoreProfiles && (
+          <>
+            <div className="flex justify-center items-center gap-6 mb-3">
+              {/* Pass Button */}
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => handleSwipe('left')}
+                className="flex items-center justify-center shadow-lg transition-all"
+                style={{
+                  width: '72px',
+                  height: '72px',
+                  background: DESIGN_SYSTEM.colors.interactive.no,
+                  color: DESIGN_SYSTEM.colors.text.primary,
+                  borderRadius: DESIGN_SYSTEM.borderRadius.round,
+                  boxShadow: DESIGN_SYSTEM.shadows.button
+                }}
+              >
+                <X className="w-8 h-8" />
+              </motion.button>
 
-          {/* Undo Button */}
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleUndo}
-            disabled={history.length === 0}
-            className={cn(
-              "flex items-center justify-center",
-              history.length === 0 && "opacity-30 cursor-not-allowed"
-            )}
-            style={{
-              width: '48px',
-              height: '48px',
-              background: 'transparent',
-              color: DESIGN_SYSTEM.colors.text.secondary,
-              borderRadius: DESIGN_SYSTEM.borderRadius.round,
-              border: `2px solid ${DESIGN_SYSTEM.colors.text.secondary}`
-            }}
-          >
-            <RotateCcw className="w-4 h-4" />
-          </motion.button>
+              {/* Undo Button */}
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleUndo}
+                disabled={history.length === 0}
+                className={cn(
+                  "flex items-center justify-center shadow-lg transition-all",
+                  history.length === 0 && "opacity-30 cursor-not-allowed"
+                )}
+                style={{
+                  width: '56px',
+                  height: '56px',
+                  background: 'transparent',
+                  color: DESIGN_SYSTEM.colors.text.secondary,
+                  borderRadius: DESIGN_SYSTEM.borderRadius.round,
+                  border: `2px solid ${DESIGN_SYSTEM.colors.text.secondary}`
+                }}
+              >
+                <RotateCcw className="w-5 h-5" />
+              </motion.button>
 
-          {/* Like Button */}
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => handleSwipe('right')}
-            className="flex items-center justify-center"
-            style={{
-              width: '64px',
-              height: '64px',
-              background: DESIGN_SYSTEM.colors.interactive.yes,
-              color: 'white',
-              borderRadius: DESIGN_SYSTEM.borderRadius.round,
-              boxShadow: `0 4px 16px ${DESIGN_SYSTEM.colors.interactive.yes}40`
-            }}
-          >
-            <Heart className="w-6 h-6" />
-          </motion.button>
-        </div>
-      )}
+              {/* Like Button */}
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => handleSwipe('right')}
+                className="flex items-center justify-center shadow-xl transition-all"
+                style={{
+                  width: '72px',
+                  height: '72px',
+                  background: DESIGN_SYSTEM.colors.interactive.yes,
+                  color: DESIGN_SYSTEM.colors.background.dark,
+                  borderRadius: DESIGN_SYSTEM.borderRadius.round,
+                  boxShadow: `0 4px 16px ${DESIGN_SYSTEM.colors.accent.pink}40`,
+                  fontWeight: 600,
+                  fontSize: '18px'
+                }}
+              >
+                <Heart className="w-8 h-8" />
+              </motion.button>
+            </div>
 
-      {/* Maybe Later Button */}
-      {!noMoreProfiles && (
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="mx-auto block mt-2 text-sm font-medium"
-          style={{
-            background: 'transparent',
-            color: DESIGN_SYSTEM.colors.text.secondary,
-          }}
-        >
-          Maybe later
-        </motion.button>
-      )}
+            {/* Umm Button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="mx-auto block"
+              style={{
+                background: 'transparent',
+                color: DESIGN_SYSTEM.colors.text.secondary,
+                fontSize: '14px',
+                fontStyle: 'italic',
+                border: 'none'
+              }}
+            >
+              Maybe Later
+            </motion.button>
+          </>
+        )}
+      </div>
 
       {/* Match Modal */}
       <Dialog open={!!matchModal} onOpenChange={() => setMatchModal(null)}>
@@ -585,19 +630,28 @@ export default function Connect() {
           className="text-center p-0 overflow-hidden border-0"
           style={{
             background: DESIGN_SYSTEM.colors.background.card,
-            maxWidth: '320px',
-            borderRadius: DESIGN_SYSTEM.borderRadius.large,
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4)'
+            maxWidth: '350px',
+            borderRadius: DESIGN_SYSTEM.borderRadius.xlarge,
+            boxShadow: DESIGN_SYSTEM.shadows.elevated,
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)'
           }}
         >
-          <div className="py-6 px-5">
-            <div className="relative w-24 h-24 mx-auto mb-4">
+          <motion.div 
+            className="py-8 px-6"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+          >
+            <div className="relative w-28 h-28 mx-auto mb-6">
               <motion.div 
                 className="absolute inset-0 rounded-full"
                 style={{
-                  background: `linear-gradient(135deg, ${DESIGN_SYSTEM.colors.interactive.yes} 0%, ${DESIGN_SYSTEM.colors.primary.purple} 100%)`
+                  background: `linear-gradient(135deg, ${DESIGN_SYSTEM.colors.accent.pink} 0%, ${DESIGN_SYSTEM.colors.primary.lavender} 100%)`
                 }}
-                animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.1, 0.3] }}
+                animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0.2, 0.5] }}
                 transition={{ duration: 2, repeat: Infinity }}
               />
               <img
@@ -606,33 +660,60 @@ export default function Connect() {
                 className="w-full h-full rounded-full object-cover border-4 relative z-10"
                 style={{
                   borderColor: DESIGN_SYSTEM.colors.background.card,
+                  borderRadius: DESIGN_SYSTEM.borderRadius.round
                 }}
               />
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2, type: 'spring' }}
+                className="absolute -top-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center z-20 border-4"
+                style={{
+                  background: DESIGN_SYSTEM.colors.accent.gold,
+                  borderColor: DESIGN_SYSTEM.colors.background.card,
+                  borderRadius: DESIGN_SYSTEM.borderRadius.round
+                }}
+              >
+                <Heart className="w-5 h-5 text-white fill-white" />
+              </motion.div>
             </div>
             
-            <h2 
-              className="text-xl font-bold mb-2"
+            <motion.h2 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="text-[32px] font-bold mb-2"
               style={{ 
-                color: DESIGN_SYSTEM.colors.text.primary,
+                fontFamily: DESIGN_SYSTEM.typography.fonts.decorative,
+                color: DESIGN_SYSTEM.colors.text.primary
               }}
             >
               It's a Match!
-            </h2>
-            <p 
-              className="text-sm mb-6"
+            </motion.h2>
+            <motion.p 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="mb-6"
               style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
             >
               You and {matchModal?.name} liked each other
-            </p>
+            </motion.p>
             
-            <div className="flex gap-3">
+            <motion.div 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="flex gap-3"
+            >
               <Button
                 variant="outline"
                 onClick={() => setMatchModal(null)}
-                className="flex-1 h-11 text-sm"
+                className="flex-1 h-12"
                 style={{
-                  borderColor: DESIGN_SYSTEM.colors.primary.purple,
-                  color: DESIGN_SYSTEM.colors.primary.purple,
+                  borderRadius: DESIGN_SYSTEM.borderRadius.large,
+                  borderColor: DESIGN_SYSTEM.colors.primary.lavender,
+                  color: DESIGN_SYSTEM.colors.primary.lavender
                 }}
               >
                 Keep Swiping
@@ -642,167 +723,152 @@ export default function Connect() {
                   setMatchModal(null);
                   navigate('/matches');
                 }}
-                className="flex-1 h-11 text-sm"
+                className="flex-1 h-12"
                 style={{
-                  background: DESIGN_SYSTEM.colors.primary.purple,
-                  color: 'white',
+                  background: DESIGN_SYSTEM.colors.primary.lavender,
+                  color: DESIGN_SYSTEM.colors.background.dark,
+                  borderRadius: DESIGN_SYSTEM.borderRadius.large,
+                  fontWeight: 600
                 }}
               >
                 Send Message
               </Button>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         </DialogContent>
       </Dialog>
 
-      {/* Profile Details Modal - Fixed layout */}
+      {/* Profile Info Modal - Fixed positioning and layout */}
       <Dialog open={!!viewingProfile} onOpenChange={() => setViewingProfile(null)}>
         <DialogContent 
           className="p-0 overflow-hidden max-h-[85vh]"
           style={{
             background: DESIGN_SYSTEM.colors.background.card,
-            maxWidth: '380px',
-            borderRadius: DESIGN_SYSTEM.borderRadius.large,
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4)',
-            border: `1px solid ${DESIGN_SYSTEM.colors.primary.purple}20`
+            maxWidth: '400px',
+            borderRadius: DESIGN_SYSTEM.borderRadius.xlarge,
+            boxShadow: DESIGN_SYSTEM.shadows.elevated,
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            overflowY: 'auto'
           }}
         >
           {viewingProfile && (
-            <div className="flex flex-col h-full">
-              {/* Header with close button */}
-              <div className="flex justify-end p-4">
-                <button
-                  onClick={() => setViewingProfile(null)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors"
+            <div className="relative">
+              {/* Close Button */}
+              <DialogClose className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center hover:bg-black/60 transition-colors">
+                <X className="w-5 h-5 text-white" />
+              </DialogClose>
+              
+              <div className="relative h-64">
+                <img
+                  src={viewingProfile.photo}
+                  alt={viewingProfile.name}
+                  className="w-full h-full object-cover"
+                />
+                <div 
+                  className="absolute inset-0"
                   style={{
-                    background: 'rgba(255, 255, 255, 0.05)'
+                    background: 'linear-gradient(to top, rgba(45, 45, 45, 0.95) 0%, rgba(45, 45, 45, 0.5) 30%, transparent 70%)'
                   }}
-                >
-                  <X className="w-4 h-4" style={{ color: DESIGN_SYSTEM.colors.text.secondary }} />
-                </button>
+                />
+                <div className="absolute bottom-6 left-6 right-6">
+                  <h2 
+                    className="text-[32px] font-bold mb-1"
+                    style={{ 
+                      color: DESIGN_SYSTEM.colors.text.primary,
+                      fontFamily: DESIGN_SYSTEM.typography.fonts.subheading
+                    }}
+                  >
+                    {viewingProfile.name}, {viewingProfile.age}
+                  </h2>
+                  {viewingProfile.gender && (
+                    <p 
+                      className="text-[16px] mb-2"
+                      style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+                    >
+                      {viewingProfile.gender}
+                    </p>
+                  )}
+                  {viewingProfile.occupation && (
+                    <p 
+                      className="text-[16px] flex items-center gap-2"
+                      style={{ color: DESIGN_SYSTEM.colors.primary.lavender }}
+                    >
+                      <Briefcase className="w-4 h-4" />
+                      {viewingProfile.occupation}
+                    </p>
+                  )}
+                </div>
               </div>
               
-              {/* Scrollable content */}
-              <div className="flex-1 overflow-y-auto px-5 pb-5">
-                {/* Profile Image */}
-                <div className="relative mb-6">
-                  <img
-                    src={viewingProfile.photo}
-                    alt={viewingProfile.name}
-                    className="w-full h-64 object-cover rounded-2xl"
-                    style={{
-                      borderRadius: DESIGN_SYSTEM.borderRadius.large,
-                    }}
-                  />
-                  <div 
-                    className="absolute inset-0 rounded-2xl"
-                    style={{
-                      background: 'linear-gradient(to top, rgba(26, 26, 46, 0.9) 0%, transparent 40%)'
-                    }}
-                  />
-                  <div className="absolute bottom-4 left-4">
-                    <h2 
-                      className="text-2xl font-bold text-white"
+              <div className="p-6 space-y-6">
+                {/* Bio Section */}
+                {viewingProfile.bio && (
+                  <div>
+                    <h3 
+                      className="text-sm font-semibold mb-2"
+                      style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+                    >
+                      About
+                    </h3>
+                    <p 
+                      className="text-sm"
                       style={{ 
-                        fontFamily: DESIGN_SYSTEM.typography.fonts.heading
+                        color: DESIGN_SYSTEM.colors.text.secondary,
+                        lineHeight: 1.8
                       }}
                     >
-                      {viewingProfile.name}, {viewingProfile.age}
-                    </h2>
-                    {viewingProfile.gender && (
-                      <p className="text-white/80">
-                        {viewingProfile.gender}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Details Sections */}
-                <div className="space-y-6">
-                  {/* Occupation */}
-                  {viewingProfile.occupation && (
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Briefcase className="w-4 h-4" style={{ color: DESIGN_SYSTEM.colors.primary.purple }} />
-                        <h3 
-                          className="text-sm font-semibold"
-                          style={{ color: DESIGN_SYSTEM.colors.text.primary }}
-                        >
-                          Occupation
-                        </h3>
-                      </div>
-                      <p style={{ color: DESIGN_SYSTEM.colors.text.secondary }}>
-                        {viewingProfile.occupation}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Location */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <MapPin className="w-4 h-4" style={{ color: DESIGN_SYSTEM.colors.primary.purple }} />
-                      <h3 
-                        className="text-sm font-semibold"
-                        style={{ color: DESIGN_SYSTEM.colors.text.primary }}
-                      >
-                        Location
-                      </h3>
-                    </div>
-                    <p style={{ color: DESIGN_SYSTEM.colors.text.secondary }}>
-                      {viewingProfile.location}
+                      {viewingProfile.bio}
                     </p>
                   </div>
+                )}
 
-                  {/* Bio */}
-                  {viewingProfile.bio && (
-                    <div>
-                      <h3 
-                        className="text-sm font-semibold mb-2"
-                        style={{ color: DESIGN_SYSTEM.colors.text.primary }}
-                      >
-                        About
-                      </h3>
-                      <p 
-                        className="text-sm leading-relaxed"
-                        style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
-                      >
-                        {viewingProfile.bio}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Interests */}
-                  {viewingProfile.interests && viewingProfile.interests.length > 0 && (
-                    <div>
-                      <h3 
-                        className="text-sm font-semibold mb-3"
-                        style={{ color: DESIGN_SYSTEM.colors.text.primary }}
-                      >
-                        Interests
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {viewingProfile.interests.map((interest) => (
-                          <span
-                            key={interest}
-                            className="px-3 py-1.5 text-xs font-medium rounded-full"
-                            style={{
-                              background: `${DESIGN_SYSTEM.colors.primary.purple}15`,
-                              color: DESIGN_SYSTEM.colors.primary.purple,
-                              border: `1px solid ${DESIGN_SYSTEM.colors.primary.purple}30`
-                            }}
-                          >
-                            {interest}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                {/* Location Section */}
+                <div>
+                  <h3 
+                    className="text-sm font-semibold mb-2"
+                    style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+                  >
+                    Location
+                  </h3>
+                  <p 
+                    className="text-sm flex items-center gap-2"
+                    style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+                  >
+                    <MapPin className="w-4 h-4" style={{ color: DESIGN_SYSTEM.colors.primary.lavender }} />
+                    {viewingProfile.location}
+                  </p>
                 </div>
-              </div>
-
-              {/* Action Buttons - Fixed at bottom */}
-              <div className="p-5 border-t" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-                <div className="flex gap-3">
+                
+                {/* Interests Section */}
+                <div>
+                  <h3 
+                    className="text-sm font-semibold mb-2"
+                    style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+                  >
+                    Interests
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {viewingProfile.interests.map((interest) => (
+                      <span
+                        key={interest}
+                        className="px-3 py-1.5 text-xs font-medium rounded-full"
+                        style={{
+                          background: `${DESIGN_SYSTEM.colors.primary.lavender}20`,
+                          color: DESIGN_SYSTEM.colors.primary.lavender,
+                          borderRadius: DESIGN_SYSTEM.borderRadius.small
+                        }}
+                      >
+                        {interest}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4">
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -811,8 +877,9 @@ export default function Connect() {
                     }}
                     className="flex-1 h-12"
                     style={{
+                      borderRadius: DESIGN_SYSTEM.borderRadius.large,
                       borderColor: DESIGN_SYSTEM.colors.interactive.no,
-                      color: DESIGN_SYSTEM.colors.text.primary,
+                      color: DESIGN_SYSTEM.colors.text.primary
                     }}
                   >
                     <X className="w-5 h-5 mr-2" />
@@ -825,8 +892,10 @@ export default function Connect() {
                     }}
                     className="flex-1 h-12"
                     style={{
-                      background: DESIGN_SYSTEM.colors.primary.purple,
-                      color: 'white',
+                      background: DESIGN_SYSTEM.colors.primary.lavender,
+                      color: DESIGN_SYSTEM.colors.background.dark,
+                      borderRadius: DESIGN_SYSTEM.borderRadius.large,
+                      fontWeight: 600
                     }}
                   >
                     <Heart className="w-5 h-5 mr-2" />
