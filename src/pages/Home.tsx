@@ -37,6 +37,27 @@ const DESIGN = {
   }
 };
 
+// Theme colors for different event categories
+const EVENT_THEMES = {
+  music: '#C4B5FD', // Purple
+  art: '#FFB8E6',   // Pink
+  tech: '#60A5FA',  // Blue
+  food: '#34D399',  // Green
+  sports: '#F87171', // Red
+  default: '#C4B5FD' // Primary
+};
+
+// Get theme color for event category
+const getEventTheme = (category = '') => {
+  const cat = category.toLowerCase();
+  if (cat.includes('music') || cat.includes('concert')) return EVENT_THEMES.music;
+  if (cat.includes('art') || cat.includes('exhibit')) return EVENT_THEMES.art;
+  if (cat.includes('tech') || cat.includes('workshop')) return EVENT_THEMES.tech;
+  if (cat.includes('food') || cat.includes('dining')) return EVENT_THEMES.food;
+  if (cat.includes('sports') || cat.includes('fitness')) return EVENT_THEMES.sports;
+  return EVENT_THEMES.default;
+};
+
 export default function Home() {
   const navigate = useNavigate();
   const { user, events, unreadNotificationsCount } = useApp();
@@ -126,13 +147,18 @@ export default function Home() {
     }
   };
 
+  const handleQrScan = () => {
+    // Only request camera access when the modal opens
+    setShowCheckIn(true);
+  };
+
   // Quick actions in 2x2 grid
   const quickActions = [
     { 
       icon: QrCode, 
       label: 'QR Scan', 
       color: 'bg-purple-500', 
-      onClick: () => setShowCheckIn(true),
+      onClick: handleQrScan,
       pro: false
     },
     { 
@@ -187,22 +213,13 @@ export default function Home() {
   const itemsPerSlide = 2;
   const totalMyEventsSlides = Math.ceil(myEvents.length / itemsPerSlide);
 
-  // Handle my events carousel navigation
+  // Calculate my events carousel navigation
   const handleMyEventsPrev = () => {
     setMyEventsIndex(prev => (prev - 1 + totalMyEventsSlides) % totalMyEventsSlides);
   };
 
   const handleMyEventsNext = () => {
     setMyEventsIndex(prev => (prev + 1) % totalMyEventsSlides);
-  };
-
-  // Handle featured events navigation
-  const handleFeaturedPrev = () => {
-    setFeaturedIndex(prev => (prev - 1 + featuredEvents.length) % featuredEvents.length);
-  };
-
-  const handleFeaturedNext = () => {
-    setFeaturedIndex(prev => (prev + 1) % featuredEvents.length);
   };
 
   return (
@@ -557,7 +574,7 @@ export default function Home() {
           </section>
         )}
 
-        {/* Featured Events - Carousel (Reduced size by 5%) */}
+        {/* Featured Events - Carousel with Illuminated Border */}
         {featuredEvents.length > 0 ? (
           <section className="mb-6">
             <div className="flex items-center justify-between mb-4">
@@ -581,94 +598,176 @@ export default function Home() {
                 className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar"
                 style={{ scrollBehavior: 'smooth' }}
               >
-                {featuredEvents.map((event) => (
-                  <div 
-                    key={event.id} 
-                    className="flex-shrink-0 w-full snap-start px-1"
-                  >
-                    {/* Reduced card size by 5% (scaled down) */}
+                {featuredEvents.map((event) => {
+                  const themeColor = getEventTheme(event.category);
+                  
+                  return (
                     <div 
-                      className="transition-all cursor-pointer active:scale-98"
-                      style={{ 
-                        background: DESIGN.colors.card,
-                        border: `1px solid ${DESIGN.colors.textSecondary}20`,
-                        borderRadius: DESIGN.borderRadius.card,
-                        transform: 'scale(0.95)',
-                        transformOrigin: 'center'
-                      }}
-                      onClick={() => navigate(`/event/${event.id}`)}
+                      key={event.id} 
+                      className="flex-shrink-0 w-full snap-start px-1"
                     >
-                      {/* Featured Event Image - Adjusted for reduced size */}
-                      <div className="relative h-44">
-                        <img 
-                          src={event.coverImage} 
-                          alt={event.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.src = '/default-event.jpg';
+                      {/* Featured Event Card with Illuminated Border and Pointed Top Corners */}
+                      <div className="relative">
+                        {/* Illuminated Border Effect */}
+                        <div 
+                          className="absolute inset-0 rounded-[28px] animate-pulse"
+                          style={{
+                            background: `linear-gradient(90deg, transparent, ${themeColor}40, transparent)`,
+                            filter: 'blur(12px)',
+                            zIndex: 0,
+                            margin: '-2px'
                           }}
                         />
-                        <div className="absolute top-3 right-3">
-                          <div 
-                            className="w-10 h-10 rounded-full flex items-center justify-center"
-                            style={{ 
-                              background: 'rgba(251, 191, 36, 0.9)',
-                              backdropFilter: 'blur(4px)'
-                            }}
-                          >
-                            <Star className="w-5 h-5 text-black fill-black" />
-                          </div>
-                        </div>
+                        
+                        {/* Inner Glow Effect */}
                         <div 
-                          className="absolute bottom-3 left-3 text-white text-sm px-3 py-1 rounded"
-                          style={{ background: 'rgba(0, 0, 0, 0.7)' }}
+                          className="absolute inset-0 rounded-[26px]"
+                          style={{
+                            boxShadow: `0 0 30px ${themeColor}40, inset 0 0 20px ${themeColor}20`,
+                            zIndex: 1,
+                            margin: '1px',
+                            pointerEvents: 'none'
+                          }}
+                        />
+
+                        {/* Main Card Container */}
+                        <div 
+                          className="relative transition-all cursor-pointer active:scale-98 z-10"
+                          style={{ 
+                            background: DESIGN.colors.card,
+                            border: `1px solid ${DESIGN.colors.textSecondary}20`,
+                            borderRadius: '24px',
+                            transform: 'scale(0.95)',
+                            transformOrigin: 'center',
+                            overflow: 'hidden'
+                          }}
+                          onClick={() => navigate(`/event/${event.id}`)}
                         >
-                          {event.attendees || 0} going
-                        </div>
-                      </div>
-                      
-                      {/* Event Details - Adjusted padding for reduced size */}
-                      <div className="p-3">
-                        <div className="flex items-start justify-between mb-2">
-                          <h3 className="text-base font-bold line-clamp-1">{event.name}</h3>
-                          <span className="text-sm font-semibold">
-                            {event.price === 0 ? 'FREE' : `N$${event.price}`}
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 mb-2">
-                          <span 
-                            className="px-2 py-1 text-xs font-medium rounded"
-                            style={{ 
-                              background: `${DESIGN.colors.primary}10`,
-                              color: DESIGN.colors.primary
-                            }}
-                          >
-                            {event.category || 'Event'}
-                          </span>
-                          <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                            {event.date || 'TBA'} • {event.time || 'TBA'}
-                          </span>
-                        </div>
-                        
-                        <p className="text-xs line-clamp-2 mb-2" style={{ color: DESIGN.colors.textSecondary }}>
-                          {event.description || 'Join this amazing event!'}
-                        </p>
-                        
-                        {/* Location only */}
-                        <div className="flex items-center gap-2 pt-2" style={{ borderTop: `1px solid ${DESIGN.colors.textSecondary}20` }}>
-                          <Map className="w-3 h-3" style={{ color: DESIGN.colors.textSecondary }} />
-                          <span className="text-xs line-clamp-1" style={{ color: DESIGN.colors.textSecondary }}>
-                            {event.location || 'Location not specified'}
-                          </span>
+                          {/* Event Image Container with Pointed Top Corners */}
+                          <div className="relative">
+                            {/* Pointed Top Corners Overlay */}
+                            <div className="absolute inset-0 z-10 pointer-events-none">
+                              <div 
+                                className="absolute top-0 left-0 w-12 h-12"
+                                style={{
+                                  background: 'linear-gradient(135deg, transparent 50%, DESIGN.colors.card 50%)',
+                                  clipPath: 'polygon(0 0, 100% 0, 0 100%)',
+                                  opacity: 0.9
+                                }}
+                              />
+                              <div 
+                                className="absolute top-0 right-0 w-12 h-12"
+                                style={{
+                                  background: 'linear-gradient(225deg, transparent 50%, DESIGN.colors.card 50%)',
+                                  clipPath: 'polygon(100% 0, 0 0, 100% 100%)',
+                                  opacity: 0.9
+                                }}
+                              />
+                            </div>
+
+                            {/* Event Image with Pointed Top Corners */}
+                            <div 
+                              className="relative h-44 overflow-hidden"
+                              style={{
+                                clipPath: 'polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%, 0 12px)'
+                              }}
+                            >
+                              <img 
+                                src={event.coverImage} 
+                                alt={event.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.src = '/default-event.jpg';
+                                }}
+                              />
+                              
+                              {/* Theme-colored overlay gradient */}
+                              <div 
+                                className="absolute inset-0"
+                                style={{
+                                  background: `linear-gradient(to bottom, ${themeColor}20 0%, transparent 100%)`
+                                }}
+                              />
+                              
+                              {/* Star Badge */}
+                              <div className="absolute top-3 right-3">
+                                <div 
+                                  className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"
+                                  style={{ 
+                                    background: 'rgba(251, 191, 36, 0.9)',
+                                    boxShadow: '0 4px 12px rgba(251, 191, 36, 0.4)'
+                                  }}
+                                >
+                                  <Star className="w-5 h-5 text-black fill-black" />
+                                </div>
+                              </div>
+                              
+                              {/* Attendees Count */}
+                              <div 
+                                className="absolute bottom-3 left-3 text-white text-sm px-3 py-1.5 rounded-lg backdrop-blur-sm"
+                                style={{ 
+                                  background: 'rgba(0, 0, 0, 0.7)',
+                                  border: `1px solid ${themeColor}40`
+                                }}
+                              >
+                                {event.attendees || 0} going
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Event Details */}
+                          <div className="p-3">
+                            <div className="flex items-start justify-between mb-2">
+                              <h3 className="text-base font-bold line-clamp-1">{event.name}</h3>
+                              <span className="text-sm font-semibold">
+                                {event.price === 0 ? 'FREE' : `N$${event.price}`}
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 mb-2">
+                              <span 
+                                className="px-2 py-1 text-xs font-medium rounded"
+                                style={{ 
+                                  background: `${themeColor}20`,
+                                  color: themeColor,
+                                  border: `1px solid ${themeColor}40`
+                                }}
+                              >
+                                {event.category || 'Event'}
+                              </span>
+                              <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                                {event.date || 'TBA'} • {event.time || 'TBA'}
+                              </span>
+                            </div>
+                            
+                            <p className="text-xs line-clamp-2 mb-2" style={{ color: DESIGN.colors.textSecondary }}>
+                              {event.description || 'Join this amazing event!'}
+                            </p>
+                            
+                            {/* Location with theme color accent */}
+                            <div className="flex items-center gap-2 pt-2" style={{ borderTop: `1px solid ${DESIGN.colors.textSecondary}20` }}>
+                              <div 
+                                className="w-6 h-6 rounded-full flex items-center justify-center"
+                                style={{ 
+                                  background: `${themeColor}20`,
+                                  border: `1px solid ${themeColor}40`
+                                }}
+                              >
+                                <Map className="w-3 h-3" style={{ color: themeColor }} />
+                              </div>
+                              <span className="text-xs line-clamp-1" style={{ color: DESIGN.colors.textSecondary }}>
+                                {event.location || 'Location not specified'}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
-              {/* Featured Events Navigation - Removed arrows, kept pills */}
+              {/* Featured Events Navigation - Carousel pills only */}
               {featuredEvents.length > 1 && (
                 <div className="flex justify-center gap-1.5 mt-4">
                   {featuredEvents.map((_, index) => (
@@ -722,7 +821,11 @@ export default function Home() {
       <BottomNav />
 
       {/* Modals */}
-      <CheckInModal isOpen={showCheckIn} onClose={() => setShowCheckIn(false)} />
+      <CheckInModal 
+        isOpen={showCheckIn} 
+        onClose={() => setShowCheckIn(false)} 
+        requestCameraOnOpen={true} // Only request camera when modal opens
+      />
       <TicketsModal isOpen={showTickets} onClose={() => setShowTickets(false)} />
       <EventWizardModal isOpen={showEventWizard} onClose={() => setShowEventWizard(false)} />
       <SubscriptionModal isOpen={showSubscription} onClose={() => setShowSubscription(false)} />
