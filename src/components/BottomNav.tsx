@@ -1,4 +1,4 @@
-import { Home, Calendar, Zap, Send, User } from 'lucide-react';
+import { Home, Calendar, Zap, Send, User, Bell } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/contexts/AppContext';
@@ -13,7 +13,7 @@ const navItems = [
 
 export function BottomNav() {
   const location = useLocation();
-  const { matches } = useApp();
+  const { matches, unreadNotificationsCount } = useApp();
   const unreadMessagesCount = matches.filter(m => m.unread).length;
 
   return (
@@ -23,10 +23,10 @@ export function BottomNav() {
           (path === '/home' && location.pathname.startsWith('/home')) ||
           (path === '/events' && location.pathname.startsWith('/events')) ||
           (path === '/connect' && location.pathname.startsWith('/connect')) ||
-          (path === '/matches' && location.pathname.startsWith('/matches')) ||
+          (path === '/matches' && (location.pathname.startsWith('/matches') || location.pathname.startsWith('/chats'))) ||
           (path === '/profile' && location.pathname.startsWith('/profile'));
         
-        const isMatches = path === '/matches';
+        const isChats = path === '/matches';
         
         return (
           <Link
@@ -46,8 +46,8 @@ export function BottomNav() {
                 strokeWidth={isActive ? 2.5 : 2}
               />
               
-              {isMatches && unreadMessagesCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-brand-purple rounded-full text-[10px] font-bold flex items-center justify-center text-white border border-background">
+              {isChats && unreadMessagesCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full text-[10px] font-bold flex items-center justify-center text-primary-foreground border border-background">
                   {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
                 </span>
               )}
