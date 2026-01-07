@@ -70,7 +70,7 @@ export default function EventDetail() {
   );
 
   const descriptionTruncated = useMemo(() => 
-    event?.description.length > 150 ?? false, 
+    (event?.description?.length ?? 0) > 150, 
     [event]
   );
 

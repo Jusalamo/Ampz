@@ -117,7 +117,6 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         bearing: -17.6,
         antialias: true,
         attributionControl: false,
-        optimizeForTerrain: true,
       });
 
       // Hide map loading tiles
@@ -156,29 +155,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         }
       });
 
-      // Track user location updates
-      map.current.on('locationfound', (e) => {
-        const { lng, lat } = e.coords;
-        
-        // Remove existing user marker
-        if (userMarkerRef.current) {
-          userMarkerRef.current.remove();
-        }
-
-        // Create new user marker
-        const userMarkerEl = document.createElement('div');
-        userMarkerEl.className = 'user-marker';
-        userMarkerEl.innerHTML = `
-          <div class="relative">
-            <div class="w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg"></div>
-            <div class="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 w-12 h-6 bg-blue-500/10 rounded-full blur-sm"></div>
-          </div>
-        `;
-
-        userMarkerRef.current = new mapboxgl.Marker(userMarkerEl)
-          .setLngLat([lng, lat])
-          .addTo(map.current!);
-      });
+      // Note: Mapbox uses geolocate control for user location tracking
 
     } catch (error) {
       console.error('Failed to initialize map:', error);
@@ -697,71 +674,6 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         )}
       </div>
 
-      {/* Custom CSS for 3D cards and scrollbars */}
-      <style jsx global>{`
-        .event-card-3d {
-          pointer-events: auto;
-          animation: float-up 0.3s ease-out;
-        }
-        
-        .event-card-3d .close-3d-card:hover {
-          background-color: rgba(0, 0, 0, 0.1);
-        }
-        
-        .event-card-3d .view-event-btn:hover {
-          opacity: 0.9;
-        }
-        
-        @keyframes float-up {
-          from {
-            opacity: 0;
-            transform: translate(-50%, -80%) scale(0.9);
-          }
-          to {
-            opacity: 1;
-            transform: translate(-50%, -100%) scale(1);
-          }
-        }
-        
-        .event-marker {
-          filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
-        }
-        
-        .user-marker {
-          filter: drop-shadow(0 4px 8px rgba(59, 130, 246, 0.5));
-        }
-        
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .no-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #888;
-          border-radius: 3px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #555;
-        }
-        
-        /* Ensure map markers are above map tiles */
-        .mapboxgl-marker {
-          z-index: 1;
-        }
-        
-        /* Make 3D cards appear above regular markers */
-        .event-card-3d {
-          z-index: 1000 !important;
-        }
-      `}</style>
     </div>
   );
 }

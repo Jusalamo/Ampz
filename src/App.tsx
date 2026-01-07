@@ -2,14 +2,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { HashRouter, Routes, Route, Navigate } from "react-router-dom"; // Changed from BrowserRouter to HashRouter
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppProvider, useApp } from "./contexts/AppContext";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Home from "./pages/Home";
 import Events from "./pages/Events";
 import Connect from "./pages/Connect";
-import Matches from "./pages/Matches";
+import Chats from "./pages/Chats";
 import Profile from "./pages/Profile";
 import EventDetail from "./pages/EventDetail";
 import Settings from "./pages/Settings";
@@ -42,7 +42,8 @@ function AppRoutes() {
       <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
       <Route path="/connect" element={<ProtectedRoute><Connect /></ProtectedRoute>} />
       <Route path="/connections" element={<Navigate to="/connect" replace />} />
-      <Route path="/matches" element={<ProtectedRoute><Matches /></ProtectedRoute>} />
+      <Route path="/matches" element={<ProtectedRoute><Chats /></ProtectedRoute>} />
+      <Route path="/chats" element={<ProtectedRoute><Chats /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/event/:id" element={<ProtectedRoute><EventDetail /></ProtectedRoute>} />
       <Route path="/social" element={<ProtectedRoute><Social /></ProtectedRoute>} />
@@ -65,7 +66,7 @@ const App = () => (
       <AppProvider>
         <Toaster />
         <Sonner />
-        <HashRouter> {/* Changed from BrowserRouter to HashRouter */}
+        <HashRouter>
           <AppRoutes />
         </HashRouter>
       </AppProvider>

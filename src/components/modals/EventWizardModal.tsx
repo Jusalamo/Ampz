@@ -784,7 +784,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         maxAttendees: 500,
         attendees: 0,
         organizerId: user.id,
-        organizerName: user.name || 'Unknown Organizer',
         qrCode,
         geofenceRadius: eventData.geofenceRadius,
         customTheme: eventData.themeColor,
@@ -793,10 +792,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         videos: eventData.videos,
         tags: [eventData.category],
         isFeatured: user?.subscription?.tier === 'max',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        status: 'active' as const,
-        isFree: eventData.isFree,
       };
 
       await addEvent(newEvent);

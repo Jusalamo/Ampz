@@ -103,6 +103,30 @@ export interface Match {
   lastMessageTime: string;
   unread: boolean;
   online: boolean;
+  isPinned?: boolean;
+  isMuted?: boolean;
+}
+
+export interface Friend {
+  id: string;
+  friendProfile: ConnectionProfile;
+  friendsSince: string;
+  lastMessage: string;
+  lastMessageTime: string;
+  unread: boolean;
+  online: boolean;
+  isPinned?: boolean;
+  isMuted?: boolean;
+  sharedEvents?: string[];
+}
+
+export interface FriendRequest {
+  id: string;
+  fromUser: ConnectionProfile;
+  toUserId: string;
+  status: 'pending' | 'accepted' | 'declined';
+  timestamp: string;
+  mutualFriends?: number;
 }
 
 export interface Message {
