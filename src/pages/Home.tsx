@@ -12,6 +12,31 @@ import { useScrollDirection } from '@/hooks/useScrollDirection';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
+// Design Constants
+const DESIGN = {
+  colors: {
+    primary: '#C4B5FD',
+    lavenderLight: '#E9D5FF',
+    accentPink: '#FFB8E6',
+    background: '#1A1A1A',
+    card: '#2D2D2D',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#B8B8B8'
+  },
+  spacing: {
+    default: '16px',
+    cardPadding: '16px',
+    buttonGap: '12px',
+    sectionSpacing: '24px'
+  },
+  borderRadius: {
+    card: '24px',
+    button: '12px',
+    roundButton: '50%',
+    smallPill: '8px'
+  }
+};
+
 export default function Home() {
   const navigate = useNavigate();
   const { user, events, unreadNotificationsCount } = useApp();
@@ -27,7 +52,7 @@ export default function Home() {
   const featuredRef = useRef<HTMLDivElement>(null);
   const myEventsCarouselRef = useRef<HTMLDivElement>(null);
 
-  // Get all user events (created + bookmarked) - FIXED: added null checks
+  // Get all user events (created + bookmarked)
   const createdEvents = events?.filter(e => e.organizerId === user?.id) || [];
   const bookmarkedEvents = events?.filter(e => user?.bookmarkedEvents?.includes(e.id)) || [];
   const myEvents = [...createdEvents, ...bookmarkedEvents];
@@ -38,7 +63,7 @@ export default function Home() {
   // Check if user has Pro or Max subscription
   const isProUser = user?.subscription?.tier === 'pro' || user?.subscription?.tier === 'max';
 
-  // Auto-rotate featured events - FIXED: added length check
+  // Auto-rotate featured events
   useEffect(() => {
     if (!featuredEvents || featuredEvents.length <= 1) return;
     const interval = setInterval(() => {
@@ -47,11 +72,11 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [featuredEvents]);
 
-  // Scroll to current featured event - FIXED: added null checks
+  // Scroll to current featured event
   useEffect(() => {
     if (featuredRef.current && featuredEvents?.length > 0) {
       const container = featuredRef.current;
-      const cardWidth = container.offsetWidth - 40; // Account for padding
+      const cardWidth = container.offsetWidth - 40;
       container.scrollTo({
         left: featuredIndex * cardWidth,
         behavior: 'smooth',
@@ -59,14 +84,13 @@ export default function Home() {
     }
   }, [featuredIndex, featuredEvents?.length]);
 
-  // Handle my events carousel scroll - FIXED: added null checks
+  // Handle my events carousel scroll
   useEffect(() => {
     if (myEventsCarouselRef.current && myEvents?.length > 0) {
       const container = myEventsCarouselRef.current;
-      // Calculate card width based on actual card dimensions (2 cards + gap)
-      const cardWidth = (container.offsetWidth - 12) / 2; // 12px = gap(3px) * 3 (gaps between 2 cards)
+      const cardWidth = (container.offsetWidth - 12) / 2;
       container.scrollTo({
-        left: myEventsIndex * container.offsetWidth, // Scroll by full container width
+        left: myEventsIndex * container.offsetWidth,
         behavior: 'smooth',
       });
     }
@@ -98,18 +122,17 @@ export default function Home() {
         variant: 'destructive'
       });
     } else {
-      navigate('/event-manager'); // FIXED: Changed from '/EventManager' to '/event-manager'
+      navigate('/event-manager');
     }
   };
 
-  // Quick actions in 2x2 grid - UPDATED: Added Manage Events button
+  // Quick actions in 2x2 grid
   const quickActions = [
     { 
       icon: QrCode, 
       label: 'QR Scan', 
       color: 'bg-purple-500', 
       onClick: () => setShowCheckIn(true),
-      iconSize: 'w-6 h-6',
       pro: false
     },
     { 
@@ -117,28 +140,25 @@ export default function Home() {
       label: 'Create Event', 
       color: 'bg-pink-500', 
       onClick: handleCreateEvent, 
-      pro: !isProUser,
-      iconSize: 'w-6 h-6'
+      pro: !isProUser
     },
     { 
       icon: Settings, 
       label: 'Manage Events', 
       color: 'bg-orange-500', 
       onClick: handleManageEvents,
-      pro: !isProUser,
-      iconSize: 'w-6 h-6'
+      pro: !isProUser
     },
     { 
       icon: Ticket, 
       label: 'Tickets', 
       color: 'bg-green-500', 
       onClick: () => setShowTickets(true),
-      iconSize: 'w-6 h-6',
       pro: false
     },
   ];
 
-  // Compact stats grid - FIXED: added null checks
+  // Compact stats grid
   const stats = [
     { 
       icon: Calendar, 
@@ -186,36 +206,59 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground pb-20">
+    <div 
+      className="min-h-screen pb-20"
+      style={{ background: DESIGN.colors.background, color: DESIGN.colors.textPrimary }}
+    >
       {/* Header */}
       <header 
         className={cn(
-          'fixed top-0 left-0 right-0 z-50 transition-transform duration-300 bg-background/95 backdrop-blur-xl border-b border-border',
+          'fixed top-0 left-0 right-0 z-50 transition-transform duration-300 backdrop-blur-xl',
           isHeaderHidden ? '-translate-y-full' : 'translate-y-0'
         )}
+        style={{ 
+          background: `${DESIGN.colors.background}95`,
+          borderBottom: `1px solid ${DESIGN.colors.textSecondary}20`
+        }}
       >
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <Zap className="w-4 h-4 text-primary-foreground" />
+              <div 
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ background: DESIGN.colors.primary }}
+              >
+                <Zap className="w-4 h-4" style={{ color: DESIGN.colors.background }} />
               </div>
               <span className="text-xl font-bold">Ampz</span>
             </div>
             <div className="flex items-center gap-3">
               {user?.subscription?.tier !== 'free' && (
-                <span className="px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full uppercase">
+                <span 
+                  className="px-3 py-1 text-xs font-bold rounded-full uppercase"
+                  style={{ 
+                    background: DESIGN.colors.primary,
+                    color: DESIGN.colors.background
+                  }}
+                >
                   {user?.subscription?.tier}
                 </span>
               )}
               <div className="relative">
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="w-9 h-9 rounded-full bg-card flex items-center justify-center border border-border hover:border-primary transition-colors"
+                  className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
+                  style={{ 
+                    background: DESIGN.colors.card,
+                    border: `1px solid ${DESIGN.colors.textSecondary}20`
+                  }}
                 >
-                  <Bell className="w-5 h-5" />
+                  <Bell className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
                   {unreadNotificationsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs font-bold flex items-center justify-center text-white">
+                    <span 
+                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center"
+                      style={{ background: '#EF4444', color: '#FFFFFF' }}
+                    >
                       {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
                     </span>
                   )}
@@ -234,7 +277,10 @@ export default function Home() {
         {/* Welcome Section */}
         <div className="mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary">
+            <div 
+              className="w-12 h-12 rounded-full overflow-hidden border-2"
+              style={{ borderColor: DESIGN.colors.primary }}
+            >
               <img 
                 src={user?.profile?.profilePhoto || '/default-avatar.png'} 
                 alt={user?.profile?.name || 'User'} 
@@ -245,8 +291,12 @@ export default function Home() {
               />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Welcome back</p>
-              <h1 className="text-xl font-bold">{user?.profile?.name?.split(' ')[0] || 'Guest'}</h1>
+              <p className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
+                Welcome back
+              </p>
+              <h1 className="text-xl font-bold">
+                {user?.profile?.name?.split(' ')[0] || 'Guest'}
+              </h1>
             </div>
           </div>
         </div>
@@ -256,45 +306,74 @@ export default function Home() {
           {stats.map(({ icon: Icon, value, label, color, bgColor }) => (
             <div 
               key={label} 
-              className={cn(
-                "rounded-xl p-3 text-center border border-border",
-                bgColor
-              )}
+              className="rounded-xl p-3 text-center"
+              style={{ 
+                background: DESIGN.colors.card,
+                border: `1px solid ${DESIGN.colors.textSecondary}20`,
+                borderRadius: DESIGN.borderRadius.card
+              }}
             >
               <Icon className={cn("w-5 h-5 mx-auto mb-1", color)} />
-              <p className="text-lg font-bold">{value}</p>
-              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className="text-lg font-bold" style={{ color: DESIGN.colors.textPrimary }}>
+                {value}
+              </p>
+              <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                {label}
+              </p>
             </div>
           ))}
         </div>
 
-        {/* Quick Actions - 2x2 Grid - UPDATED: Now has Manage Events */}
+        {/* Quick Actions - 2x2 Grid */}
         <div className="mb-8">
           <h2 className="text-lg font-bold mb-3">Quick Actions</h2>
           <div className="grid grid-cols-2 gap-3">
-            {quickActions.map(({ icon: Icon, label, color, onClick, pro, iconSize }) => (
+            {quickActions.map(({ icon: Icon, label, color, onClick, pro }) => (
               <button 
                 key={label} 
                 onClick={onClick}
-                className="bg-card rounded-xl p-4 flex flex-col items-center justify-center gap-2 border border-border hover:border-primary transition-all relative group active:scale-95"
+                className="rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition-all relative group active:scale-95"
+                style={{ 
+                  background: DESIGN.colors.card,
+                  border: `1px solid ${DESIGN.colors.textSecondary}20`,
+                  borderRadius: DESIGN.borderRadius.card
+                }}
               >
-                <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", color)}>
-                  <Icon className={cn("text-white", iconSize)} />
+                <div 
+                  className={cn("w-12 h-12 rounded-xl flex items-center justify-center", color)}
+                  style={{ borderRadius: DESIGN.borderRadius.card }}
+                >
+                  <Icon className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-sm font-medium">{label}</span>
+                <span className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>
+                  {label}
+                </span>
                 {pro && (
-                  <span className="absolute top-2 right-2 px-1.5 py-0.5 bg-primary text-white text-xs font-bold rounded">PRO</span>
+                  <span 
+                    className="absolute top-2 right-2 px-1.5 py-0.5 text-xs font-bold rounded"
+                    style={{ 
+                      background: DESIGN.colors.primary,
+                      color: DESIGN.colors.background
+                    }}
+                  >
+                    PRO
+                  </span>
                 )}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Map Button moved here as a separate section */}
+        {/* Map Button */}
         <div className="mb-8">
           <button 
             onClick={() => navigate('/events')}
-            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl p-4 flex items-center justify-center gap-3 border border-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all active:scale-98"
+            className="w-full text-white rounded-xl p-4 flex items-center justify-center gap-3 transition-all active:scale-98"
+            style={{ 
+              background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
+              border: '1px solid #1E40AF',
+              borderRadius: DESIGN.borderRadius.card
+            }}
           >
             <Map className="w-6 h-6" />
             <span className="text-lg font-bold">Explore Events Map</span>
@@ -307,14 +386,15 @@ export default function Home() {
           <section className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Bookmark className="w-5 h-5 text-primary" />
+                <Bookmark className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
                 My Events
               </h2>
               <div className="flex items-center gap-2">
                 {createdEvents.length > 0 && isProUser && (
                   <button 
-                    onClick={() => navigate('/event-manager')} // FIXED: Changed from '/manage-events' to '/event-manager'
-                    className="text-primary text-sm font-medium flex items-center gap-1 hover:underline"
+                    onClick={() => navigate('/event-manager')}
+                    className="text-sm font-medium flex items-center gap-1 hover:underline"
+                    style={{ color: DESIGN.colors.primary }}
                   >
                     <Settings className="w-4 h-4" />
                     Manage
@@ -322,7 +402,8 @@ export default function Home() {
                 )}
                 <button 
                   onClick={() => navigate('/events')}
-                  className="text-primary text-sm font-medium flex items-center gap-1 hover:underline"
+                  className="text-sm font-medium flex items-center gap-1 hover:underline"
+                  style={{ color: DESIGN.colors.primary }}
                 >
                   See All
                   <ChevronRight className="w-4 h-4" />
@@ -351,7 +432,12 @@ export default function Home() {
                           return (
                             <div 
                               key={event.id} 
-                              className="bg-card rounded-xl overflow-hidden border border-border hover:border-primary transition-all group cursor-pointer active:scale-98"
+                              className="rounded-xl overflow-hidden transition-all group cursor-pointer active:scale-98"
+                              style={{ 
+                                background: DESIGN.colors.card,
+                                border: `1px solid ${DESIGN.colors.textSecondary}20`,
+                                borderRadius: DESIGN.borderRadius.card
+                              }}
                               onClick={() => navigate(`/event/${event.id}`)}
                             >
                               {/* Event Image with Bookmark Badge */}
@@ -366,19 +452,28 @@ export default function Home() {
                                 />
                                 <div className="absolute top-2 right-2">
                                   {isBookmarked && (
-                                    <div className="w-8 h-8 bg-yellow-500/90 rounded-full flex items-center justify-center">
+                                    <div 
+                                      className="w-8 h-8 rounded-full flex items-center justify-center"
+                                      style={{ background: 'rgba(234, 179, 8, 0.9)' }}
+                                    >
                                       <Bookmark className="w-4 h-4 text-white fill-white" />
                                     </div>
                                   )}
                                 </div>
                                 {isCreated && (
                                   <div className="absolute top-2 left-2">
-                                    <div className="px-2 py-1 bg-primary/90 rounded text-xs font-bold text-white">
+                                    <div 
+                                      className="px-2 py-1 rounded text-xs font-bold text-white"
+                                      style={{ background: `${DESIGN.colors.primary}90` }}
+                                    >
                                       CREATED
                                     </div>
                                   </div>
                                 )}
-                                <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                                <div 
+                                  className="absolute bottom-2 left-2 text-white text-xs px-2 py-1 rounded"
+                                  style={{ background: 'rgba(0, 0, 0, 0.7)' }}
+                                >
                                   {event.attendees || 0} going
                                 </div>
                               </div>
@@ -389,14 +484,14 @@ export default function Home() {
                                   {event.name}
                                 </h3>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs text-muted-foreground">
+                                  <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                                     {event.category || 'Event'}
                                   </span>
                                   <span className="text-xs font-semibold">
                                     {event.price === 0 ? 'FREE' : `N$${event.price}`}
                                   </span>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                                <p className="text-xs mt-1 line-clamp-1" style={{ color: DESIGN.colors.textSecondary }}>
                                   {event.location || 'Location not specified'}
                                 </p>
                               </div>
@@ -413,17 +508,27 @@ export default function Home() {
                 <>
                   <button
                     onClick={handleMyEventsPrev}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10 active:scale-95"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-8 h-8 rounded-full flex items-center justify-center transition-colors z-10 active:scale-95"
+                    style={{ 
+                      background: `${DESIGN.colors.background}80`,
+                      backdropFilter: 'blur(4px)',
+                      border: `1px solid ${DESIGN.colors.textSecondary}20`
+                    }}
                     aria-label="Previous events"
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <ChevronLeft className="w-4 h-4" style={{ color: DESIGN.colors.textPrimary }} />
                   </button>
                   <button
                     onClick={handleMyEventsNext}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10 active:scale-95"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-8 h-8 rounded-full flex items-center justify-center transition-colors z-10 active:scale-95"
+                    style={{ 
+                      background: `${DESIGN.colors.background}80`,
+                      backdropFilter: 'blur(4px)',
+                      border: `1px solid ${DESIGN.colors.textSecondary}20`
+                    }}
                     aria-label="Next events"
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-4 h-4" style={{ color: DESIGN.colors.textPrimary }} />
                   </button>
                   
                   {/* Dots Indicator */}
@@ -435,9 +540,14 @@ export default function Home() {
                         className={cn(
                           "h-1.5 rounded-full transition-all",
                           index === myEventsIndex 
-                            ? "bg-primary w-4" 
-                            : "bg-muted w-1.5"
+                            ? "w-4" 
+                            : "w-1.5"
                         )}
+                        style={{
+                          backgroundColor: index === myEventsIndex 
+                            ? DESIGN.colors.primary 
+                            : DESIGN.colors.textSecondary
+                        }}
                         aria-label={`Go to slide ${index + 1}`}
                       />
                     ))}
@@ -450,14 +560,21 @@ export default function Home() {
           <section className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Bookmark className="w-5 h-5 text-primary" />
+                <Bookmark className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
                 My Events
               </h2>
             </div>
-            <div className="bg-card rounded-xl p-8 text-center border border-dashed border-border">
-              <Bookmark className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No events yet</p>
-              <p className="text-sm text-muted-foreground mt-1">
+            <div 
+              className="rounded-xl p-8 text-center border border-dashed"
+              style={{ 
+                background: DESIGN.colors.card,
+                borderColor: DESIGN.colors.textSecondary,
+                borderRadius: DESIGN.borderRadius.card
+              }}
+            >
+              <Bookmark className="w-12 h-12 mx-auto mb-3" style={{ color: DESIGN.colors.textSecondary }} />
+              <p style={{ color: DESIGN.colors.textSecondary }}>No events yet</p>
+              <p className="text-sm mt-1" style={{ color: DESIGN.colors.textSecondary }}>
                 {isProUser ? 'Create or bookmark events to see them here' : 'Upgrade to Pro to create events'}
               </p>
             </div>
@@ -469,12 +586,13 @@ export default function Home() {
           <section className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Star className="w-5 h-5 text-yellow-500" />
+                <Star className="w-5 h-5" style={{ color: '#FBBF24' }} />
                 Featured Events
               </h2>
               <button 
                 onClick={() => navigate('/events')}
-                className="text-primary text-sm font-medium flex items-center gap-1 hover:underline"
+                className="text-sm font-medium flex items-center gap-1 hover:underline"
+                style={{ color: DESIGN.colors.primary }}
               >
                 View All
                 <ChevronRight className="w-4 h-4" />
@@ -493,7 +611,12 @@ export default function Home() {
                     className="flex-shrink-0 w-full snap-start px-1"
                   >
                     <div 
-                      className="bg-card rounded-xl overflow-hidden border border-border hover:border-primary transition-all cursor-pointer active:scale-98"
+                      className="rounded-xl overflow-hidden transition-all cursor-pointer active:scale-98"
+                      style={{ 
+                        background: DESIGN.colors.card,
+                        border: `1px solid ${DESIGN.colors.textSecondary}20`,
+                        borderRadius: DESIGN.borderRadius.card
+                      }}
                       onClick={() => navigate(`/event/${event.id}`)}
                     >
                       {/* Featured Event Image */}
@@ -507,16 +630,22 @@ export default function Home() {
                           }}
                         />
                         <div className="absolute top-3 right-3">
-                          <div className="px-3 py-1 bg-primary/90 rounded-full text-xs font-bold text-white">
+                          <div 
+                            className="px-3 py-1 rounded-full text-xs font-bold text-white"
+                            style={{ background: `${DESIGN.colors.primary}90` }}
+                          >
                             FEATURED
                           </div>
                         </div>
-                        <div className="absolute bottom-3 left-3 bg-black/70 text-white text-sm px-3 py-1 rounded">
+                        <div 
+                          className="absolute bottom-3 left-3 text-white text-sm px-3 py-1 rounded"
+                          style={{ background: 'rgba(0, 0, 0, 0.7)' }}
+                        >
                           {event.attendees || 0} going
                         </div>
                       </div>
                       
-                      {/* Event Details - Removed host info and check-in button */}
+                      {/* Event Details */}
                       <div className="p-4">
                         <div className="flex items-start justify-between mb-2">
                           <h3 className="text-lg font-bold line-clamp-1">{event.name}</h3>
@@ -526,22 +655,28 @@ export default function Home() {
                         </div>
                         
                         <div className="flex items-center gap-2 mb-3">
-                          <span className="px-2 py-1 bg-primary/10 text-primary text-xs font-medium rounded">
+                          <span 
+                            className="px-2 py-1 text-xs font-medium rounded"
+                            style={{ 
+                              background: `${DESIGN.colors.primary}10`,
+                              color: DESIGN.colors.primary
+                            }}
+                          >
                             {event.category || 'Event'}
                           </span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                             {event.date || 'TBA'} • {event.time || 'TBA'}
                           </span>
                         </div>
                         
-                        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                        <p className="text-sm line-clamp-2 mb-3" style={{ color: DESIGN.colors.textSecondary }}>
                           {event.description || 'Join this amazing event!'}
                         </p>
                         
                         {/* Location only */}
-                        <div className="flex items-center gap-2 pt-3 border-t border-border">
-                          <Map className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground line-clamp-1">
+                        <div className="flex items-center gap-2 pt-3" style={{ borderTop: `1px solid ${DESIGN.colors.textSecondary}20` }}>
+                          <Map className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
+                          <span className="text-sm line-clamp-1" style={{ color: DESIGN.colors.textSecondary }}>
                             {event.location || 'Location not specified'}
                           </span>
                         </div>
@@ -556,17 +691,27 @@ export default function Home() {
                 <>
                   <button
                     onClick={handleFeaturedPrev}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10 active:scale-95"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-8 h-8 rounded-full flex items-center justify-center transition-colors z-10 active:scale-95"
+                    style={{ 
+                      background: `${DESIGN.colors.background}80`,
+                      backdropFilter: 'blur(4px)',
+                      border: `1px solid ${DESIGN.colors.textSecondary}20`
+                    }}
                     aria-label="Previous featured event"
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <ChevronLeft className="w-4 h-4" style={{ color: DESIGN.colors.textPrimary }} />
                   </button>
                   <button
                     onClick={handleFeaturedNext}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center border border-border hover:border-primary transition-colors z-10 active:scale-95"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1 w-8 h-8 rounded-full flex items-center justify-center transition-colors z-10 active:scale-95"
+                    style={{ 
+                      background: `${DESIGN.colors.background}80`,
+                      backdropFilter: 'blur(4px)',
+                      border: `1px solid ${DESIGN.colors.textSecondary}20`
+                    }}
                     aria-label="Next featured event"
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-4 h-4" style={{ color: DESIGN.colors.textPrimary }} />
                   </button>
                   
                   {/* Dots Indicator */}
@@ -578,9 +723,14 @@ export default function Home() {
                         className={cn(
                           "h-1.5 rounded-full transition-all",
                           index === featuredIndex 
-                            ? "bg-primary w-4" 
-                            : "bg-muted w-1.5"
+                            ? "w-4" 
+                            : "w-1.5"
                         )}
+                        style={{
+                          backgroundColor: index === featuredIndex 
+                            ? DESIGN.colors.primary 
+                            : DESIGN.colors.textSecondary
+                        }}
                         aria-label={`Go to slide ${index + 1}`}
                       />
                     ))}
@@ -593,14 +743,23 @@ export default function Home() {
           <section className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Star className="w-5 h-5 text-yellow-500" />
+                <Star className="w-5 h-5" style={{ color: '#FBBF24' }} />
                 Featured Events
               </h2>
             </div>
-            <div className="bg-card rounded-xl p-8 text-center border border-dashed border-border">
-              <Star className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No featured events</p>
-              <p className="text-sm text-muted-foreground mt-1">Check back later for featured events</p>
+            <div 
+              className="rounded-xl p-8 text-center border border-dashed"
+              style={{ 
+                background: DESIGN.colors.card,
+                borderColor: DESIGN.colors.textSecondary,
+                borderRadius: DESIGN.borderRadius.card
+              }}
+            >
+              <Star className="w-12 h-12 mx-auto mb-3" style={{ color: DESIGN.colors.textSecondary }} />
+              <p style={{ color: DESIGN.colors.textSecondary }}>No featured events</p>
+              <p className="text-sm mt-1" style={{ color: DESIGN.colors.textSecondary }}>
+                Check back later for featured events
+              </p>
             </div>
           </section>
         )}
