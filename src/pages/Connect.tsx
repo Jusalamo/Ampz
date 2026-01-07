@@ -1,75 +1,94 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Heart, RotateCcw, Sparkles, MapPin, Briefcase, Info, ChevronRight, Zap, Lock, AlertCircle, MessageCircle } from 'lucide-react';
+import { X, Heart, RotateCcw, Sparkles, MapPin, Briefcase, Info, Zap, Lock, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
 import { ConnectionProfile } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-// Design System Constants following Apple HIG
+// Apple HIG Design System Constants
 const APPLE_HIG = {
   spacing: {
-    xs: '4px',
-    sm: '8px',
-    md: '16px',
-    lg: '24px',
-    xl: '32px',
-    xxl: '40px',
-    xxxl: '48px'
+    xs: '8px',    // 8pt grid
+    sm: '16px',   // Standard margin
+    md: '24px',   // Between major elements
+    lg: '32px',   // Section spacing
+    xl: '40px',   // Large spacing
+    xxl: '48px'   // Major section spacing
+  },
+  sizing: {
+    touchTarget: '44px',      // Minimum touch target
+    buttonHeight: '50px',     // Filled button height
+    segmentedControl: '32px', // Segmented control height
+    listRow: '44px',         // Minimum list row height
+    inputHeight: '44px',     // Input field height
+    switchHeight: '31px',    // Switch height
+    switchWidth: '51px',     // Switch width
+    tabBarHeight: '49px',    // Tab bar height
+    iconSize: '28px',        // Tab bar icon size
+    modalTopRadius: '20px',  // Modal corner radius
+    cardRadius: '12px',      // Card corner radius
+    largeCardRadius: '20px'  // Large card radius
   },
   typography: {
-    sizes: {
-      largeTitle: '34px',
-      title1: '28px',
-      title2: '22px',
-      title3: '20px',
-      body: '17px',
-      callout: '16px',
-      subhead: '15px',
-      footnote: '13px',
-      caption1: '12px',
-      caption2: '11px'
+    button: {
+      size: '17px',
+      weight: '600' // Semi-bold
     },
-    weights: {
-      regular: 400,
-      medium: 500,
-      semibold: 600,
-      bold: 700
+    body: {
+      size: '17px',
+      weight: '400' // Regular
+    },
+    caption: {
+      size: '13px',
+      weight: '600' // Bold for section headers
+    },
+    small: {
+      size: '10px', // Tab bar labels
+      weight: '400'
     }
   },
-  dimensions: {
-    touchTarget: '44px',
-    buttonHeight: '50px',
-    inputHeight: '44px',
-    navBarHeight: '44px',
-    tabBarHeight: '49px',
-    sectionSpacing: '32px'
-  },
-  borderRadius: {
-    small: '8px',
-    medium: '12px',
-    large: '20px'
+  colors: {
+    // Keeping your existing theme colors
+    primary: '#C4B5FD',      // Your lavender as primary
+    destructive: '#FF3B30',  // Apple red
+    background: {
+      dark: '#1A1A1A',
+      card: '#2D2D2D'
+    },
+    text: {
+      primary: '#FFFFFF',
+      secondary: '#B8B8B8',
+      tertiary: '#8E8E93'    // Apple gray
+    },
+    system: {
+      blue: '#007AFF',       // Apple system blue
+      gray: '#8E8E93',       // Apple system gray
+      gray2: '#636366',      // Apple system gray 2
+      gray3: '#48484A',      // Apple system gray 3
+      gray4: '#3A3A3C',      // Apple system gray 4
+      gray5: '#2C2C2E',      // Apple system gray 5
+      gray6: '#1C1C1E'       // Apple system gray 6
+    }
   },
   shadows: {
-    subtle: '0 2px 8px rgba(0, 0, 0, 0.04)',
-    medium: '0 4px 16px rgba(0, 0, 0, 0.08)',
-    elevated: '0 8px 32px rgba(0, 0, 0, 0.12)'
+    card: '0 2px 8px rgba(0, 0, 0, 0.04)',
+    button: '0 4px 12px rgba(0, 0, 0, 0.08)'
   },
   animations: {
-    spring: { tension: 300, friction: 30 },
-    durations: {
-      fast: '0.2s',
-      medium: '0.4s',
-      slow: '0.65s'
+    spring: {
+      tension: 300,
+      friction: 30,
+      duration: '0.65s',
+      easing: 'cubic-bezier(0.4, 0.0, 0.2, 1)'
     },
-    easings: {
-      standard: 'cubic-bezier(0.4, 0.0, 0.2, 1)',
-      deceleration: 'cubic-bezier(0.0, 0.0, 0.2, 1)',
-      acceleration: 'cubic-bezier(0.4, 0.0, 1, 1)'
+    microInteraction: {
+      scale: 0.95,
+      duration: '0.2s'
     }
   }
 };
@@ -83,42 +102,47 @@ interface ProfileCardProps {
 
 function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProps) {
   const [exitX, setExitX] = useState(0);
-  const [isPressed, setIsPressed] = useState(false);
+  const [showHint, setShowHint] = useState<'like' | 'pass' | null>(null);
 
   const handleDragEnd = useCallback((_: unknown, info: PanInfo) => {
-    setIsPressed(false);
-    if (info.offset.x > 120) {
+    if (info.offset.x > 100) {
       setExitX(500);
       onSwipe('right');
-    } else if (info.offset.x < -120) {
+    } else if (info.offset.x < -100) {
       setExitX(-500);
       onSwipe('left');
     }
   }, [onSwipe]);
 
-  const handleDragStart = () => {
-    setIsPressed(true);
-  };
+  const handleDrag = useCallback((_: unknown, info: PanInfo) => {
+    if (info.offset.x > 50) {
+      setShowHint('like');
+    } else if (info.offset.x < -50) {
+      setShowHint('pass');
+    } else {
+      setShowHint(null);
+    }
+  }, []);
 
   return (
     <motion.div
       className="absolute inset-0"
       drag={isTop ? 'x' : false}
       dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-      dragElastic={0.8}
-      onDragStart={handleDragStart}
+      dragElastic={0.7}
+      onDrag={handleDrag}
       onDragEnd={handleDragEnd}
-      initial={{ scale: isTop ? 1 : 0.95, y: isTop ? 0 : 8, opacity: isTop ? 1 : 0.8 }}
+      initial={{ scale: isTop ? 1 : 0.95, y: isTop ? 0 : 12, opacity: isTop ? 1 : 0.6 }}
       animate={{ 
-        scale: isTop ? (isPressed ? 0.98 : 1) : 0.95,
-        y: isTop ? 0 : 8,
-        opacity: isTop ? 1 : 0.8,
-        rotateZ: 0 
+        scale: isTop ? 1 : 0.95, 
+        y: isTop ? 0 : 12,
+        opacity: isTop ? 1 : 0.6
       }}
       exit={{ x: exitX, opacity: 0, rotateZ: exitX > 0 ? 15 : -15 }}
+      whileTap={{ scale: 0.95 }} // Micro-interaction on press
       style={{ 
         zIndex: isTop ? 10 : 1,
-        transformOrigin: 'center'
+        transformOrigin: '50% 100%'
       }}
       transition={{ 
         type: 'spring',
@@ -126,99 +150,140 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
         damping: 30
       }}
     >
-      {/* Profile Card Container following iOS card design */}
+      {/* Profile Card Container - Apple HIG Style */}
       <div 
-        className="w-full h-full overflow-hidden relative bg-white dark:bg-gray-900"
+        className="w-full h-full overflow-hidden relative"
         style={{
-          borderRadius: APPLE_HIG.borderRadius.large,
-          boxShadow: APPLE_HIG.shadows.elevated
+          background: 'linear-gradient(135deg, #C4B5FD 0%, #E9D5FF 100%)',
+          borderRadius: APPLE_HIG.sizing.largeCardRadius,
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: APPLE_HIG.shadows.card
         }}
       >
-        {/* Profile Photo with gradient overlay */}
-        <div className="relative h-[70%]">
+        {/* Swipe Hints */}
+        <AnimatePresence>
+          {showHint === 'like' && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="absolute top-4 left-4 z-20 px-3 py-2 border-2 border-white/30 rounded-xl rotate-[-15deg] backdrop-blur-md"
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: APPLE_HIG.sizing.cardRadius
+              }}
+            >
+              <span 
+                className="text-[20px] font-semibold"
+                style={{ color: APPLE_HIG.colors.primary }}
+              >
+                LIKE
+              </span>
+            </motion.div>
+          )}
+          {showHint === 'pass' && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="absolute top-4 right-4 z-20 px-3 py-2 border-2 border-white/30 rounded-xl rotate-[15deg] backdrop-blur-md"
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: APPLE_HIG.sizing.cardRadius
+              }}
+            >
+              <span 
+                className="text-[20px] font-semibold"
+                style={{ color: APPLE_HIG.colors.text.tertiary }}
+              >
+                PASS
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        
+        {/* Profile Photo */}
+        <div className="relative h-[70%]"> {/* Adjusted for better fit */}
           <img
             src={profile.photo}
             alt={profile.name}
             className="w-full h-full object-cover"
+            style={{
+              borderBottomLeftRadius: APPLE_HIG.sizing.cardRadius,
+              borderBottomRightRadius: APPLE_HIG.sizing.cardRadius
+            }}
             draggable={false}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
           
-          {/* Info Button */}
+          {/* View Profile Button - Apple HIG touch target */}
           <button
             onClick={(e) => {
               e.stopPropagation();
               onViewProfile();
             }}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center hover:bg-black/30 active:bg-black/40 transition-colors"
-            style={{ borderRadius: '50%' }}
+            className="absolute top-3 right-3 flex items-center justify-center hover:opacity-80 active:scale-95 transition-all"
+            style={{
+              width: APPLE_HIG.sizing.touchTarget,
+              height: APPLE_HIG.sizing.touchTarget,
+              background: 'rgba(0, 0, 0, 0.4)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: APPLE_HIG.sizing.cardRadius
+            }}
           >
             <Info className="w-5 h-5 text-white" />
           </button>
         </div>
 
-        {/* Profile Info - Simplified */}
-        <div className="p-5 bg-white dark:bg-gray-900">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 
-                className="font-semibold mb-1 text-gray-900 dark:text-white"
-                style={{ fontSize: APPLE_HIG.typography.sizes.title2 }}
-              >
-                {profile.name}, {profile.age}
-              </h2>
-              {profile.gender && (
-                <p 
-                  className="text-gray-600 dark:text-gray-400"
-                  style={{ fontSize: APPLE_HIG.typography.sizes.callout }}
-                >
-                  {profile.gender}
-                </p>
-              )}
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewProfile();
+        {/* Profile Info - SIMPLIFIED: Only name, age, gender */}
+        <div 
+          className="absolute bottom-0 left-0 right-0 p-4"
+          style={{ 
+            background: 'linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent)',
+            borderBottomLeftRadius: APPLE_HIG.sizing.largeCardRadius,
+            borderBottomRightRadius: APPLE_HIG.sizing.largeCardRadius
+          }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <h2 
+              className="text-[20px] font-semibold"
+              style={{ 
+                color: APPLE_HIG.colors.text.primary,
+                fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif'
               }}
-              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 active:bg-gray-200 dark:active:bg-gray-700 transition-colors"
-              style={{ borderRadius: '50%' }}
             >
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            </button>
+              {profile.name}
+            </h2>
+            <span 
+              className="text-[20px]"
+              style={{ 
+                color: APPLE_HIG.colors.text.secondary,
+                opacity: 0.9
+              }}
+            >
+              {profile.age}
+            </span>
           </div>
           
-          {/* Swipe Hints */}
-          <div className="flex items-center justify-center gap-8 mt-4">
-            <div className="flex flex-col items-center">
-              <div 
-                className="w-14 h-14 rounded-full flex items-center justify-center mb-2 border-2 border-red-400"
-                style={{ borderRadius: '50%' }}
-              >
-                <X className="w-6 h-6 text-red-400" />
-              </div>
+          {/* Gender/Identity - Centered badge */}
+          <div className="flex justify-center">
+            <div 
+              className="px-3 py-1.5 rounded-full flex items-center justify-center"
+              style={{
+                background: 'rgba(255, 255, 255, 0.15)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: APPLE_HIG.sizing.cardRadius,
+                minHeight: APPLE_HIG.sizing.touchTarget
+              }}
+            >
               <span 
-                className="text-gray-600 dark:text-gray-400"
-                style={{ fontSize: APPLE_HIG.typography.sizes.footnote }}
-              >
-                Swipe left
-              </span>
-            </div>
-            <div className="flex flex-col items-center">
-              <div 
-                className="w-14 h-14 rounded-full flex items-center justify-center mb-2"
-                style={{
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #C4B5FD 0%, #FFB8E6 100%)'
+                className="text-[15px] font-medium text-center"
+                style={{ 
+                  color: APPLE_HIG.colors.text.primary,
+                  lineHeight: '1.2'
                 }}
               >
-                <Heart className="w-6 h-6 text-white" />
-              </div>
-              <span 
-                className="text-gray-600 dark:text-gray-400"
-                style={{ fontSize: APPLE_HIG.typography.sizes.footnote }}
-              >
-                Swipe right
+                {profile.gender || "Preferred not to say"}
               </span>
             </div>
           </div>
@@ -310,56 +375,62 @@ export default function Connect() {
   // No active events state
   if (!hasActiveEvents) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-[calc(49px+env(safe-area-inset-bottom))]">
-        {/* Navigation Header */}
+      <div 
+        className="app-container min-h-screen"
+        style={{
+          background: APPLE_HIG.colors.background.dark,
+          padding: APPLE_HIG.spacing.sm,
+          fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif'
+        }}
+      >
         <div 
-          className="sticky top-0 z-50 px-5 pt-4 pb-3 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800"
-          style={{ paddingTop: 'calc(16px + env(safe-area-inset-top))' }}
+          className="flex flex-col items-center justify-center min-h-[calc(100vh-100px)] px-4"
+          style={{ paddingTop: '20px' }}
         >
-          <h1 
-            className="font-semibold text-gray-900 dark:text-white"
-            style={{ fontSize: APPLE_HIG.typography.sizes.title3 }}
-          >
-            Connect
-          </h1>
-        </div>
-
-        {/* Empty State */}
-        <div className="flex flex-col items-center justify-center px-5" style={{ minHeight: 'calc(100vh - 140px)' }}>
           <div 
             className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
             style={{
               background: 'rgba(196, 181, 253, 0.1)',
-              borderRadius: '50%'
+              borderRadius: APPLE_HIG.sizing.largeCardRadius
             }}
           >
-            <Lock className="w-10 h-10" style={{ color: '#C4B5FD' }} />
+            <Lock className="w-10 h-10" style={{ color: APPLE_HIG.colors.primary }} />
           </div>
           <h2 
-            className="font-semibold text-center mb-2 text-gray-900 dark:text-white"
-            style={{ fontSize: APPLE_HIG.typography.sizes.title2 }}
+            className="text-[28px] font-bold mb-3 text-center"
+            style={{ 
+              color: APPLE_HIG.colors.text.primary,
+              fontWeight: '700'
+            }}
           >
             Check In to Connect
           </h2>
           <p 
-            className="text-center mb-6 max-w-xs text-gray-600 dark:text-gray-400"
-            style={{ fontSize: APPLE_HIG.typography.sizes.body }}
+            className="text-center mb-6 max-w-xs"
+            style={{ 
+              color: APPLE_HIG.colors.text.secondary,
+              fontSize: '17px',
+              lineHeight: '1.4'
+            }}
           >
-            Get tickets and check in to see who's at the event!
+            To start connecting with people, you need to be checked in at an event. 
+            Get tickets and check in to see who's there!
           </p>
           <Button 
             onClick={() => navigate('/events')} 
-            className="w-full max-w-[280px]"
+            className="w-full max-w-[280px] active:scale-95"
             style={{
-              height: APPLE_HIG.dimensions.buttonHeight,
-              borderRadius: APPLE_HIG.borderRadius.medium,
-              background: '#C4B5FD'
+              height: APPLE_HIG.sizing.buttonHeight,
+              background: APPLE_HIG.colors.primary,
+              color: APPLE_HIG.colors.background.dark,
+              borderRadius: APPLE_HIG.sizing.cardRadius,
+              fontSize: APPLE_HIG.typography.button.size,
+              fontWeight: APPLE_HIG.typography.button.weight,
+              marginBottom: APPLE_HIG.spacing.lg
             }}
           >
             <Sparkles className="w-5 h-5 mr-2" />
-            <span style={{ fontSize: APPLE_HIG.typography.sizes.body, fontWeight: APPLE_HIG.typography.weights.semibold }}>
-              Browse Events
-            </span>
+            Browse Events
           </Button>
         </div>
         <BottomNav />
@@ -368,43 +439,56 @@ export default function Connect() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-[calc(49px+env(safe-area-inset-bottom))]">
-      {/* Navigation Header */}
+    <div 
+      className="app-container"
+      style={{
+        background: APPLE_HIG.colors.background.dark,
+        padding: APPLE_HIG.spacing.sm,
+        paddingBottom: `calc(${APPLE_HIG.sizing.tabBarHeight} + 20px)`, // Space for tab bar
+        minHeight: '100vh',
+        fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+    >
+      {/* Header */}
       <div 
-        className="sticky top-0 z-50 px-5 pt-4 pb-3 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800"
-        style={{ paddingTop: 'calc(16px + env(safe-area-inset-top))' }}
+        className="flex items-center justify-between mb-4"
+        style={{ paddingTop: '8px' }}
       >
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 
-              className="font-semibold text-gray-900 dark:text-white mb-1"
-              style={{ fontSize: APPLE_HIG.typography.sizes.title3 }}
-            >
-              {currentEventName}
-            </h1>
-            <p 
-              className="text-gray-600 dark:text-gray-400"
-              style={{ fontSize: APPLE_HIG.typography.sizes.footnote }}
-            >
-              {availableProfiles.length - currentIndex} people here
-            </p>
-          </div>
-          
-          {/* Likes Counter */}
-          <div 
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full"
-            style={{
-              background: 'rgba(196, 181, 253, 0.1)',
-              borderRadius: '50px'
+        <div>
+          <h1 
+            className="text-[34px] font-bold mb-1"
+            style={{ 
+              color: APPLE_HIG.colors.text.primary,
+              fontWeight: '700'
             }}
           >
-            <Heart className="w-4 h-4" style={{ color: '#C4B5FD' }} />
+            {currentEventName}
+          </h1>
+          <p 
+            className="text-[15px]"
+            style={{ 
+              color: APPLE_HIG.colors.text.secondary,
+              opacity: 0.8
+            }}
+          >
+            {availableProfiles.length - currentIndex} people here
+          </p>
+        </div>
+        <div className="flex items-center">
+          {/* Likes Counter - Apple HIG style */}
+          <div 
+            className="flex items-center gap-2 px-3 py-2 rounded-full"
+            style={{
+              background: 'rgba(255, 184, 230, 0.1)',
+              borderRadius: APPLE_HIG.sizing.cardRadius
+            }}
+          >
+            <Heart className="w-4 h-4" style={{ color: APPLE_HIG.colors.primary }} />
             <span 
-              className="font-semibold"
-              style={{ 
-                fontSize: APPLE_HIG.typography.sizes.footnote,
-                color: '#C4B5FD'
-              }}
+              className="text-[15px] font-semibold"
+              style={{ color: APPLE_HIG.colors.primary }}
             >
               {likesRemaining}
             </span>
@@ -412,136 +496,208 @@ export default function Connect() {
         </div>
       </div>
 
-      {/* Main Content - Fixed height container */}
-      <div className="px-5 pt-5">
-        {/* Card Stack */}
-        <div className="relative" style={{ height: 'calc(100vh - 280px)' }}>
-          {noMoreProfiles ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center px-4">
-                <div 
-                  className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5"
-                  style={{
-                    background: 'rgba(196, 181, 253, 0.1)',
-                    borderRadius: '50%'
-                  }}
-                >
-                  <Heart className="w-10 h-10" style={{ color: '#C4B5FD' }} />
-                </div>
-                <h3 
-                  className="font-semibold mb-2 text-gray-900 dark:text-white"
-                  style={{ fontSize: APPLE_HIG.typography.sizes.title2 }}
-                >
-                  That's Everyone!
-                </h3>
-                <p 
-                  className="text-gray-600 dark:text-gray-400 mb-5"
-                  style={{ fontSize: APPLE_HIG.typography.sizes.body }}
-                >
-                  Check back later for more connections.
-                </p>
-                <Button 
-                  onClick={() => navigate('/events')} 
-                  variant="outline"
-                  className="w-full max-w-[200px]"
-                  style={{
-                    height: APPLE_HIG.dimensions.buttonHeight,
-                    borderRadius: APPLE_HIG.borderRadius.medium,
-                    borderColor: '#C4B5FD',
-                    color: '#C4B5FD'
-                  }}
-                >
-                  Find More Events
-                </Button>
+      {/* Card Stack - Fixed height to prevent scrolling */}
+      <div 
+        className="relative w-full mx-auto mb-4"
+        style={{ 
+          height: 'calc(100vh - 280px)', // Dynamic height calculation
+          maxHeight: '500px',
+          flexShrink: 0
+        }}
+      >
+        {noMoreProfiles ? (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute inset-0 flex items-center justify-center"
+          >
+            <div className="text-center px-4">
+              <div 
+                className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                style={{
+                  background: 'rgba(196, 181, 253, 0.1)',
+                  borderRadius: APPLE_HIG.sizing.largeCardRadius
+                }}
+              >
+                <Heart className="w-8 h-8" style={{ color: APPLE_HIG.colors.primary }} />
               </div>
+              <h3 
+                className="text-[22px] font-bold mb-2"
+                style={{ 
+                  color: APPLE_HIG.colors.text.primary,
+                  fontWeight: '600'
+                }}
+              >
+                That's Everyone!
+              </h3>
+              <p 
+                className="text-[15px] mb-4"
+                style={{ 
+                  color: APPLE_HIG.colors.text.secondary,
+                  lineHeight: '1.4'
+                }}
+              >
+                Check back later for more connections.
+              </p>
+              <Button 
+                onClick={() => navigate('/events')} 
+                variant="outline" 
+                className="w-full max-w-[200px] active:scale-95"
+                style={{
+                  height: APPLE_HIG.sizing.buttonHeight,
+                  borderColor: APPLE_HIG.colors.primary,
+                  color: APPLE_HIG.colors.primary,
+                  borderRadius: APPLE_HIG.sizing.cardRadius,
+                  fontSize: APPLE_HIG.typography.button.size,
+                  fontWeight: APPLE_HIG.typography.button.weight
+                }}
+              >
+                Find More Events
+              </Button>
             </div>
-          ) : (
-            <AnimatePresence mode="popLayout">
-              {visibleProfiles.map((profile, index) => (
-                <ProfileCard
-                  key={profile.id}
-                  profile={profile}
-                  onSwipe={handleSwipe}
-                  isTop={index === visibleProfiles.length - 1}
-                  onViewProfile={() => setViewingProfile(profile)}
-                />
-              ))}
-            </AnimatePresence>
-          )}
-        </div>
-
-        {/* Action Buttons */}
-        {!noMoreProfiles && (
-          <div className="flex justify-center items-center gap-5 mt-6">
-            {/* Pass Button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => handleSwipe('left')}
-              className="w-16 h-16 rounded-full flex items-center justify-center bg-white dark:bg-gray-800 shadow-lg active:bg-gray-100 dark:active:bg-gray-700 transition-colors"
-              style={{
-                borderRadius: '50%',
-                boxShadow: APPLE_HIG.shadows.medium
-              }}
-            >
-              <X className="w-7 h-7 text-gray-400" />
-            </motion.button>
-
-            {/* Undo Button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleUndo}
-              disabled={history.length === 0}
-              className={cn(
-                "w-12 h-12 rounded-full flex items-center justify-center bg-white dark:bg-gray-800 shadow-lg active:bg-gray-100 dark:active:bg-gray-700 transition-colors",
-                history.length === 0 && "opacity-30 cursor-not-allowed"
-              )}
-              style={{
-                borderRadius: '50%',
-                boxShadow: APPLE_HIG.shadows.medium
-              }}
-            >
-              <RotateCcw className="w-5 h-5 text-gray-400" />
-            </motion.button>
-
-            {/* Like Button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => handleSwipe('right')}
-              className="w-16 h-16 rounded-full flex items-center justify-center shadow-xl active:opacity-90 transition-opacity"
-              style={{
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #C4B5FD 0%, #FFB8E6 100%)',
-                boxShadow: '0 8px 32px rgba(196, 181, 253, 0.3)'
-              }}
-            >
-              <Heart className="w-7 h-7 text-white" />
-            </motion.button>
-          </div>
+          </motion.div>
+        ) : (
+          <AnimatePresence mode="popLayout">
+            {visibleProfiles.map((profile, index) => (
+              <ProfileCard
+                key={profile.id}
+                profile={profile}
+                onSwipe={handleSwipe}
+                isTop={index === visibleProfiles.length - 1}
+                onViewProfile={() => setViewingProfile(profile)}
+              />
+            ))}
+          </AnimatePresence>
         )}
       </div>
 
-      {/* Match Modal - iOS Style Sheet */}
-      <Dialog open={!!matchModal} onOpenChange={() => setMatchModal(null)}>
-        <DialogContent 
-          className="fixed bottom-0 left-0 right-0 mx-auto max-w-[500px] rounded-t-[20px] rounded-b-none p-0 border-0"
+      {/* Action Buttons - Apple HIG spacing */}
+      {!noMoreProfiles && (
+        <div 
+          className="flex justify-center items-center gap-4 mb-6"
+          style={{ marginTop: 'auto' }} // Push to bottom
+        >
+          {/* Pass Button - 44px minimum touch target */}
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => handleSwipe('left')}
+            className="flex items-center justify-center transition-all active:scale-95"
+            style={{
+              width: APPLE_HIG.sizing.touchTarget,
+              height: APPLE_HIG.sizing.touchTarget,
+              background: 'rgba(74, 74, 74, 0.8)',
+              backdropFilter: 'blur(20px)',
+              color: APPLE_HIG.colors.text.primary,
+              borderRadius: APPLE_HIG.sizing.round,
+              boxShadow: APPLE_HIG.shadows.button
+            }}
+          >
+            <X className="w-6 h-6" />
+          </motion.button>
+
+          {/* Undo Button */}
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleUndo}
+            disabled={history.length === 0}
+            className={cn(
+              "flex items-center justify-center transition-all active:scale-95",
+              history.length === 0 && "opacity-30"
+            )}
+            style={{
+              width: '40px',
+              height: '40px',
+              background: 'transparent',
+              color: APPLE_HIG.colors.text.secondary,
+              borderRadius: APPLE_HIG.sizing.round,
+              border: `1px solid ${APPLE_HIG.colors.text.secondary}`
+            }}
+          >
+            <RotateCcw className="w-4 h-4" />
+          </motion.button>
+
+          {/* Like Button - 44px minimum touch target */}
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => handleSwipe('right')}
+            className="flex items-center justify-center transition-all active:scale-95"
+            style={{
+              width: APPLE_HIG.sizing.touchTarget,
+              height: APPLE_HIG.sizing.touchTarget,
+              background: '#FFB8E6',
+              color: APPLE_HIG.colors.background.dark,
+              borderRadius: APPLE_HIG.sizing.round,
+              boxShadow: '0 4px 16px rgba(255, 184, 230, 0.3)',
+              fontSize: '17px',
+              fontWeight: '600'
+            }}
+          >
+            <Heart className="w-6 h-6" />
+          </motion.button>
+        </div>
+      )}
+
+      {/* Maybe Later Button - Text button style */}
+      {!noMoreProfiles && (
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          className="mx-auto block mb-8 transition-all"
           style={{
-            boxShadow: '0 -4px 32px rgba(0, 0, 0, 0.15)'
+            background: 'transparent',
+            color: APPLE_HIG.colors.text.secondary,
+            fontSize: '15px',
+            border: 'none',
+            padding: '8px 16px',
+            opacity: 0.8
           }}
         >
-          {/* Drag Handle */}
-          <div className="pt-3 pb-1 flex justify-center">
-            <div className="w-9 h-1.5 rounded-full bg-gray-300 dark:bg-gray-700" />
+          Maybe Later
+        </motion.button>
+      )}
+
+      {/* Match Modal - Apple HIG bottom sheet */}
+      <Dialog open={!!matchModal} onOpenChange={() => setMatchModal(null)}>
+        <DialogContent 
+          className="p-0 border-0 rounded-t-[20px] rounded-b-none bottom-0 fixed max-w-none w-full"
+          style={{
+            background: APPLE_HIG.colors.system.gray6,
+            borderRadius: `${APPLE_HIG.sizing.modalTopRadius} ${APPLE_HIG.sizing.modalTopRadius} 0 0`,
+            maxHeight: '90vh',
+            margin: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            transform: 'none',
+            top: 'auto'
+          }}
+        >
+          {/* Drag handle */}
+          <div className="w-full flex justify-center pt-3 pb-2">
+            <div 
+              className="w-9 h-1 rounded-full"
+              style={{ background: APPLE_HIG.colors.system.gray2 }}
+            />
           </div>
 
-          <div className="px-5 pb-8">
-            <div className="relative w-32 h-32 mx-auto mb-6">
+          <motion.div 
+            className="py-6 px-5"
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{
+              type: 'spring',
+              stiffness: 300,
+              damping: 30
+            }}
+          >
+            {/* Celebration Animation */}
+            <div className="relative w-20 h-20 mx-auto mb-5">
               <motion.div 
                 className="absolute inset-0 rounded-full"
                 style={{
-                  background: 'linear-gradient(135deg, #C4B5FD 0%, #FFB8E6 100%)'
+                  background: `linear-gradient(135deg, ${APPLE_HIG.colors.primary} 0%, #E9D5FF 100%)`
                 }}
                 animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.2, 0.5] }}
                 transition={{ duration: 2, repeat: Infinity }}
@@ -549,50 +705,68 @@ export default function Connect() {
               <img
                 src={matchModal?.photo}
                 alt={matchModal?.name}
-                className="w-full h-full rounded-full object-cover border-8 relative z-10"
+                className="w-full h-full rounded-full object-cover border-4 relative z-10"
                 style={{
-                  borderColor: 'white',
-                  borderRadius: '50%'
+                  borderColor: APPLE_HIG.colors.system.gray6,
+                  borderRadius: APPLE_HIG.sizing.round
                 }}
               />
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.2, type: 'spring' }}
-                className="absolute -top-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center z-20 border-4"
+                className="absolute -top-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center z-20 border-2"
                 style={{
                   background: '#D4AF37',
-                  borderColor: 'white',
-                  borderRadius: '50%'
+                  borderColor: APPLE_HIG.colors.system.gray6,
+                  borderRadius: APPLE_HIG.sizing.round
                 }}
               >
-                <Heart className="w-4 h-4 text-white fill-white" />
+                <Heart className="w-3 h-3 text-white fill-white" />
               </motion.div>
             </div>
             
-            <h2 
-              className="text-center font-semibold mb-2 text-gray-900 dark:text-white"
-              style={{ fontSize: APPLE_HIG.typography.sizes.title1 }}
+            <motion.h2 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="text-[28px] font-bold mb-2 text-center"
+              style={{ 
+                color: APPLE_HIG.colors.text.primary,
+                fontWeight: '700'
+              }}
             >
               It's a Match!
-            </h2>
-            <p 
-              className="text-center mb-6 text-gray-600 dark:text-gray-400"
-              style={{ fontSize: APPLE_HIG.typography.sizes.body }}
+            </motion.h2>
+            <motion.p 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="mb-6 text-center"
+              style={{ 
+                color: APPLE_HIG.colors.text.secondary,
+                fontSize: '17px'
+              }}
             >
               You and {matchModal?.name} liked each other
-            </p>
+            </motion.p>
             
-            <div className="flex gap-3">
+            <motion.div 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="flex gap-3"
+            >
               <Button
                 variant="outline"
                 onClick={() => setMatchModal(null)}
-                className="flex-1"
+                className="flex-1 h-12 active:scale-95"
                 style={{
-                  height: APPLE_HIG.dimensions.buttonHeight,
-                  borderRadius: APPLE_HIG.borderRadius.medium,
-                  borderColor: '#C4B5FD',
-                  color: '#C4B5FD'
+                  borderRadius: APPLE_HIG.sizing.cardRadius,
+                  borderColor: APPLE_HIG.colors.system.gray4,
+                  color: APPLE_HIG.colors.text.primary,
+                  fontSize: '17px',
+                  fontWeight: '600'
                 }}
               >
                 Keep Swiping
@@ -602,98 +776,124 @@ export default function Connect() {
                   setMatchModal(null);
                   navigate('/matches');
                 }}
-                className="flex-1"
+                className="flex-1 h-12 active:scale-95"
                 style={{
-                  height: APPLE_HIG.dimensions.buttonHeight,
-                  borderRadius: APPLE_HIG.borderRadius.medium,
-                  background: '#C4B5FD',
-                  color: '#1A1A1A'
+                  background: APPLE_HIG.colors.primary,
+                  color: APPLE_HIG.colors.background.dark,
+                  borderRadius: APPLE_HIG.sizing.cardRadius,
+                  fontSize: '17px',
+                  fontWeight: '600'
                 }}
               >
-                <MessageCircle className="w-5 h-5 mr-2" />
                 Message
               </Button>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         </DialogContent>
       </Dialog>
 
-      {/* Profile View Modal - iOS Style */}
+      {/* Profile View Modal - Apple HIG bottom sheet */}
       <Dialog open={!!viewingProfile} onOpenChange={() => setViewingProfile(null)}>
         <DialogContent 
-          className="fixed bottom-0 left-0 right-0 mx-auto max-w-[500px] rounded-t-[20px] rounded-b-none p-0 border-0 max-h-[85vh] overflow-hidden"
+          className="p-0 border-0 rounded-t-[20px] rounded-b-none bottom-0 fixed max-w-none w-full"
           style={{
-            boxShadow: '0 -4px 32px rgba(0, 0, 0, 0.15)'
+            background: APPLE_HIG.colors.system.gray6,
+            borderRadius: `${APPLE_HIG.sizing.modalTopRadius} ${APPLE_HIG.sizing.modalTopRadius} 0 0`,
+            maxHeight: '90vh',
+            margin: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            transform: 'none',
+            top: 'auto'
           }}
         >
-          {/* Drag Handle */}
-          <div className="pt-3 pb-1 flex justify-center sticky top-0 bg-white dark:bg-gray-900">
-            <div className="w-9 h-1.5 rounded-full bg-gray-300 dark:bg-gray-700" />
+          {/* Drag handle */}
+          <div className="w-full flex justify-center pt-3 pb-2">
+            <div 
+              className="w-9 h-1 rounded-full"
+              style={{ background: APPLE_HIG.colors.system.gray2 }}
+            />
           </div>
 
-          {viewingProfile && (
-            <div className="overflow-y-auto">
-              <div className="relative h-64">
-                <img
-                  src={viewingProfile.photo}
-                  alt={viewingProfile.name}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                
-                {/* Close Button */}
-                <button
-                  onClick={() => setViewingProfile(null)}
-                  className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center hover:bg-black/50 active:bg-black/60 transition-colors"
-                  style={{ borderRadius: '50%' }}
-                >
-                  <X className="w-5 h-5 text-white" />
-                </button>
-              </div>
-              
-              <div className="px-5 py-6 bg-white dark:bg-gray-900">
-                <div className="mb-6">
-                  <h2 
-                    className="font-semibold text-gray-900 dark:text-white mb-1"
-                    style={{ fontSize: APPLE_HIG.typography.sizes.title1 }}
+          <div className="overflow-y-auto flex-1 max-h-[80vh]">
+            {viewingProfile && (
+              <div className="flex flex-col">
+                <div className="relative h-56">
+                  <img
+                    src={viewingProfile.photo}
+                    alt={viewingProfile.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <div 
+                    className="absolute inset-0"
+                    style={{
+                      background: 'linear-gradient(to top, rgba(28, 28, 30, 0.95), rgba(28, 28, 30, 0.4), transparent)'
+                    }}
+                  />
+                  
+                  {/* Close button */}
+                  <button
+                    onClick={() => setViewingProfile(null)}
+                    className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center active:scale-95"
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.4)',
+                      backdropFilter: 'blur(20px)',
+                      borderRadius: APPLE_HIG.sizing.cardRadius
+                    }}
                   >
-                    {viewingProfile.name}, {viewingProfile.age}
-                  </h2>
-                  <div className="flex items-center gap-4">
+                    <X className="w-5 h-5 text-white" />
+                  </button>
+                </div>
+                
+                <div className="p-5 space-y-6">
+                  <div>
+                    <h2 
+                      className="text-[28px] font-bold mb-1"
+                      style={{ 
+                        color: APPLE_HIG.colors.text.primary,
+                        fontWeight: '700'
+                      }}
+                    >
+                      {viewingProfile.name}, {viewingProfile.age}
+                    </h2>
                     {viewingProfile.gender && (
-                      <span 
-                        className="px-3 py-1 rounded-full text-gray-700 dark:text-gray-300"
-                        style={{
-                          fontSize: APPLE_HIG.typography.sizes.caption1,
-                          background: 'rgba(196, 181, 253, 0.1)',
-                          borderRadius: '50px'
-                        }}
+                      <p 
+                        className="text-[17px] mb-2"
+                        style={{ color: APPLE_HIG.colors.text.secondary }}
                       >
                         {viewingProfile.gender}
-                      </span>
+                      </p>
                     )}
                     {viewingProfile.occupation && (
-                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                        <Briefcase className="w-4 h-4" />
-                        <span style={{ fontSize: APPLE_HIG.typography.sizes.callout }}>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Briefcase className="w-4 h-4" style={{ color: APPLE_HIG.colors.primary }} />
+                        <span 
+                          className="text-[15px]"
+                          style={{ color: APPLE_HIG.colors.primary }}
+                        >
                           {viewingProfile.occupation}
                         </span>
                       </div>
                     )}
                   </div>
-                </div>
 
-                <div className="space-y-5">
                   <div>
                     <h3 
-                      className="font-semibold text-gray-900 dark:text-white mb-2"
-                      style={{ fontSize: APPLE_HIG.typography.sizes.callout }}
+                      className="text-[13px] font-semibold mb-3 uppercase tracking-wider"
+                      style={{ 
+                        color: APPLE_HIG.colors.text.tertiary,
+                        fontWeight: '600'
+                      }}
                     >
                       About
                     </h3>
                     <p 
-                      className="text-gray-600 dark:text-gray-400"
-                      style={{ fontSize: APPLE_HIG.typography.sizes.body, lineHeight: 1.5 }}
+                      className="text-[17px]"
+                      style={{ 
+                        color: APPLE_HIG.colors.text.secondary,
+                        lineHeight: '1.5'
+                      }}
                     >
                       {viewingProfile.bio}
                     </p>
@@ -701,14 +901,20 @@ export default function Connect() {
 
                   <div>
                     <h3 
-                      className="font-semibold text-gray-900 dark:text-white mb-2"
-                      style={{ fontSize: APPLE_HIG.typography.sizes.callout }}
+                      className="text-[13px] font-semibold mb-3 uppercase tracking-wider"
+                      style={{ 
+                        color: APPLE_HIG.colors.text.tertiary,
+                        fontWeight: '600'
+                      }}
                     >
                       Location
                     </h3>
-                    <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                      <MapPin className="w-4 h-4" />
-                      <span style={{ fontSize: APPLE_HIG.typography.sizes.body }}>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4" style={{ color: APPLE_HIG.colors.primary }} />
+                      <span 
+                        className="text-[17px]"
+                        style={{ color: APPLE_HIG.colors.text.secondary }}
+                      >
                         {viewingProfile.location}
                       </span>
                     </div>
@@ -717,8 +923,11 @@ export default function Connect() {
                   {viewingProfile.interests && viewingProfile.interests.length > 0 && (
                     <div>
                       <h3 
-                        className="font-semibold text-gray-900 dark:text-white mb-3"
-                        style={{ fontSize: APPLE_HIG.typography.sizes.callout }}
+                        className="text-[13px] font-semibold mb-3 uppercase tracking-wider"
+                        style={{ 
+                          color: APPLE_HIG.colors.text.tertiary,
+                          fontWeight: '600'
+                        }}
                       >
                         Interests
                       </h3>
@@ -726,12 +935,11 @@ export default function Connect() {
                         {viewingProfile.interests.map((interest) => (
                           <span
                             key={interest}
-                            className="px-3 py-1.5 rounded-full"
+                            className="px-3 py-1.5 text-[14px] font-medium"
                             style={{
-                              fontSize: APPLE_HIG.typography.sizes.caption1,
                               background: 'rgba(196, 181, 253, 0.1)',
-                              color: '#C4B5FD',
-                              borderRadius: '50px'
+                              color: APPLE_HIG.colors.primary,
+                              borderRadius: APPLE_HIG.sizing.cardRadius
                             }}
                           >
                             {interest}
@@ -742,50 +950,61 @@ export default function Connect() {
                   )}
                 </div>
 
-                {/* Action buttons */}
-                <div className="flex gap-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-800">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setViewingProfile(null);
-                      handleSwipe('left');
-                    }}
-                    className="flex-1"
-                    style={{
-                      height: APPLE_HIG.dimensions.buttonHeight,
-                      borderRadius: APPLE_HIG.borderRadius.medium,
-                      borderColor: '#4A4A4A',
-                      color: '#4A4A4A'
-                    }}
-                  >
-                    <X className="w-5 h-5 mr-2" />
-                    Pass
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setViewingProfile(null);
-                      handleSwipe('right');
-                    }}
-                    className="flex-1"
-                    style={{
-                      height: APPLE_HIG.dimensions.buttonHeight,
-                      borderRadius: APPLE_HIG.borderRadius.medium,
-                      background: '#C4B5FD',
-                      color: '#1A1A1A'
-                    }}
-                  >
-                    <Heart className="w-5 h-5 mr-2" />
-                    Like
-                  </Button>
+                {/* Action buttons at bottom - Apple HIG style */}
+                <div 
+                  className="p-5 border-t"
+                  style={{ 
+                    borderColor: APPLE_HIG.colors.system.gray4,
+                    paddingBottom: 'calc(20px + env(safe-area-inset-bottom, 0px))'
+                  }}
+                >
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setViewingProfile(null);
+                        handleSwipe('left');
+                      }}
+                      className="flex-1 h-12 active:scale-95"
+                      style={{
+                        borderRadius: APPLE_HIG.sizing.cardRadius,
+                        borderColor: APPLE_HIG.colors.system.gray4,
+                        color: APPLE_HIG.colors.text.primary,
+                        fontSize: '17px',
+                        fontWeight: '600'
+                      }}
+                    >
+                      <X className="w-5 h-5 mr-2" />
+                      Pass
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setViewingProfile(null);
+                        handleSwipe('right');
+                      }}
+                      className="flex-1 h-12 active:scale-95"
+                      style={{
+                        background: APPLE_HIG.colors.primary,
+                        color: APPLE_HIG.colors.background.dark,
+                        borderRadius: APPLE_HIG.sizing.cardRadius,
+                        fontSize: '17px',
+                        fontWeight: '600'
+                      }}
+                    >
+                      <Heart className="w-5 h-5 mr-2" />
+                      Like
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
-      {/* Add safe area spacing before bottom nav */}
-      <div style={{ height: '16px' }}></div>
+      {/* Bottom spacing for safe area */}
+      <div style={{ height: '20px' }} />
+      
       <BottomNav />
     </div>
   );
