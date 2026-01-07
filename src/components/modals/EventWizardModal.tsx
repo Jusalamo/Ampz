@@ -103,6 +103,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const videoInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const mapsInitialized = useRef({ map1: false, map2: false });
 
   // Get user's location for proximity bias
   const [userLocation, setUserLocation] = useState({ lat: -22.5609, lng: 17.0658 });
@@ -172,56 +173,46 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   }, [isOpen]);
 
-  // Keep maps alive - don't cleanup when switching steps
+  // Cleanup maps ONLY when modal closes
   useEffect(() => {
     if (!isOpen) {
-      // Only cleanup when modal fully closes
-      if (map1.current) {
-        try {
-          map1.current.remove();
-        } catch (error) {
-          console.error('Error removing map1:', error);
+      const cleanupMap = (
+        mapRef: React.MutableRefObject<mapboxgl.Map | null>, 
+        markerRef: React.MutableRefObject<mapboxgl.Marker | null>
+      ) => {
+        if (markerRef.current) {
+          try {
+            markerRef.current.remove();
+          } catch (error) {
+            console.error('Error removing marker:', error);
+          }
+          markerRef.current = null;
         }
-        map1.current = null;
-        marker1.current = null;
-      }
-      if (map2.current) {
-        try {
-          map2.current.remove();
-        } catch (error) {
-          console.error('Error removing map2:', error);
+        if (mapRef.current) {
+          try {
+            mapRef.current.remove();
+          } catch (error) {
+            console.error('Error removing map:', error);
+          }
+          mapRef.current = null;
         }
-        map2.current = null;
-        marker2.current = null;
-      }
-    }
-  }, [isOpen]);
+      };
 
-  // Initialize map for step 3 (Location) - Keep map instance alive
+      cleanupMap(map1, marker1);
+      cleanupMap(map2, marker2);
+      
+      // Reset initialization flags
+      mapsInitialized.current = { map1: false, map2: false };
+    }
+  }, [isOpen]); // Only depends on isOpen
+
+  // Initialize map for step 3
   useEffect(() => {
-    if (step === 3 && isOpen && mapContainer1.current) {
+    if (step === 3 && isOpen && mapContainer1.current && !mapsInitialized.current.map1) {
       const initMap = async () => {
         try {
-          if (!map1.current) {
-            // Create new map only if it doesn't exist
-            await initializeMap(mapContainer1.current, 1);
-          } else {
-            // Map exists, just resize and update view
-            setTimeout(() => {
-              if (map1.current) {
-                try {
-                  map1.current.resize();
-                  map1.current.flyTo({
-                    center: [eventData.coordinates.lng, eventData.coordinates.lat],
-                    zoom: 14,
-                    duration: 500
-                  });
-                } catch (error) {
-                  console.error('Error updating map1:', error);
-                }
-              }
-            }, 100);
-          }
+          await initializeMap(mapContainer1.current!, 1);
+          mapsInitialized.current.map1 = true;
         } catch (error) {
           console.error('Error initializing map for step 3:', error);
           setMapError('Failed to load map. Please try again.');
@@ -229,35 +220,32 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       };
       
       initMap();
+    } else if (step === 3 && map1.current && mapsInitialized.current.map1) {
+      // Map already exists, just update it
+      setTimeout(() => {
+        if (map1.current) {
+          try {
+            map1.current.resize();
+            map1.current.flyTo({
+              center: [eventData.coordinates.lng, eventData.coordinates.lat],
+              zoom: 14,
+              duration: 500
+            });
+          } catch (error) {
+            console.error('Error updating map1:', error);
+          }
+        }
+      }, 50);
     }
-  }, [step, isOpen]);
+  }, [step, isOpen, eventData.coordinates]);
 
-  // Initialize map for step 4 (Radius) - Keep map instance alive
+  // Initialize map for step 4
   useEffect(() => {
-    if (step === 4 && isOpen && mapContainer2.current) {
+    if (step === 4 && isOpen && mapContainer2.current && !mapsInitialized.current.map2) {
       const initMap = async () => {
         try {
-          if (!map2.current) {
-            // Create new map only if it doesn't exist
-            await initializeMap(mapContainer2.current, 2);
-          } else {
-            // Map exists, just resize and update view
-            setTimeout(() => {
-              if (map2.current) {
-                try {
-                  map2.current.resize();
-                  map2.current.flyTo({
-                    center: [eventData.coordinates.lng, eventData.coordinates.lat],
-                    zoom: 14,
-                    duration: 500
-                  });
-                  updateGeofenceCircle(map2.current);
-                } catch (error) {
-                  console.error('Error updating map2:', error);
-                }
-              }
-            }, 100);
-          }
+          await initializeMap(mapContainer2.current!, 2);
+          mapsInitialized.current.map2 = true;
         } catch (error) {
           console.error('Error initializing map for step 4:', error);
           setMapError('Failed to load map. Please try again.');
@@ -265,6 +253,55 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       };
       
       initMap();
+    } else if (step === 4 && map2.current && mapsInitialized.current.map2) {
+      // Map already exists, just update it
+      setTimeout(() => {
+        if (map2.current) {
+          try {
+            map2.current.resize();
+            map2.current.flyTo({
+              center: [eventData.coordinates.lng, eventData.coordinates.lat],
+              zoom: 14,
+              duration: 500
+            });
+            updateGeofenceCircle(map2.current);
+          } catch (error) {
+            console.error('Error updating map2:', error);
+          }
+        }
+      }, 50);
+    }
+  }, [step, isOpen, eventData.coordinates]);
+
+  // Add this useEffect to ensure proper map rendering when switching steps
+  useEffect(() => {
+    if (isOpen) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        // Resize maps based on current step
+        if (step === 3 && map1.current && mapsInitialized.current.map1) {
+          try {
+            map1.current.resize();
+            // Trigger a re-render
+            const center = map1.current.getCenter();
+            map1.current.jumpTo({ center, zoom: map1.current.getZoom() });
+          } catch (error) {
+            console.error('Error resizing map1:', error);
+          }
+        }
+        
+        if (step === 4 && map2.current && mapsInitialized.current.map2) {
+          try {
+            map2.current.resize();
+            const center = map2.current.getCenter();
+            map2.current.jumpTo({ center, zoom: map2.current.getZoom() });
+          } catch (error) {
+            console.error('Error resizing map2:', error);
+          }
+        }
+      }, 150);
+      
+      return () => clearTimeout(timer);
     }
   }, [step, isOpen]);
 
@@ -399,12 +436,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   }, [eventData.themeColor, eventData.coordinates]);
 
   // Update geofence circle when radius changes
-  useEffect(() => {
-    if (step === 4 && map2.current && map2.current.loaded()) {
-      updateGeofenceCircle(map2.current);
-    }
-  }, [eventData.geofenceRadius, eventData.coordinates, step]);
-
   const updateGeofenceCircle = useCallback((mapInstance: mapboxgl.Map) => {
     if (!mapInstance.loaded()) return;
 
@@ -481,33 +512,32 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     setIsReverseGeocoding(true);
     try {
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` +
+        `https://api.mapbox.com/search/geocode/v6/reverse?` +
+        `longitude=${lng}&latitude=${lat}&` +
         `access_token=${MAPBOX_TOKEN}&` +
         `language=en&` +
-        `types=address,poi,place,neighborhood,locality,region&` +
         `limit=1`
       );
       
       if (!response.ok) {
-        throw new Error(`Geocoding API error: ${response.status}`);
+        throw new Error(`Reverse geocoding API error: ${response.status}`);
       }
       
       const data = await response.json();
       if (data.features && data.features.length > 0) {
         const place = data.features[0];
+        const properties = place.properties || {};
+        const context = properties.context || {};
         
-        // Extract structured address information
-        const context = place.context || [];
-        const street = place.properties?.address || '';
-        const neighborhood = context.find((c: any) => c.id.includes('neighborhood'))?.text || '';
-        const locality = context.find((c: any) => c.id.includes('place'))?.text || '';
-        const region = context.find((c: any) => c.id.includes('region'))?.text || '';
-        const country = context.find((c: any) => c.id.includes('country'))?.text || '';
+        // Extract address components from v6 API structure
+        const street = properties.name || properties.full_address || '';
+        const locality = context.place?.name || '';
+        const region = context.region?.name || '';
+        const country = context.country?.name || '';
         
         // Build full address
         const fullAddress = [
           street,
-          neighborhood,
           locality,
           region,
           country
@@ -515,19 +545,19 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         
         setEventData(prev => ({
           ...prev,
-          location: place.text || locality || '',
-          address: fullAddress || place.place_name || '',
-          streetName: street || place.text || '',
+          location: properties.name || locality || '',
+          address: fullAddress || properties.full_address || '',
+          streetName: street || properties.name || '',
         }));
         
         setSelectedVenueDetails({
-          name: place.text || locality || 'Selected Location',
-          address: fullAddress || place.place_name || '',
+          name: properties.name || locality || 'Selected Location',
+          address: fullAddress || properties.full_address || '',
         });
         
         // Update search input
         if (searchInputRef.current) {
-          searchInputRef.current.value = fullAddress || place.text || '';
+          searchInputRef.current.value = fullAddress || properties.name || '';
         }
       }
     } catch (error) {
@@ -554,20 +584,17 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       setIsSearching(true);
       
       try {
-        // Bbox for Namibia: [11.7, -28.97, 25.27, -16.96]
-        const namibiaBbox = '11.7,-28.97,25.27,-16.96';
-        
+        // Correct Geocoding v6 API endpoint and parameters
         const response = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?` +
+          `https://api.mapbox.com/search/geocode/v6/forward?` +
+          `q=${encodeURIComponent(query)}&` +
           `access_token=${MAPBOX_TOKEN}&` +
           `country=NA&` + // Restrict to Namibia
-          `bbox=${namibiaBbox}&` + // Bounding box for Namibia
+          `bbox=11.7,-28.97,25.27,-16.96&` + // Namibia bounding box
           `proximity=${userLocation.lng},${userLocation.lat}&` +
           `language=en&` +
-          `limit=10&` +
-          `types=country,region,district,place,locality,neighborhood,address,poi&` +
-          `autocomplete=true&` +
-          `fuzzyMatch=true`
+          `types=address,place,poi&` + // Filter for relevant features
+          `limit=10`
         );
         
         if (!response.ok) {
@@ -577,24 +604,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         const data = await response.json();
         
         if (data.features && data.features.length > 0) {
-          // Filter for Namibian locations only and sort by proximity
+          // For v6 API, check if results are from Namibia
           const namibianResults = data.features
             .filter((feature: any) => {
-              const context = feature.context || [];
-              const countryContext = context.find((c: any) => c.id.includes('country'));
-              return countryContext?.short_code === 'NA' || countryContext?.text === 'Namibia';
-            })
-            .sort((a: any, b: any) => {
-              // Calculate distance from user location
-              const distA = Math.sqrt(
-                Math.pow(a.center[0] - userLocation.lng, 2) + 
-                Math.pow(a.center[1] - userLocation.lat, 2)
-              );
-              const distB = Math.sqrt(
-                Math.pow(b.center[0] - userLocation.lng, 2) + 
-                Math.pow(b.center[1] - userLocation.lat, 2)
-              );
-              return distA - distB;
+              // In v6, country info might be in properties.context.country
+              const countryCode = feature.properties?.context?.country?.iso_3166_1_alpha_2;
+              return countryCode === 'NA';
             })
             .slice(0, 8);
           
@@ -641,30 +656,36 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   };
 
   const formatSuggestion = (feature: any) => {
-    const primaryText = feature.text;
-    const secondaryText = feature.place_name.replace(feature.text + ', ', '');
-    const icon = getSuggestionIcon(feature.place_type, feature.properties?.category);
+    const properties = feature.properties || {};
+    const primaryText = properties.name || feature.text || '';
+    const secondaryText = properties.full_address || properties.place_formatted || '';
+    
+    // For v6 API, use properties.type instead of place_type
+    const placeTypes = properties.type ? [properties.type] : feature.place_type || [];
+    const icon = getSuggestionIcon(placeTypes, properties.category);
     
     return {
       icon,
       primary: primaryText,
       secondary: secondaryText,
-      coordinates: feature.center,
+      coordinates: feature.geometry?.coordinates || [],
       fullData: feature
     };
   };
 
   const handleLocationSelect = (selectedFeature: any) => {
-    const [lng, lat] = selectedFeature.center;
-    const venueName = selectedFeature.text || '';
-    const address = selectedFeature.place_name || '';
+    const coordinates = selectedFeature.geometry?.coordinates || selectedFeature.center;
+    const [lng, lat] = coordinates;
+    const properties = selectedFeature.properties || {};
+    const venueName = properties.name || selectedFeature.text || '';
+    const address = properties.full_address || properties.place_formatted || '';
     
     setEventData(prev => ({
       ...prev,
       coordinates: { lat, lng },
       location: venueName,
       address: address,
-      streetName: selectedFeature.properties?.address || venueName,
+      streetName: properties.name || venueName,
     }));
     
     setSelectedVenueDetails({
@@ -1560,6 +1581,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             if (mapContainer1.current && map1.current) {
                               map1.current.remove();
                               map1.current = null;
+                              mapsInitialized.current.map1 = false;
                               setMapError(null);
                               initializeMap(mapContainer1.current, 1);
                             }
@@ -1584,6 +1606,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                           onClick={() => {
                             if (mapContainer1.current) {
                               setMapError(null);
+                              mapsInitialized.current.map1 = false;
                               initializeMap(mapContainer1.current, 1);
                             }
                           }}
@@ -1597,7 +1620,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         <div
                           ref={mapContainer1}
                           className="w-full h-full"
-                          style={{ minHeight: '320px' }}
+                          style={{ 
+                            minHeight: '320px',
+                            display: step === 3 ? 'block' : 'none' 
+                          }}
                         />
                         <div className="absolute top-3 left-3 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs border border-border">
                           {isReverseGeocoding ? (
@@ -1670,6 +1696,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             if (mapContainer2.current && map2.current) {
                               map2.current.remove();
                               map2.current = null;
+                              mapsInitialized.current.map2 = false;
                               setMapError(null);
                               initializeMap(mapContainer2.current, 2);
                             }
@@ -1694,6 +1721,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                           onClick={() => {
                             if (mapContainer2.current) {
                               setMapError(null);
+                              mapsInitialized.current.map2 = false;
                               initializeMap(mapContainer2.current, 2);
                             }
                           }}
@@ -1707,7 +1735,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         <div
                           ref={mapContainer2}
                           className="w-full h-full"
-                          style={{ minHeight: '320px' }}
+                          style={{ 
+                            minHeight: '320px',
+                            display: step === 4 ? 'block' : 'none' 
+                          }}
                         />
                         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm px-4 py-2 rounded-lg text-sm border border-border flex items-center gap-2">
                           <div 
