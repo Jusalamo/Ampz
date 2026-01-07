@@ -19,7 +19,9 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { Event } from '@/lib/types';
 import debounce from 'lodash/debounce';
 
+// Initialize Mapbox with token
 const MAPBOX_TOKEN = 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg';
+mapboxgl.accessToken = MAPBOX_TOKEN;
 
 interface EventWizardModalProps {
   isOpen: boolean;
@@ -85,6 +87,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   } | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
 
   const mapContainer1 = useRef<HTMLDivElement>(null);
   const mapContainer2 = useRef<HTMLDivElement>(null);
@@ -159,6 +162,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       setSelectedVenueDetails(null);
       setIsSearching(false);
       setIsReverseGeocoding(false);
+      setMapError(null);
     }
   }, [isOpen]);
 
@@ -166,12 +170,20 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   useEffect(() => {
     if (!isOpen) {
       if (map1.current) {
-        map1.current.remove();
+        try {
+          map1.current.remove();
+        } catch (error) {
+          console.error('Error removing map1:', error);
+        }
         map1.current = null;
         marker1.current = null;
       }
       if (map2.current) {
-        map2.current.remove();
+        try {
+          map2.current.remove();
+        } catch (error) {
+          console.error('Error removing map2:', error);
+        }
         map2.current = null;
         marker2.current = null;
       }
@@ -181,160 +193,211 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   // Initialize map for step 3 (Location)
   useEffect(() => {
     if (step === 3 && isOpen && mapContainer1.current) {
-      if (!map1.current) {
-        initializeMap(mapContainer1.current, 1);
-      } else {
-        // Map already exists, just make sure it's visible
-        setTimeout(() => {
-          if (map1.current) {
-            map1.current.resize();
-            map1.current.flyTo({
-              center: [eventData.coordinates.lng, eventData.coordinates.lat],
-              zoom: 14,
-              duration: 500
-            });
+      const initMap = async () => {
+        try {
+          if (!map1.current) {
+            await initializeMap(mapContainer1.current, 1);
+          } else {
+            // Map already exists, just make sure it's visible
+            setTimeout(() => {
+              if (map1.current) {
+                try {
+                  map1.current.resize();
+                  map1.current.flyTo({
+                    center: [eventData.coordinates.lng, eventData.coordinates.lat],
+                    zoom: 14,
+                    duration: 500
+                  });
+                } catch (error) {
+                  console.error('Error updating map1:', error);
+                }
+              }
+            }, 100);
           }
-        }, 50);
-      }
+        } catch (error) {
+          console.error('Error initializing map for step 3:', error);
+          setMapError('Failed to load map. Please try again.');
+        }
+      };
+      
+      initMap();
     }
   }, [step, isOpen]);
 
   // Initialize map for step 4 (Radius)
   useEffect(() => {
     if (step === 4 && isOpen && mapContainer2.current) {
-      if (!map2.current) {
-        initializeMap(mapContainer2.current, 2);
-      } else {
-        // Map already exists, just make sure it's visible
-        setTimeout(() => {
-          if (map2.current) {
-            map2.current.resize();
-            map2.current.flyTo({
-              center: [eventData.coordinates.lng, eventData.coordinates.lat],
-              zoom: 14,
-              duration: 500
-            });
-            updateGeofenceCircle(map2.current);
+      const initMap = async () => {
+        try {
+          if (!map2.current) {
+            await initializeMap(mapContainer2.current, 2);
+          } else {
+            // Map already exists, just make sure it's visible
+            setTimeout(() => {
+              if (map2.current) {
+                try {
+                  map2.current.resize();
+                  map2.current.flyTo({
+                    center: [eventData.coordinates.lng, eventData.coordinates.lat],
+                    zoom: 14,
+                    duration: 500
+                  });
+                  updateGeofenceCircle(map2.current);
+                } catch (error) {
+                  console.error('Error updating map2:', error);
+                }
+              }
+            }, 100);
           }
-        }, 50);
-      }
+        } catch (error) {
+          console.error('Error initializing map for step 4:', error);
+          setMapError('Failed to load map. Please try again.');
+        }
+      };
+      
+      initMap();
     }
   }, [step, isOpen]);
 
-  const initializeMap = useCallback((container: HTMLDivElement, mapNumber: 1 | 2) => {
-    if (!container) return;
-    
-    setIsMapLoading(true);
+  const initializeMap = useCallback(async (container: HTMLDivElement, mapNumber: 1 | 2) => {
+    if (!container) {
+      console.error('Map container not found');
+      setMapError('Map container not available');
+      return;
+    }
     
     try {
-      mapboxgl.accessToken = MAPBOX_TOKEN;
+      // Clear any existing error
+      setMapError(null);
+      
+      // Set a minimum height for the container to prevent black screen
+      container.style.minHeight = '320px';
       
       const mapInstance = new mapboxgl.Map({
         container,
-        style: 'mapbox://styles/mapbox/streets-v12',
+        style: 'mapbox://styles/mapbox/streets-v11', // Changed to v11 for better compatibility
         center: [eventData.coordinates.lng, eventData.coordinates.lat],
         zoom: 14,
         pitch: 0,
         bearing: 0,
         antialias: true,
         attributionControl: false,
+        failIfMajorPerformanceCaveat: false,
+        preserveDrawingBuffer: true, // Helps with rendering issues
       });
 
-      mapInstance.on('load', () => {
-        setIsMapLoading(false);
-        
-        if (mapNumber === 1) {
-          map1.current = mapInstance;
-          
-          // Add marker for map 1
-          marker1.current = new mapboxgl.Marker({ 
-            color: eventData.themeColor,
-            draggable: true 
-          })
-            .setLngLat([eventData.coordinates.lng, eventData.coordinates.lat])
-            .addTo(mapInstance);
-
-          // Handle marker drag
-          marker1.current.on('dragend', () => {
-            if (marker1.current) {
-              const lngLat = marker1.current.getLngLat();
-              setEventData(prev => ({ 
-                ...prev, 
-                coordinates: { lat: lngLat.lat, lng: lngLat.lng } 
-              }));
-              reverseGeocode(lngLat.lng, lngLat.lat);
-            }
-          });
-
-          // Click to set location
-          mapInstance.on('click', (e) => {
-            const { lng, lat } = e.lngLat;
-            setEventData(prev => ({ ...prev, coordinates: { lat, lng } }));
-            if (marker1.current) {
-              marker1.current.setLngLat([lng, lat]);
-            } else {
-              marker1.current = new mapboxgl.Marker({ color: eventData.themeColor })
-                .setLngLat([lng, lat])
-                .addTo(mapInstance);
-            }
-            reverseGeocode(lng, lat);
-          });
-        } else {
-          map2.current = mapInstance;
-          
-          // Add marker for map 2
-          marker2.current = new mapboxgl.Marker({ 
-            color: eventData.themeColor 
-          })
-            .setLngLat([eventData.coordinates.lng, eventData.coordinates.lat])
-            .addTo(mapInstance);
-
-          // Add geofence circle
-          updateGeofenceCircle(mapInstance);
-        }
-
-        // Add navigation controls
-        mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
-        
-        // Add geolocate control
-        const geolocateControl = new mapboxgl.GeolocateControl({
-          positionOptions: { enableHighAccuracy: true },
-          trackUserLocation: true,
-          showUserLocation: true,
-        });
-        
-        geolocateControl.on('geolocate', (position: GeolocationPosition) => {
-          const { longitude, latitude } = position.coords;
-          setEventData(prev => ({
-            ...prev,
-            coordinates: { lat: latitude, lng: longitude }
-          }));
-          reverseGeocode(longitude, latitude);
-        });
-        
-        mapInstance.addControl(geolocateControl, 'top-right');
-      });
-
+      // Add error handler
       mapInstance.on('error', (e) => {
-        console.error('Map error:', e);
-        setIsMapLoading(false);
+        console.error('Mapbox error:', e);
+        setMapError('Map failed to load. Please refresh the page.');
+      });
+
+      // Wait for map to load
+      await new Promise<void>((resolve) => {
+        mapInstance.on('load', () => {
+          console.log(`Map ${mapNumber} loaded successfully`);
+          
+          if (mapNumber === 1) {
+            map1.current = mapInstance;
+            
+            // Add marker for map 1
+            marker1.current = new mapboxgl.Marker({ 
+              color: eventData.themeColor,
+              draggable: true 
+            })
+              .setLngLat([eventData.coordinates.lng, eventData.coordinates.lat])
+              .addTo(mapInstance);
+
+            // Handle marker drag
+            marker1.current.on('dragend', () => {
+              if (marker1.current) {
+                const lngLat = marker1.current.getLngLat();
+                setEventData(prev => ({ 
+                  ...prev, 
+                  coordinates: { lat: lngLat.lat, lng: lngLat.lng } 
+                }));
+                reverseGeocode(lngLat.lng, lngLat.lat);
+              }
+            });
+
+            // Click to set location
+            mapInstance.on('click', (e) => {
+              const { lng, lat } = e.lngLat;
+              setEventData(prev => ({ ...prev, coordinates: { lat, lng } }));
+              if (marker1.current) {
+                marker1.current.setLngLat([lng, lat]);
+              } else {
+                marker1.current = new mapboxgl.Marker({ color: eventData.themeColor })
+                  .setLngLat([lng, lat])
+                  .addTo(mapInstance);
+              }
+              reverseGeocode(lng, lat);
+            });
+          } else {
+            map2.current = mapInstance;
+            
+            // Add marker for map 2
+            marker2.current = new mapboxgl.Marker({ 
+              color: eventData.themeColor 
+            })
+              .setLngLat([eventData.coordinates.lng, eventData.coordinates.lat])
+              .addTo(mapInstance);
+
+            // Add geofence circle
+            updateGeofenceCircle(mapInstance);
+          }
+
+          // Add navigation controls
+          mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
+          
+          // Add geolocate control
+          const geolocateControl = new mapboxgl.GeolocateControl({
+            positionOptions: { enableHighAccuracy: true },
+            trackUserLocation: true,
+            showUserLocation: true,
+          });
+          
+          geolocateControl.on('geolocate', (position: GeolocationPosition) => {
+            const { longitude, latitude } = position.coords;
+            setEventData(prev => ({
+              ...prev,
+              coordinates: { lat: latitude, lng: longitude }
+            }));
+            reverseGeocode(longitude, latitude);
+          });
+          
+          mapInstance.addControl(geolocateControl, 'top-right');
+          
+          // Force a resize to ensure proper rendering
+          setTimeout(() => {
+            mapInstance.resize();
+          }, 100);
+          
+          resolve();
+        });
+
+        // Set a timeout in case map fails to load
+        setTimeout(() => {
+          resolve();
+        }, 5000);
       });
 
     } catch (error) {
-      console.error('Error initializing map:', error);
-      setIsMapLoading(false);
+      console.error('Error creating map:', error);
+      setMapError('Failed to initialize map. Please check your internet connection and try again.');
+      throw error;
     }
   }, [eventData.themeColor, eventData.coordinates]);
 
   // Update geofence circle when radius changes
   useEffect(() => {
-    if (step === 4 && map2.current && map2.current.isStyleLoaded()) {
+    if (step === 4 && map2.current && map2.current.loaded()) {
       updateGeofenceCircle(map2.current);
     }
   }, [eventData.geofenceRadius, eventData.coordinates, step]);
 
   const updateGeofenceCircle = useCallback((mapInstance: mapboxgl.Map) => {
-    if (!mapInstance.isStyleLoaded()) return;
+    if (!mapInstance.loaded()) return;
 
     const { lat, lng } = eventData.coordinates;
     const radiusInKm = eventData.geofenceRadius / 1000;
@@ -354,50 +417,54 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     const fillLayerId = 'geofence-fill';
     const lineLayerId = 'geofence-line';
     
-    if (mapInstance.getSource(sourceId)) {
-      (mapInstance.getSource(sourceId) as mapboxgl.GeoJSONSource).setData({
-        type: 'Feature',
-        properties: {},
-        geometry: { type: 'Polygon', coordinates: [coords] },
-      });
-    } else {
-      mapInstance.addSource(sourceId, {
-        type: 'geojson',
-        data: {
+    try {
+      if (mapInstance.getSource(sourceId)) {
+        (mapInstance.getSource(sourceId) as mapboxgl.GeoJSONSource).setData({
           type: 'Feature',
           properties: {},
           geometry: { type: 'Polygon', coordinates: [coords] },
-        },
-      });
+        });
+      } else {
+        mapInstance.addSource(sourceId, {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            properties: {},
+            geometry: { type: 'Polygon', coordinates: [coords] },
+          },
+        });
 
-      mapInstance.addLayer({
-        id: fillLayerId,
-        type: 'fill',
-        source: sourceId,
-        paint: {
-          'fill-color': eventData.themeColor,
-          'fill-opacity': 0.15,
-        },
-      });
+        mapInstance.addLayer({
+          id: fillLayerId,
+          type: 'fill',
+          source: sourceId,
+          paint: {
+            'fill-color': eventData.themeColor,
+            'fill-opacity': 0.15,
+          },
+        });
 
-      mapInstance.addLayer({
-        id: lineLayerId,
-        type: 'line',
-        source: sourceId,
-        paint: {
-          'line-color': eventData.themeColor,
-          'line-width': 2,
-          'line-dasharray': [2, 2],
-        },
-      });
-    }
+        mapInstance.addLayer({
+          id: lineLayerId,
+          type: 'line',
+          source: sourceId,
+          paint: {
+            'line-color': eventData.themeColor,
+            'line-width': 2,
+            'line-dasharray': [2, 2],
+          },
+        });
+      }
 
-    // Update layer colors if theme changes
-    if (mapInstance.getLayer(fillLayerId)) {
-      mapInstance.setPaintProperty(fillLayerId, 'fill-color', eventData.themeColor);
-    }
-    if (mapInstance.getLayer(lineLayerId)) {
-      mapInstance.setPaintProperty(lineLayerId, 'line-color', eventData.themeColor);
+      // Update layer colors if theme changes
+      if (mapInstance.getLayer(fillLayerId)) {
+        mapInstance.setPaintProperty(fillLayerId, 'fill-color', eventData.themeColor);
+      }
+      if (mapInstance.getLayer(lineLayerId)) {
+        mapInstance.setPaintProperty(lineLayerId, 'line-color', eventData.themeColor);
+      }
+    } catch (error) {
+      console.error('Error updating geofence circle:', error);
     }
   }, [eventData.geofenceRadius, eventData.coordinates, eventData.themeColor]);
 
@@ -411,6 +478,11 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         `types=address,poi,place,neighborhood,locality,region&` +
         `limit=1`
       );
+      
+      if (!response.ok) {
+        throw new Error(`Geocoding API error: ${response.status}`);
+      }
+      
       const data = await response.json();
       if (data.features && data.features.length > 0) {
         const place = data.features[0];
@@ -451,6 +523,11 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       }
     } catch (error) {
       console.error('Reverse geocoding error:', error);
+      toast({
+        title: 'Location Error',
+        description: 'Could not get address for this location.',
+        variant: 'destructive'
+      });
     } finally {
       setIsReverseGeocoding(false);
     }
@@ -482,6 +559,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           `fuzzy=true`
         );
         
+        if (!response.ok) {
+          throw new Error(`Search API error: ${response.status}`);
+        }
+        
         const data = await response.json();
         
         if (data.features && data.features.length > 0) {
@@ -500,6 +581,11 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         console.error('Search error:', error);
         setLocationSuggestions([]);
         setShowSuggestions(false);
+        toast({
+          title: 'Search Error',
+          description: 'Could not search for locations. Please try again.',
+          variant: 'destructive'
+        });
       } finally {
         setIsSearching(false);
       }
@@ -1275,7 +1361,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   
                   {/* Autocomplete Dropdown */}
                   {showSuggestions && locationSuggestions.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
+                    <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
                       {locationSuggestions.map((place, index) => {
                         const formatted = formatSuggestion(place);
                         return (
@@ -1285,7 +1371,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             className={cn(
                               "w-full px-4 py-3 flex items-start gap-3 transition-colors text-left border-border",
                               index < locationSuggestions.length - 1 && "border-b",
-                              "hover:bg-accent bg-gray-50" // Changed from transparent to gray-50
+                              "hover:bg-accent bg-gray-50"
                             )}
                           >
                             <span className="text-muted-foreground mt-0.5 flex-shrink-0">
@@ -1306,44 +1392,82 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   )}
                 </div>
 
-                {/* Map - Now persists between steps */}
+                {/* Map - Now with error handling */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium">Map View</label>
-                    <button 
-                      className="text-xs text-muted-foreground hover:text-primary"
-                      onClick={() => {
-                        if (map1.current) {
-                          map1.current.flyTo({
-                            center: [eventData.coordinates.lng, eventData.coordinates.lat],
-                            zoom: 14
-                          });
-                        }
-                      }}
-                    >
-                      Recenter
-                    </button>
-                  </div>
-                  <div className="relative w-full h-80 rounded-xl overflow-hidden border border-border">
-                    {isMapLoading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 z-10">
-                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                      </div>
-                    )}
-                    <div
-                      ref={mapContainer1}
-                      className="w-full h-full"
-                    />
-                    <div className="absolute top-3 left-3 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs border border-border">
-                      {isReverseGeocoding ? (
-                        <div className="flex items-center gap-1">
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          Getting address...
-                        </div>
-                      ) : (
-                        "Drag marker to adjust location"
+                    <div className="flex gap-2">
+                      <button 
+                        className="text-xs text-muted-foreground hover:text-primary"
+                        onClick={() => {
+                          if (map1.current) {
+                            map1.current.flyTo({
+                              center: [eventData.coordinates.lng, eventData.coordinates.lat],
+                              zoom: 14
+                            });
+                          }
+                        }}
+                      >
+                        Recenter
+                      </button>
+                      {mapError && (
+                        <button 
+                          className="text-xs text-red-500 hover:text-red-600"
+                          onClick={() => {
+                            if (mapContainer1.current && map1.current) {
+                              map1.current.remove();
+                              map1.current = null;
+                              setMapError(null);
+                              initializeMap(mapContainer1.current, 1);
+                            }
+                          }}
+                        >
+                          Retry
+                        </button>
                       )}
                     </div>
+                  </div>
+                  <div className="relative w-full h-80 rounded-xl overflow-hidden border border-border bg-gray-100">
+                    {mapError ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+                        <Map className="w-12 h-12 text-red-500 mb-3" />
+                        <p className="text-sm font-medium text-red-600 mb-2">{mapError}</p>
+                        <p className="text-xs text-muted-foreground text-center mb-4">
+                          Check your internet connection and Mapbox token
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            if (mapContainer1.current) {
+                              setMapError(null);
+                              initializeMap(mapContainer1.current, 1);
+                            }
+                          }}
+                        >
+                          <Loader2 className="w-3 h-3 mr-2" />
+                          Reload Map
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          ref={mapContainer1}
+                          className="w-full h-full"
+                          style={{ minHeight: '320px' }}
+                        />
+                        <div className="absolute top-3 left-3 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs border border-border">
+                          {isReverseGeocoding ? (
+                            <div className="flex items-center gap-1">
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              Getting address...
+                            </div>
+                          ) : (
+                            "Drag marker to adjust location"
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -1392,29 +1516,67 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium">Geofence Area</label>
-                    <span className="text-xs text-muted-foreground">
-                      Drag marker to adjust location
-                    </span>
-                  </div>
-                  <div className="relative w-full h-96 rounded-xl overflow-hidden border border-border">
-                    {isMapLoading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900 z-10">
-                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                      </div>
-                    )}
-                    <div
-                      ref={mapContainer2}
-                      className="w-full h-full"
-                    />
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm px-4 py-2 rounded-lg text-sm border border-border flex items-center gap-2">
-                      <div 
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: eventData.themeColor }}
-                      />
-                      <span className="font-medium" style={{ color: eventData.themeColor }}>
-                        {eventData.geofenceRadius}m radius
+                    <div className="flex gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        Drag marker to adjust location
                       </span>
+                      {mapError && (
+                        <button 
+                          className="text-xs text-red-500 hover:text-red-600"
+                          onClick={() => {
+                            if (mapContainer2.current && map2.current) {
+                              map2.current.remove();
+                              map2.current = null;
+                              setMapError(null);
+                              initializeMap(mapContainer2.current, 2);
+                            }
+                          }}
+                        >
+                          Retry
+                        </button>
+                      )}
                     </div>
+                  </div>
+                  <div className="relative w-full h-96 rounded-xl overflow-hidden border border-border bg-gray-100">
+                    {mapError ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
+                        <Map className="w-12 h-12 text-red-500 mb-3" />
+                        <p className="text-sm font-medium text-red-600 mb-2">{mapError}</p>
+                        <p className="text-xs text-muted-foreground text-center mb-4">
+                          Check your internet connection and Mapbox token
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            if (mapContainer2.current) {
+                              setMapError(null);
+                              initializeMap(mapContainer2.current, 2);
+                            }
+                          }}
+                        >
+                          <Loader2 className="w-3 h-3 mr-2" />
+                          Reload Map
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          ref={mapContainer2}
+                          className="w-full h-full"
+                          style={{ minHeight: '320px' }}
+                        />
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm px-4 py-2 rounded-lg text-sm border border-border flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: eventData.themeColor }}
+                          />
+                          <span className="font-medium" style={{ color: eventData.themeColor }}>
+                            {eventData.geofenceRadius}m radius
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
