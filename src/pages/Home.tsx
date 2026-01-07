@@ -98,7 +98,7 @@ export default function Home() {
         variant: 'destructive'
       });
     } else {
-      navigate('/EventManager');
+      navigate('/event-manager'); // FIXED: Changed from '/EventManager' to '/event-manager'
     }
   };
 
@@ -313,7 +313,7 @@ export default function Home() {
               <div className="flex items-center gap-2">
                 {createdEvents.length > 0 && isProUser && (
                   <button 
-                    onClick={() => navigate('/manage-events')}
+                    onClick={() => navigate('/event-manager')} // FIXED: Changed from '/manage-events' to '/event-manager'
                     className="text-primary text-sm font-medium flex items-center gap-1 hover:underline"
                   >
                     <Settings className="w-4 h-4" />
