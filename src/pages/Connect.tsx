@@ -1,6 +1,10 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Heart, RotateCcw, Sparkles, MapPin, Briefcase, Info, ChevronDown, Eye, EyeOff, Zap, Lock, AlertCircle } from 'lucide-react';
+import { 
+  X, Heart, RotateCcw, MapPin, Briefcase, Info, 
+  Zap, Lock, MessageCircle, User, Search, ChevronLeft,
+  MoreHorizontal, Calendar, Users, Filter
+} from 'lucide-react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
@@ -10,98 +14,122 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-// Design System Constants from JSON
-const DESIGN_SYSTEM = {
+// iOS Design System Constants
+const IOS_DESIGN = {
   colors: {
-    primary: {
-      lavender: '#C4B5FD',
-      lavenderLight: '#E9D5FF',
-      lavenderDark: '#A78BFA'
+    light: {
+      primary: '#000000',
+      secondary: 'rgba(60, 60, 67, 0.6)',
+      tertiary: 'rgba(60, 60, 67, 0.3)',
+      background: {
+        primary: '#FFFFFF',
+        secondary: '#F2F2F7',
+        tertiary: '#FFFFFF',
+        grouped: '#F2F2F7',
+      },
+      system: {
+        blue: '#007AFF',
+        green: '#34C759',
+        indigo: '#5856D6',
+        orange: '#FF9500',
+        red: '#FF3B30',
+        gray: '#8E8E93',
+        gray2: '#AEAEB2',
+        gray3: '#C7C7CC',
+        gray4: '#D1D1D6',
+        gray5: '#E5E5EA',
+        gray6: '#F2F2F7'
+      },
+      separator: 'rgba(60, 60, 67, 0.12)'
     },
-    background: {
-      dark: '#1A1A1A',
-      card: '#2D2D2D',
-      gradient: 'linear-gradient(180deg, #1A1A1A 0%, #2D2D2D 100%)'
-    },
-    text: {
+    dark: {
       primary: '#FFFFFF',
-      secondary: '#B8B8B8',
-      accent: '#C4B5FD'
-    },
-    accent: {
-      pink: '#FFB8E6',
-      gold: '#D4AF37',
-      goldLight: '#E8C878'
-    },
-    interactive: {
-      yes: '#FFB8E6',
-      no: '#4A4A4A',
-      border: '#C4B5FD'
+      secondary: 'rgba(235, 235, 245, 0.6)',
+      tertiary: 'rgba(235, 235, 245, 0.3)',
+      background: {
+        primary: '#000000',
+        secondary: '#1C1C1E',
+        tertiary: '#2C2C2E',
+        grouped: '#000000',
+      },
+      system: {
+        blue: '#0A84FF',
+        green: '#30D158',
+        indigo: '#5E5CE6',
+        orange: '#FF9F0A',
+        red: '#FF453A',
+        gray: '#8E8E93',
+        gray2: '#636366',
+        gray3: '#48484A',
+        gray4: '#3A3A3C',
+        gray5: '#2C2C2E',
+        gray6: '#1C1C1E'
+      },
+      separator: 'rgba(84, 84, 88, 0.65)'
     }
   },
   typography: {
-    fonts: {
-      heading: "'Playfair Display', 'Georgia', serif",
-      subheading: "'Poppins', 'Inter', sans-serif",
-      body: "'Inter', 'Roboto', sans-serif",
-      decorative: "'Pacifico', 'Brush Script MT', cursive"
-    },
+    fontFamily: `-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif`,
     sizes: {
-      h1: '48px',
-      h2: '36px',
-      h3: '28px',
-      h4: '24px',
-      body: '16px',
-      caption: '14px',
-      small: '12px'
-    },
-    weights: {
-      light: 300,
-      regular: 400,
-      medium: 500,
-      semibold: 600,
-      bold: 700
+      largeTitle: { fontSize: '34px', lineHeight: '41px', fontWeight: 400 },
+      title1: { fontSize: '28px', lineHeight: '34px', fontWeight: 400 },
+      title2: { fontSize: '22px', lineHeight: '28px', fontWeight: 400 },
+      title3: { fontSize: '20px', lineHeight: '25px', fontWeight: 400 },
+      headline: { fontSize: '17px', lineHeight: '22px', fontWeight: 600 },
+      body: { fontSize: '17px', lineHeight: '22px', fontWeight: 400 },
+      callout: { fontSize: '16px', lineHeight: '21px', fontWeight: 400 },
+      subhead: { fontSize: '15px', lineHeight: '20px', fontWeight: 400 },
+      footnote: { fontSize: '13px', lineHeight: '18px', fontWeight: 400 },
+      caption1: { fontSize: '12px', lineHeight: '16px', fontWeight: 400 },
+      caption2: { fontSize: '11px', lineHeight: '13px', fontWeight: 400 }
     }
   },
   spacing: {
-    xs: '4px',
-    sm: '8px',
-    md: '16px',
-    lg: '24px',
-    xl: '32px',
-    xxl: '48px',
-    xxxl: '64px'
+    xs: '8px',
+    sm: '16px',
+    md: '24px',
+    lg: '32px',
+    xl: '40px',
+    xxl: '48px'
   },
   borderRadius: {
     small: '8px',
-    medium: '16px',
-    large: '24px',
-    xlarge: '32px',
-    round: '50%'
+    medium: '10px',
+    large: '12px',
+    xlarge: '20px',
+    round: '9999px'
   },
   shadows: {
-    card: '0 8px 32px rgba(0, 0, 0, 0.4)',
-    button: '0 4px 16px rgba(196, 181, 253, 0.3)',
-    elevated: '0 12px 48px rgba(0, 0, 0, 0.5)'
+    subtle: '0 2px 8px rgba(0, 0, 0, 0.04)',
+    medium: '0 4px 12px rgba(0, 0, 0, 0.08)',
+    strong: '0 8px 24px rgba(0, 0, 0, 0.12)'
   },
   animations: {
-    cardSwipe: {
-      duration: '300ms',
-      easing: 'cubic-bezier(0.4, 0.0, 0.2, 1)'
-    },
-    buttonHover: {
-      duration: '200ms',
-      easing: 'ease-in-out'
-    },
-    fadeIn: {
-      duration: '400ms',
-      easing: 'ease-out'
-    },
-    slideUp: {
-      duration: '500ms',
-      easing: 'cubic-bezier(0.16, 1, 0.3, 1)'
-    }
+    spring: { type: 'spring', stiffness: 300, damping: 30 },
+    fast: { duration: 0.2 },
+    medium: { duration: 0.3 },
+    slow: { duration: 0.4 }
   }
+};
+
+// Custom hook for iOS-style theme
+const useIOSTheme = () => {
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  
+  useEffect(() => {
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsDarkMode(darkModeMediaQuery.matches);
+    
+    const handleChange = (e: MediaQueryListEvent) => setIsDarkMode(e.matches);
+    darkModeMediaQuery.addEventListener('change', handleChange);
+    
+    return () => darkModeMediaQuery.removeEventListener('change', handleChange);
+  }, []);
+  
+  return {
+    colors: isDarkMode ? IOS_DESIGN.colors.dark : IOS_DESIGN.colors.light,
+    isDarkMode
+  };
 };
 
 interface ProfileCardProps {
@@ -112,23 +140,24 @@ interface ProfileCardProps {
 }
 
 function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProps) {
+  const { colors } = useIOSTheme();
   const [exitX, setExitX] = useState(0);
   const [showHint, setShowHint] = useState<'like' | 'pass' | null>(null);
 
   const handleDragEnd = useCallback((_: unknown, info: PanInfo) => {
-    if (info.offset.x > 100) {
+    if (info.offset.x > 120) {
       setExitX(500);
       onSwipe('right');
-    } else if (info.offset.x < -100) {
+    } else if (info.offset.x < -120) {
       setExitX(-500);
       onSwipe('left');
     }
   }, [onSwipe]);
 
   const handleDrag = useCallback((_: unknown, info: PanInfo) => {
-    if (info.offset.x > 50) {
+    if (info.offset.x > 60) {
       setShowHint('like');
-    } else if (info.offset.x < -50) {
+    } else if (info.offset.x < -60) {
       setShowHint('pass');
     } else {
       setShowHint(null);
@@ -139,8 +168,8 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
     <motion.div
       className="absolute inset-0"
       drag={isTop ? 'x' : false}
-      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-      dragElastic={0.7}
+      dragConstraints={{ left: -200, right: 200, top: 0, bottom: 0 }}
+      dragElastic={0.8}
       onDrag={handleDrag}
       onDragEnd={handleDragEnd}
       initial={{ scale: isTop ? 1 : 0.95, y: isTop ? 0 : 20, opacity: isTop ? 1 : 0.7 }}
@@ -148,60 +177,63 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
         scale: isTop ? 1 : 0.95, 
         y: isTop ? 0 : 20,
         opacity: isTop ? 1 : 0.7,
-        rotateZ: isTop ? -2 : 0
       }}
-      exit={{ x: exitX, opacity: 0, rotateZ: exitX > 0 ? 15 : -15 }}
+      exit={{ x: exitX, opacity: 0, rotate: exitX * 0.05 }}
       whileDrag={{ cursor: 'grabbing' }}
       style={{ 
         zIndex: isTop ? 10 : 1,
-        transformOrigin: '50% 100%'
+        transformOrigin: 'center'
       }}
-      transition={{ 
-        type: 'spring', 
-        stiffness: 300, 
-        damping: 30 
-      }}
+      transition={IOS_DESIGN.animations.spring}
     >
-      {/* Profile Card Container with Design System Styles */}
+      {/* Profile Card Container - iOS Style */}
       <div 
-        className="w-full h-full rounded-[24px] overflow-hidden relative"
+        className="w-full h-full overflow-hidden relative"
         style={{
-          background: 'linear-gradient(135deg, #C4B5FD 0%, #E9D5FF 100%)',
-          boxShadow: DESIGN_SYSTEM.shadows.card,
-          border: '2px solid #D4AF37',
-          padding: '16px' // Reduced padding for smaller card
+          background: colors.background.primary,
+          borderRadius: IOS_DESIGN.borderRadius.xlarge,
+          boxShadow: IOS_DESIGN.shadows.medium,
+          border: `1px solid ${colors.separator}`
         }}
       >
         {/* Swipe Hints */}
         <AnimatePresence>
           {showHint === 'like' && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="absolute top-6 left-6 z-20 px-4 py-2 border-4 border-[#C4B5FD] rounded-xl rotate-[-20deg]"
+              initial={{ opacity: 0, scale: 0.8, x: -100 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.8, x: -100 }}
+              className="absolute top-8 left-8 z-20 px-6 py-3 rounded-[14px]"
               style={{
-                background: DESIGN_SYSTEM.colors.background.dark,
-                borderColor: DESIGN_SYSTEM.colors.interactive.border
+                background: colors.system.green + '20',
+                border: `2px solid ${colors.system.green}`,
+                backdropFilter: 'blur(20px)'
               }}
             >
-              <span className="text-[24px] font-bold" style={{ color: DESIGN_SYSTEM.colors.primary.lavender }}>
+              <span 
+                className="text-[24px] font-bold"
+                style={{ color: colors.system.green }}
+              >
                 LIKE
               </span>
             </motion.div>
           )}
           {showHint === 'pass' && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="absolute top-6 right-6 z-20 px-4 py-2 border-4 border-[#4A4A4A] rounded-xl rotate-[20deg]"
+              initial={{ opacity: 0, scale: 0.8, x: 100 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.8, x: 100 }}
+              className="absolute top-8 right-8 z-20 px-6 py-3 rounded-[14px]"
               style={{
-                background: DESIGN_SYSTEM.colors.background.dark,
-                borderColor: DESIGN_SYSTEM.colors.interactive.no
+                background: colors.system.red + '20',
+                border: `2px solid ${colors.system.red}`,
+                backdropFilter: 'blur(20px)'
               }}
             >
-              <span className="text-[24px] font-bold" style={{ color: DESIGN_SYSTEM.colors.text.secondary }}>
+              <span 
+                className="text-[24px] font-bold"
+                style={{ color: colors.system.red }}
+              >
                 PASS
               </span>
             </motion.div>
@@ -209,70 +241,124 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
         </AnimatePresence>
         
         {/* Profile Photo */}
-        <div className="relative h-[65%] mb-3"> {/* Increased height percentage for photo */}
+        <div className="relative h-[70%]">
           <img
             src={profile.photo}
             alt={profile.name}
-            className="w-full h-full object-cover rounded-[18px]" /* Slightly smaller radius */
+            className="w-full h-full object-cover"
             style={{
-              border: '2px solid #FFFFFF' /* Thinner border */
+              borderBottomLeftRadius: 0,
+              borderBottomRightRadius: 0
             }}
             draggable={false}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-[18px]" />
+          <div 
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(to top, rgba(0,0,0,0.1), transparent 30%)'
+            }}
+          />
           
-          {/* View Profile Button */}
-          <button
+          {/* Info Button */}
+          <motion.button
+            whileTap={{ scale: 0.9 }}
             onClick={(e) => {
               e.stopPropagation();
               onViewProfile();
             }}
-            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center hover:bg-black/60 transition-colors"
-            style={{ borderRadius: DESIGN_SYSTEM.borderRadius.round }}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center"
+            style={{
+              background: 'rgba(0, 0, 0, 0.3)',
+              backdropFilter: 'blur(20px)'
+            }}
           >
-            <Info className="w-4 h-4 text-white" />
-          </button>
-        </div>
-
-        {/* Profile Info - SIMPLIFIED: Only name, age, gender */}
-        <div className="text-[#1A1A1A] px-1">
-          <div className="flex items-center gap-2 mb-2">
-            <h2 
-              className="text-[20px] font-semibold" /* Reduced font size */
-              style={{ fontFamily: DESIGN_SYSTEM.typography.fonts.subheading }}
-            >
-              {profile.name}
-            </h2>
+            <Info className="w-5 h-5" style={{ color: colors.primary }} />
+          </motion.button>
+          
+          {/* Event Badge */}
+          <div 
+            className="absolute top-4 left-4 px-3 py-1.5 rounded-full flex items-center gap-1.5"
+            style={{
+              background: 'rgba(0, 0, 0, 0.3)',
+              backdropFilter: 'blur(20px)'
+            }}
+          >
+            <Calendar className="w-3 h-3" style={{ color: colors.primary }} />
             <span 
-              className="text-[20px] opacity-80" /* Reduced font size */
-              style={{ color: DESIGN_SYSTEM.colors.background.card }}
+              className="text-[13px] font-medium"
+              style={{ color: colors.primary }}
             >
-              {profile.age}
+              {profile.eventName || "Current Event"}
             </span>
           </div>
-          
-          {/* Gender/Identity - Centered badge */}
-          <div className="flex justify-center">
-            <div 
-              className="px-3 py-1 rounded-full flex items-center justify-center min-h-[24px]"
-              style={{
-                background: '#FFFFFF',
-                borderRadius: DESIGN_SYSTEM.borderRadius.small
-              }}
-            >
-              <span 
-                className="text-[12px] font-medium text-center"
-                style={{ 
-                  color: DESIGN_SYSTEM.colors.background.dark,
-                  lineHeight: '1.2',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+        </div>
+
+        {/* Profile Info - iOS Style */}
+        <div 
+          className="p-6"
+          style={{ padding: IOS_DESIGN.spacing.lg }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 
+                className="mb-1"
+                style={IOS_DESIGN.typography.sizes.headline}
+              >
+                {profile.name}, {profile.age}
+              </h2>
+              <p 
+                className="mb-2"
+                style={{
+                  ...IOS_DESIGN.typography.sizes.subhead,
+                  color: colors.secondary
                 }}
               >
                 {profile.gender || "Preferred not to say"}
-              </span>
+              </p>
             </div>
+            {profile.isPublic && (
+              <div 
+                className="px-2 py-1 rounded-[6px]"
+                style={{
+                  background: colors.system.green + '20'
+                }}
+              >
+                <span 
+                  className="text-[11px] font-medium"
+                  style={{ color: colors.system.green }}
+                >
+                  Checked In
+                </span>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            {profile.interests.slice(0, 3).map((interest) => (
+              <span
+                key={interest}
+                className="px-3 py-1.5 rounded-full"
+                style={{
+                  background: colors.background.secondary,
+                  ...IOS_DESIGN.typography.sizes.caption1,
+                  color: colors.primary
+                }}
+              >
+                {interest}
+              </span>
+            ))}
+            {profile.interests.length > 3 && (
+              <span 
+                className="px-3 py-1.5 rounded-full"
+                style={{
+                  background: colors.background.secondary,
+                  ...IOS_DESIGN.typography.sizes.caption1,
+                  color: colors.secondary
+                }}
+              >
+                +{profile.interests.length - 3}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -284,17 +370,16 @@ export default function Connect() {
   const navigate = useNavigate();
   const { connectionProfiles, user, addMatch, updateUser, tickets, isDemo } = useApp();
   const { toast } = useToast();
+  const { colors } = useIOSTheme();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [history, setHistory] = useState<number[]>([]);
   const [matchModal, setMatchModal] = useState<ConnectionProfile | null>(null);
   const [viewingProfile, setViewingProfile] = useState<ConnectionProfile | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
 
-  // Filter profiles based on demo mode or user's checked-in events
+  // Filter profiles
   const availableProfiles = useMemo(() => {
-    if (isDemo) {
-      return connectionProfiles;
-    }
-    // In production, only show profiles from events user has tickets for
+    if (isDemo) return connectionProfiles;
     const userEventIds = tickets.map(t => t.eventId);
     return connectionProfiles.filter(p => userEventIds.includes(p.eventId));
   }, [connectionProfiles, tickets, isDemo]);
@@ -302,7 +387,7 @@ export default function Connect() {
   const visibleProfiles = availableProfiles.slice(currentIndex, currentIndex + 2).reverse();
   const noMoreProfiles = currentIndex >= availableProfiles.length;
 
-  // Get current event name for header
+  // Get current event
   const currentEventName = useMemo(() => {
     if (isDemo && availableProfiles.length > 0) {
       return availableProfiles[0].eventName || "Windhoek Jazz Night";
@@ -310,15 +395,13 @@ export default function Connect() {
     if (tickets.length > 0) {
       return tickets[0].eventName || "Current Event";
     }
-    return "Connect";
+    return "Nearby";
   }, [isDemo, availableProfiles, tickets]);
 
-  // Check if user has any active events to connect at
   const hasActiveEvents = isDemo || tickets.length > 0;
 
   const handleSwipe = useCallback((direction: 'left' | 'right') => {
     if (direction === 'right') {
-      // Check like limits
       if (user?.subscription.tier === 'free' && (user.likesRemaining ?? 0) <= 0) {
         toast({
           title: 'Daily Limit Reached',
@@ -330,12 +413,10 @@ export default function Connect() {
 
       const profile = availableProfiles[currentIndex];
       
-      // Deduct like for free users
       if (user?.subscription.tier === 'free') {
         updateUser({ likesRemaining: (user.likesRemaining ?? 10) - 1 });
       }
 
-      // Match logic (70% chance in demo)
       if (Math.random() > 0.7) {
         addMatch(profile);
         setMatchModal(profile);
@@ -358,7 +439,6 @@ export default function Connect() {
     setCurrentIndex(lastIndex);
   };
 
-  // Likes remaining display
   const likesRemaining = user?.subscription.tier === 'free' 
     ? (user.likesRemaining ?? 10)
     : '∞';
@@ -367,52 +447,73 @@ export default function Connect() {
   if (!hasActiveEvents) {
     return (
       <div 
-        className="app-container min-h-screen pb-nav"
+        className="min-h-screen"
         style={{
-          background: DESIGN_SYSTEM.colors.background.gradient,
-          minHeight: '100vh'
+          background: colors.background.primary,
+          fontFamily: IOS_DESIGN.typography.fontFamily
         }}
       >
-        <div className="flex flex-col items-center justify-center min-h-[80vh] px-6">
+        {/* iOS Navigation Header */}
+        <div 
+          className="sticky top-0 z-50 px-4 pt-12 pb-4"
+          style={{
+            background: colors.background.primary,
+            borderBottom: `1px solid ${colors.separator}`,
+            backdropFilter: 'blur(20px)'
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-1"
+              style={{ color: colors.system.blue }}
+            >
+              <ChevronLeft className="w-5 h-5" />
+              <span style={IOS_DESIGN.typography.sizes.body}>Back</span>
+            </button>
+            <h1 style={IOS_DESIGN.typography.sizes.title3}>Connect</h1>
+            <div className="w-10"></div>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-center min-h-[70vh] px-6">
           <div 
-            className="w-24 h-24 rounded-full flex items-center justify-center mb-6"
+            className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
             style={{
-              background: `${DESIGN_SYSTEM.colors.primary.lavender}20`,
-              borderRadius: DESIGN_SYSTEM.borderRadius.round
+              background: colors.background.secondary,
             }}
           >
-            <Lock className="w-12 h-12" style={{ color: DESIGN_SYSTEM.colors.primary.lavender }} />
+            <Lock className="w-10 h-10" style={{ color: colors.secondary }} />
           </div>
           <h2 
-            className="text-2xl font-bold mb-3 text-center"
-            style={{ 
-              color: DESIGN_SYSTEM.colors.text.primary,
-              fontFamily: DESIGN_SYSTEM.typography.fonts.subheading
-            }}
+            className="mb-3 text-center"
+            style={IOS_DESIGN.typography.sizes.title3}
           >
             Check In to Connect
           </h2>
           <p 
             className="text-center mb-6 max-w-xs"
-            style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
-          >
-            To start connecting with people, you need to be checked in at an event. 
-            Get tickets and check in to see who's there!
-          </p>
-          <Button 
-            onClick={() => navigate('/events')} 
-            className="rounded-xl" 
-            size="lg"
             style={{
-              background: DESIGN_SYSTEM.colors.primary.lavender,
-              color: DESIGN_SYSTEM.colors.background.dark,
-              borderRadius: DESIGN_SYSTEM.borderRadius.large
+              ...IOS_DESIGN.typography.sizes.body,
+              color: colors.secondary
             }}
           >
-            <Sparkles className="w-5 h-5 mr-2" />
-            Browse Events
-          </Button>
+            To start connecting with people, you need to be checked in at an event.
+          </p>
+          <button
+            onClick={() => navigate('/events')}
+            className="w-full max-w-[280px] h-[50px] rounded-[12px] flex items-center justify-center gap-2"
+            style={{
+              background: colors.system.blue,
+              color: '#FFFFFF'
+            }}
+          >
+            <span style={IOS_DESIGN.typography.sizes.headline}>
+              Browse Events
+            </span>
+          </button>
         </div>
+
         <BottomNav />
       </div>
     );
@@ -420,58 +521,87 @@ export default function Connect() {
 
   return (
     <div 
-      className="app-container pb-nav"
+      className="min-h-screen pb-[calc(49px+env(safe-area-inset-bottom))]"
       style={{
-        background: DESIGN_SYSTEM.colors.background.gradient,
-        maxWidth: '430px',
-        margin: '0 auto',
-        padding: DESIGN_SYSTEM.spacing.lg,
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between'
+        background: colors.background.primary,
+        fontFamily: IOS_DESIGN.typography.fontFamily,
+        paddingBottom: 'calc(49px + env(safe-area-inset-bottom))'
       }}
     >
-      <div>
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 
-              className="text-[28px] font-bold mb-1" /* Smaller font size */
-              style={{ 
-                color: DESIGN_SYSTEM.colors.text.primary,
-                fontFamily: DESIGN_SYSTEM.typography.fonts.heading
-              }}
+      {/* iOS Navigation Header */}
+      <div 
+        className="sticky top-0 z-50 px-4 pt-12 pb-4"
+        style={{
+          background: colors.background.primary,
+          borderBottom: `1px solid ${colors.separator}`,
+          backdropFilter: 'blur(20px)'
+        }}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <h1 style={IOS_DESIGN.typography.sizes.title3}>
+            {currentEventName}
+          </h1>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowSearch(!showSearch)}
+              className="w-8 h-8 flex items-center justify-center"
             >
-              {currentEventName}
-            </h1>
-            <p 
-              className="text-[12px]" /* Smaller font size */
-              style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+              <Search className="w-5 h-5" style={{ color: colors.system.blue }} />
+            </button>
+            <button
+              onClick={() => navigate('/connect/filters')}
+              className="w-8 h-8 flex items-center justify-center"
             >
-              {availableProfiles.length - currentIndex} people here
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Likes Counter */}
-            <div 
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full border"
-              style={{
-                background: `linear-gradient(135deg, ${DESIGN_SYSTEM.colors.accent.pink}20 0%, ${DESIGN_SYSTEM.colors.primary.lavender}20 100%)`,
-                borderColor: `${DESIGN_SYSTEM.colors.accent.pink}30`,
-                borderRadius: DESIGN_SYSTEM.borderRadius.round
-              }}
-            >
-              <Heart className="w-3 h-3" style={{ color: DESIGN_SYSTEM.colors.accent.pink }} />
-              <span className="text-xs font-bold" style={{ color: DESIGN_SYSTEM.colors.accent.pink }}>
-                {likesRemaining}
-              </span>
-            </div>
+              <Filter className="w-5 h-5" style={{ color: colors.system.blue }} />
+            </button>
           </div>
         </div>
+        
+        {/* Subtitle */}
+        <p 
+          style={{
+            ...IOS_DESIGN.typography.sizes.subhead,
+            color: colors.secondary
+          }}
+        >
+          {availableProfiles.length - currentIndex} people here • {likesRemaining} likes today
+        </p>
+        
+        {/* Search Bar (when active) */}
+        <AnimatePresence>
+          {showSearch && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-4"
+            >
+              <div 
+                className="h-10 rounded-[10px] flex items-center px-3"
+                style={{
+                  background: colors.background.secondary
+                }}
+              >
+                <Search className="w-4 h-4 mr-3" style={{ color: colors.secondary }} />
+                <input
+                  type="text"
+                  placeholder="Search people..."
+                  className="flex-1 bg-transparent outline-none"
+                  style={{
+                    ...IOS_DESIGN.typography.sizes.body,
+                    color: colors.primary
+                  }}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
-        {/* Card Stack - Reduced height to prevent scrolling */}
-        <div className="relative h-[380px] w-full mx-auto mb-4">
+      {/* Main Content */}
+      <div className="px-4 pt-6">
+        {/* Card Stack */}
+        <div className="relative h-[480px] w-full mx-auto mb-8">
           {noMoreProfiles ? (
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
@@ -480,42 +610,39 @@ export default function Connect() {
             >
               <div className="text-center px-4">
                 <div 
-                  className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
+                  className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
                   style={{
-                    background: `${DESIGN_SYSTEM.colors.primary.lavender}20`,
-                    borderRadius: DESIGN_SYSTEM.borderRadius.round
+                    background: colors.background.secondary,
                   }}
                 >
-                  <Heart className="w-10 h-10" style={{ color: DESIGN_SYSTEM.colors.primary.lavender }} />
+                  <Users className="w-10 h-10" style={{ color: colors.secondary }} />
                 </div>
                 <h3 
-                  className="text-[22px] font-bold mb-2"
-                  style={{ 
-                    color: DESIGN_SYSTEM.colors.text.primary,
-                    fontFamily: DESIGN_SYSTEM.typography.fonts.heading
-                  }}
+                  className="mb-3"
+                  style={IOS_DESIGN.typography.sizes.title3}
                 >
                   That's Everyone!
                 </h3>
                 <p 
-                  className="text-xs mb-4"
-                  style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+                  className="mb-6"
+                  style={{
+                    ...IOS_DESIGN.typography.sizes.body,
+                    color: colors.secondary
+                  }}
                 >
                   Check back later for more connections.
                 </p>
-                <Button 
-                  onClick={() => navigate('/events')} 
-                  variant="outline" 
-                  className="rounded-xl text-sm"
+                <button
+                  onClick={() => navigate('/events')}
+                  className="h-[44px] px-6 rounded-[12px]"
                   style={{
-                    borderColor: DESIGN_SYSTEM.colors.primary.lavender,
-                    color: DESIGN_SYSTEM.colors.primary.lavender,
-                    borderRadius: DESIGN_SYSTEM.borderRadius.large,
-                    padding: '8px 16px'
+                    background: colors.background.secondary,
+                    color: colors.system.blue,
+                    ...IOS_DESIGN.typography.sizes.body
                   }}
                 >
                   Find More Events
-                </Button>
+                </button>
               </div>
             </motion.div>
           ) : (
@@ -533,115 +660,122 @@ export default function Connect() {
           )}
         </div>
 
-        {/* Action Buttons with adjusted spacing */}
+        {/* Action Buttons - iOS Style */}
         {!noMoreProfiles && (
-          <div className="flex justify-center items-center gap-4 mb-2">
-            {/* Pass Button */}
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => handleSwipe('left')}
-              className="flex items-center justify-center shadow-lg transition-all"
-              style={{
-                width: '64px',
-                height: '64px',
-                background: DESIGN_SYSTEM.colors.interactive.no,
-                color: DESIGN_SYSTEM.colors.text.primary,
-                borderRadius: DESIGN_SYSTEM.borderRadius.round,
-                boxShadow: DESIGN_SYSTEM.shadows.button
-              }}
-            >
-              <X className="w-6 h-6" />
-            </motion.button>
-
+          <div className="flex justify-center items-center gap-8 mb-6">
             {/* Undo Button */}
             <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
+              whileTap={{ scale: 0.9 }}
               onClick={handleUndo}
               disabled={history.length === 0}
               className={cn(
-                "flex items-center justify-center shadow-lg transition-all",
-                history.length === 0 && "opacity-30 cursor-not-allowed"
+                "w-12 h-12 rounded-full flex items-center justify-center",
+                history.length === 0 && "opacity-30"
               )}
               style={{
-                width: '48px',
-                height: '48px',
-                background: 'transparent',
-                color: DESIGN_SYSTEM.colors.text.secondary,
-                borderRadius: DESIGN_SYSTEM.borderRadius.round,
-                border: `2px solid ${DESIGN_SYSTEM.colors.text.secondary}`
+                background: colors.background.secondary,
+                border: `1px solid ${colors.separator}`
               }}
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="w-5 h-5" style={{ color: colors.primary }} />
+            </motion.button>
+
+            {/* Pass Button */}
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => handleSwipe('left')}
+              className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg"
+              style={{
+                background: colors.background.primary,
+                border: `2px solid ${colors.system.red}`,
+                boxShadow: `0 4px 12px ${colors.system.red}20`
+              }}
+            >
+              <X className="w-7 h-7" style={{ color: colors.system.red }} />
             </motion.button>
 
             {/* Like Button */}
             <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
+              whileTap={{ scale: 0.9 }}
               onClick={() => handleSwipe('right')}
-              className="flex items-center justify-center shadow-xl transition-all"
+              className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg"
               style={{
-                width: '64px',
-                height: '64px',
-                background: DESIGN_SYSTEM.colors.interactive.yes,
-                color: DESIGN_SYSTEM.colors.background.dark,
-                borderRadius: DESIGN_SYSTEM.borderRadius.round,
-                boxShadow: `0 4px 16px ${DESIGN_SYSTEM.colors.accent.pink}40`,
-                fontWeight: 600,
-                fontSize: '16px'
+                background: colors.system.green,
+                boxShadow: `0 4px 12px ${colors.system.green}40`
               }}
             >
-              <Heart className="w-6 h-6" />
+              <Heart className="w-7 h-7" fill="#FFFFFF" color="#FFFFFF" />
+            </motion.button>
+
+            {/* Info Button */}
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => visibleProfiles[visibleProfiles.length - 1] && 
+                setViewingProfile(visibleProfiles[visibleProfiles.length - 1])}
+              className="w-12 h-12 rounded-full flex items-center justify-center"
+              style={{
+                background: colors.background.secondary,
+                border: `1px solid ${colors.separator}`
+              }}
+            >
+              <Info className="w-5 h-5" style={{ color: colors.primary }} />
             </motion.button>
           </div>
         )}
 
-        {/* Umm Button - Smaller */}
-        {!noMoreProfiles && (
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="mx-auto block text-sm" /* Smaller font */
+        {/* Tips */}
+        <div 
+          className="p-4 rounded-[12px] mb-6"
+          style={{
+            background: colors.background.secondary,
+            border: `1px solid ${colors.separator}`
+          }}
+        >
+          <p 
+            className="text-center"
             style={{
-              background: 'transparent',
-              color: DESIGN_SYSTEM.colors.text.secondary,
-              fontSize: '13px',
-              fontStyle: 'italic',
-              border: 'none',
-              padding: '4px',
-              marginBottom: '16px' /* Add margin before bottom nav */
+              ...IOS_DESIGN.typography.sizes.footnote,
+              color: colors.secondary
             }}
           >
-            Maybe Later
-          </motion.button>
-        )}
+            💡 Swipe right to like, left to pass • Tap info for details
+          </p>
+        </div>
+      </div>
 
-        {/* Match Modal */}
-        <Dialog open={!!matchModal} onOpenChange={() => setMatchModal(null)}>
-          <DialogContent 
-            className="text-center p-0 overflow-hidden border-0"
-            style={{
-              background: DESIGN_SYSTEM.colors.background.card,
-              maxWidth: '320px',
-              borderRadius: DESIGN_SYSTEM.borderRadius.xlarge,
-              boxShadow: DESIGN_SYSTEM.shadows.elevated,
-              margin: '20px'
-            }}
-          >
+      {/* Match Modal - iOS Action Sheet Style */}
+      <Dialog open={!!matchModal} onOpenChange={() => setMatchModal(null)}>
+        <DialogContent 
+          className="p-0 border-0 max-w-[500px] mx-4"
+          style={{
+            borderRadius: IOS_DESIGN.borderRadius.xlarge,
+            background: colors.background.primary,
+            boxShadow: '0 0 40px rgba(0,0,0,0.2)',
+            margin: '20px',
+            overflow: 'hidden'
+          }}
+        >
+          <div className="relative">
+            {/* Drag Handle */}
+            <div className="flex justify-center pt-3">
+              <div 
+                className="w-10 h-1 rounded-full"
+                style={{ background: colors.separator }}
+              />
+            </div>
+
             <motion.div 
-              className="py-6 px-4"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+              className="py-8 px-6 text-center"
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={IOS_DESIGN.animations.spring}
             >
-              {/* Celebration Animation */}
-              <div className="relative w-24 h-24 mx-auto mb-4">
+              {/* Match Animation */}
+              <div className="relative w-24 h-24 mx-auto mb-6">
                 <motion.div 
                   className="absolute inset-0 rounded-full"
                   style={{
-                    background: `linear-gradient(135deg, ${DESIGN_SYSTEM.colors.accent.pink} 0%, ${DESIGN_SYSTEM.colors.primary.lavender} 100%)`
+                    background: `linear-gradient(135deg, ${colors.system.green} 0%, ${colors.system.blue} 100%)`
                   }}
                   animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0.2, 0.5] }}
                   transition={{ duration: 2, repeat: Infinity }}
@@ -651,22 +785,20 @@ export default function Connect() {
                   alt={matchModal?.name}
                   className="w-full h-full rounded-full object-cover border-4 relative z-10"
                   style={{
-                    borderColor: DESIGN_SYSTEM.colors.background.card,
-                    borderRadius: DESIGN_SYSTEM.borderRadius.round
+                    borderColor: colors.background.primary,
                   }}
                 />
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.2, type: 'spring' }}
-                  className="absolute -top-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center z-20 border-4"
+                  className="absolute -top-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center z-20 border-4"
                   style={{
-                    background: DESIGN_SYSTEM.colors.accent.gold,
-                    borderColor: DESIGN_SYSTEM.colors.background.card,
-                    borderRadius: DESIGN_SYSTEM.borderRadius.round
+                    background: colors.system.green,
+                    borderColor: colors.background.primary,
                   }}
                 >
-                  <Heart className="w-3 h-3 text-white fill-white" />
+                  <Heart className="w-4 h-4" fill="#FFFFFF" color="#FFFFFF" />
                 </motion.div>
               </div>
               
@@ -674,11 +806,8 @@ export default function Connect() {
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.1 }}
-                className="text-[24px] font-bold mb-2"
-                style={{ 
-                  fontFamily: DESIGN_SYSTEM.typography.fonts.decorative,
-                  color: DESIGN_SYSTEM.colors.text.primary
-                }}
+                className="mb-2"
+                style={IOS_DESIGN.typography.sizes.title3}
               >
                 It's a Match!
               </motion.h2>
@@ -686,77 +815,82 @@ export default function Connect() {
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="mb-4 text-sm"
-                style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+                className="mb-6"
+                style={{
+                  ...IOS_DESIGN.typography.sizes.body,
+                  color: colors.secondary
+                }}
               >
                 You and {matchModal?.name} liked each other
               </motion.p>
               
-              <motion.div 
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                className="flex gap-2"
-              >
-                <Button
-                  variant="outline"
-                  onClick={() => setMatchModal(null)}
-                  className="flex-1 h-10 text-sm"
-                  style={{
-                    borderRadius: DESIGN_SYSTEM.borderRadius.medium,
-                    borderColor: DESIGN_SYSTEM.colors.primary.lavender,
-                    color: DESIGN_SYSTEM.colors.primary.lavender
-                  }}
-                >
-                  Keep Swiping
-                </Button>
-                <Button
+              <div className="space-y-3">
+                <motion.button
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.3 }}
                   onClick={() => {
                     setMatchModal(null);
                     navigate('/matches');
                   }}
-                  className="flex-1 h-10 text-sm"
+                  className="w-full h-[50px] rounded-[12px] flex items-center justify-center gap-2"
                   style={{
-                    background: DESIGN_SYSTEM.colors.primary.lavender,
-                    color: DESIGN_SYSTEM.colors.background.dark,
-                    borderRadius: DESIGN_SYSTEM.borderRadius.medium,
-                    fontWeight: 600
+                    background: colors.system.blue,
+                    color: '#FFFFFF'
                   }}
                 >
-                  Message
-                </Button>
-              </motion.div>
+                  <MessageCircle className="w-5 h-5" />
+                  <span style={IOS_DESIGN.typography.sizes.headline}>
+                    Send Message
+                  </span>
+                </motion.button>
+                
+                <motion.button
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  onClick={() => setMatchModal(null)}
+                  className="w-full h-[44px] rounded-[12px]"
+                  style={{
+                    background: colors.background.secondary,
+                    color: colors.system.blue,
+                    ...IOS_DESIGN.typography.sizes.body
+                  }}
+                >
+                  Keep Swiping
+                </motion.button>
+              </div>
             </motion.div>
-          </DialogContent>
-        </Dialog>
-      </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-      {/* Profile View Modal - FIXED to fit properly */}
+      {/* Profile Detail Sheet - iOS Style */}
       <Dialog open={!!viewingProfile} onOpenChange={() => setViewingProfile(null)}>
         <DialogContent 
-          className="p-0 overflow-hidden max-h-[85vh] flex flex-col"
+          className="p-0 border-0 max-w-[500px] mx-4"
           style={{
-            background: DESIGN_SYSTEM.colors.background.card,
-            maxWidth: '380px',
-            width: '90vw',
-            borderRadius: DESIGN_SYSTEM.borderRadius.xlarge,
-            boxShadow: DESIGN_SYSTEM.shadows.elevated,
-            margin: '20px auto'
+            borderRadius: IOS_DESIGN.borderRadius.xlarge,
+            background: colors.background.primary,
+            boxShadow: '0 0 40px rgba(0,0,0,0.2)',
+            margin: '20px',
+            maxHeight: '85vh',
+            overflow: 'hidden'
           }}
         >
           {viewingProfile && (
             <div className="flex flex-col h-full">
-              {/* Close button at top */}
-              <button
-                onClick={() => setViewingProfile(null)}
-                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center z-10 hover:bg-black/60 transition-colors"
-                style={{ borderRadius: DESIGN_SYSTEM.borderRadius.round }}
-              >
-                <X className="w-4 h-4 text-white" />
-              </button>
+              {/* Drag Handle */}
+              <div className="flex justify-center pt-3">
+                <div 
+                  className="w-10 h-1 rounded-full"
+                  style={{ background: colors.separator }}
+                />
+              </div>
 
               <div className="overflow-y-auto flex-1">
-                <div className="relative h-48">
+                {/* Profile Header */}
+                <div className="relative h-56">
                   <img
                     src={viewingProfile.photo}
                     alt={viewingProfile.name}
@@ -765,80 +899,133 @@ export default function Connect() {
                   <div 
                     className="absolute inset-0"
                     style={{
-                      background: 'linear-gradient(to top, rgba(45, 45, 45, 0.9) 0%, rgba(45, 45, 45, 0.3) 50%, transparent 100%)'
+                      background: 'linear-gradient(to top, rgba(0,0,0,0.3), transparent 40%)'
                     }}
                   />
+                  
+                  {/* Back Button */}
+                  <button
+                    onClick={() => setViewingProfile(null)}
+                    className="absolute top-4 left-4 w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.3)',
+                      backdropFilter: 'blur(20px)'
+                    }}
+                  >
+                    <ChevronLeft className="w-5 h-5" style={{ color: '#FFFFFF' }} />
+                  </button>
+                  
+                  {/* Like Button */}
+                  <button
+                    onClick={() => {
+                      setViewingProfile(null);
+                      handleSwipe('right');
+                    }}
+                    className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{
+                      background: colors.system.green,
+                      color: '#FFFFFF'
+                    }}
+                  >
+                    <Heart className="w-5 h-5" fill="#FFFFFF" color="#FFFFFF" />
+                  </button>
                 </div>
                 
-                <div className="p-5 space-y-4">
-                  <div>
+                {/* Profile Content */}
+                <div className="p-6">
+                  <div className="mb-6">
                     <h2 
-                      className="text-[24px] font-bold mb-1"
-                      style={{ 
-                        color: DESIGN_SYSTEM.colors.text.primary,
-                        fontFamily: DESIGN_SYSTEM.typography.fonts.subheading
-                      }}
+                      className="mb-1"
+                      style={IOS_DESIGN.typography.sizes.title3}
                     >
                       {viewingProfile.name}, {viewingProfile.age}
                     </h2>
                     {viewingProfile.gender && (
                       <p 
-                        className="text-[14px]"
-                        style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+                        className="mb-3"
+                        style={{
+                          ...IOS_DESIGN.typography.sizes.body,
+                          color: colors.secondary
+                        }}
                       >
                         {viewingProfile.gender}
                       </p>
                     )}
-                    {viewingProfile.occupation && (
-                      <p 
-                        className="text-[14px] flex items-center gap-2 mt-1"
-                        style={{ color: DESIGN_SYSTEM.colors.primary.lavender }}
+                    
+                    <div className="flex items-center gap-4 mb-4">
+                      {viewingProfile.occupation && (
+                        <div className="flex items-center gap-1.5">
+                          <Briefcase className="w-4 h-4" style={{ color: colors.secondary }} />
+                          <span style={{
+                            ...IOS_DESIGN.typography.sizes.footnote,
+                            color: colors.secondary
+                          }}>
+                            {viewingProfile.occupation}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4" style={{ color: colors.secondary }} />
+                        <span style={{
+                          ...IOS_DESIGN.typography.sizes.footnote,
+                          color: colors.secondary
+                        }}>
+                          {viewingProfile.location}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {viewingProfile.isPublic && (
+                      <div 
+                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-[6px] mb-4"
+                        style={{
+                          background: colors.system.green + '20'
+                        }}
                       >
-                        <Briefcase className="w-3 h-3" />
-                        {viewingProfile.occupation}
-                      </p>
+                        <Zap className="w-3 h-3" style={{ color: colors.system.green }} />
+                        <span style={{
+                          ...IOS_DESIGN.typography.sizes.caption1,
+                          color: colors.system.green
+                        }}>
+                          Checked In
+                        </span>
+                      </div>
                     )}
                   </div>
 
-                  <div>
-                    <h3 
-                      className="text-sm font-semibold mb-2"
-                      style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
-                    >
-                      About
-                    </h3>
-                    <p 
-                      className="text-sm"
-                      style={{ 
-                        color: DESIGN_SYSTEM.colors.text.secondary,
-                        lineHeight: 1.6
-                      }}
-                    >
-                      {viewingProfile.bio}
-                    </p>
-                  </div>
-
-                  <div>
-                    <h3 
-                      className="text-sm font-semibold mb-2"
-                      style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
-                    >
-                      Location
-                    </h3>
-                    <p 
-                      className="text-sm flex items-center gap-2"
-                      style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
-                    >
-                      <MapPin className="w-3 h-3" style={{ color: DESIGN_SYSTEM.colors.primary.lavender }} />
-                      {viewingProfile.location}
-                    </p>
-                  </div>
+                  {/* About Section */}
+                  {viewingProfile.bio && (
+                    <div className="mb-6">
+                      <h3 
+                        className="mb-3"
+                        style={{
+                          ...IOS_DESIGN.typography.sizes.headline,
+                          color: colors.primary
+                        }}
+                      >
+                        About
+                      </h3>
+                      <p 
+                        style={{
+                          ...IOS_DESIGN.typography.sizes.body,
+                          color: colors.secondary,
+                          lineHeight: '1.6'
+                        }}
+                      >
+                        {viewingProfile.bio}
+                      </p>
+                    </div>
+                  )}
                   
+                  {/* Interests */}
                   {viewingProfile.interests && viewingProfile.interests.length > 0 && (
                     <div>
                       <h3 
-                        className="text-sm font-semibold mb-2"
-                        style={{ color: DESIGN_SYSTEM.colors.text.secondary }}
+                        className="mb-3"
+                        style={{
+                          ...IOS_DESIGN.typography.sizes.headline,
+                          color: colors.primary
+                        }}
                       >
                         Interests
                       </h3>
@@ -846,11 +1033,11 @@ export default function Connect() {
                         {viewingProfile.interests.map((interest) => (
                           <span
                             key={interest}
-                            className="px-2 py-1 text-xs font-medium rounded-full"
+                            className="px-3 py-2 rounded-[10px]"
                             style={{
-                              background: `${DESIGN_SYSTEM.colors.primary.lavender}20`,
-                              color: DESIGN_SYSTEM.colors.primary.lavender,
-                              borderRadius: DESIGN_SYSTEM.borderRadius.small
+                              background: colors.background.secondary,
+                              ...IOS_DESIGN.typography.sizes.callout,
+                              color: colors.primary
                             }}
                           >
                             {interest}
@@ -862,41 +1049,45 @@ export default function Connect() {
                 </div>
               </div>
 
-              {/* Action buttons at bottom - FIXED positioning */}
-              <div className="p-4 border-t" style={{ borderColor: `${DESIGN_SYSTEM.colors.text.secondary}20` }}>
+              {/* Action Buttons */}
+              <div 
+                className="p-4 border-t"
+                style={{ borderColor: colors.separator }}
+              >
                 <div className="flex gap-3">
-                  <Button
-                    variant="outline"
+                  <button
                     onClick={() => {
                       setViewingProfile(null);
                       handleSwipe('left');
                     }}
-                    className="flex-1 h-10"
+                    className="flex-1 h-[50px] rounded-[12px] flex items-center justify-center gap-2"
                     style={{
-                      borderRadius: DESIGN_SYSTEM.borderRadius.medium,
-                      borderColor: DESIGN_SYSTEM.colors.interactive.no,
-                      color: DESIGN_SYSTEM.colors.text.primary
+                      background: colors.background.secondary,
+                      color: colors.system.red,
+                      border: `1px solid ${colors.separator}`
                     }}
                   >
-                    <X className="w-4 h-4 mr-2" />
-                    Pass
-                  </Button>
-                  <Button
+                    <X className="w-5 h-5" />
+                    <span style={IOS_DESIGN.typography.sizes.headline}>
+                      Pass
+                    </span>
+                  </button>
+                  <button
                     onClick={() => {
                       setViewingProfile(null);
                       handleSwipe('right');
                     }}
-                    className="flex-1 h-10"
+                    className="flex-1 h-[50px] rounded-[12px] flex items-center justify-center gap-2"
                     style={{
-                      background: DESIGN_SYSTEM.colors.primary.lavender,
-                      color: DESIGN_SYSTEM.colors.background.dark,
-                      borderRadius: DESIGN_SYSTEM.borderRadius.medium,
-                      fontWeight: 600
+                      background: colors.system.green,
+                      color: '#FFFFFF'
                     }}
                   >
-                    <Heart className="w-4 h-4 mr-2" />
-                    Like
-                  </Button>
+                    <Heart className="w-5 h-5" fill="#FFFFFF" color="#FFFFFF" />
+                    <span style={IOS_DESIGN.typography.sizes.headline}>
+                      Like
+                    </span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -904,8 +1095,6 @@ export default function Connect() {
         </DialogContent>
       </Dialog>
 
-      {/* Add spacing before bottom nav */}
-      <div className="mb-4"></div>
       <BottomNav />
     </div>
   );
