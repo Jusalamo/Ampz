@@ -27,11 +27,12 @@ const DESIGN = {
 };
 
 // Adjusted heights for better spacing
+// Adjusted heights for better spacing
 const HEIGHTS = {
-  header: '90px',       // Reduced header height
-  cardStack: '420px',   // Increased card height for less gap
-  buttons: '110px',     // Adjusted button area
-  bottomSpacing: '20px' // Space above bottom nav
+  header: '85px',       // Reduced header height
+  cardStack: '440px',   // Increased card height to reduce gap with buttons
+  buttons: '110px',     // Increased button area for better spacing
+  bottomSpacing: '35px' // Increased space above bottom nav
 };
 
 interface ProfileCardProps {
