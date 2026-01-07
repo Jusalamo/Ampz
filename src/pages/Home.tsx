@@ -37,25 +37,17 @@ const DESIGN = {
   }
 };
 
-// Theme colors for different event categories
-const EVENT_THEMES = {
-  music: '#C4B5FD', // Purple
-  art: '#FFB8E6',   // Pink
-  tech: '#60A5FA',  // Blue
-  food: '#34D399',  // Green
-  sports: '#F87171', // Red
-  default: '#C4B5FD' // Primary
-};
-
-// Get theme color for event category
-const getEventTheme = (category = '') => {
-  const cat = category.toLowerCase();
-  if (cat.includes('music') || cat.includes('concert')) return EVENT_THEMES.music;
-  if (cat.includes('art') || cat.includes('exhibit')) return EVENT_THEMES.art;
-  if (cat.includes('tech') || cat.includes('workshop')) return EVENT_THEMES.tech;
-  if (cat.includes('food') || cat.includes('dining')) return EVENT_THEMES.food;
-  if (cat.includes('sports') || cat.includes('fitness')) return EVENT_THEMES.sports;
-  return EVENT_THEMES.default;
+// Event theme colors mapping
+const EVENT_THEME_COLORS = {
+  music: '#FF6B6B',
+  art: '#4ECDC4',
+  tech: '#45B7D1',
+  food: '#FFA726',
+  sports: '#66BB6A',
+  business: '#AB47BC',
+  wellness: '#26A69A',
+  education: '#5C6BC0',
+  default: '#C4B5FD' // Primary color as fallback
 };
 
 export default function Home() {
@@ -70,6 +62,7 @@ export default function Home() {
   const [showEventWizard, setShowEventWizard] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [cameraPermissionChecked, setCameraPermissionChecked] = useState(false);
   const featuredRef = useRef<HTMLDivElement>(null);
   const myEventsCarouselRef = useRef<HTMLDivElement>(null);
 
@@ -83,6 +76,12 @@ export default function Home() {
 
   // Check if user has Pro or Max subscription
   const isProUser = user?.subscription?.tier === 'pro' || user?.subscription?.tier === 'max';
+
+  // Prevent camera permission request on mount - only request when user actually clicks QR Scan
+  useEffect(() => {
+    // Just mark that we've checked, don't request permission
+    setCameraPermissionChecked(true);
+  }, []);
 
   // Auto-rotate featured events
   useEffect(() => {
@@ -117,6 +116,36 @@ export default function Home() {
     }
   }, [myEventsIndex, myEvents?.length]);
 
+  // Get event theme color based on category
+  const getEventThemeColor = (category?: string) => {
+    if (!category) return EVENT_THEME_COLORS.default;
+    
+    const normalizedCategory = category.toLowerCase().trim();
+    
+    // Check for exact matches
+    for (const [key, color] of Object.entries(EVENT_THEME_COLORS)) {
+      if (normalizedCategory.includes(key) || key.includes(normalizedCategory)) {
+        return color;
+      }
+    }
+    
+    // Check for partial matches
+    if (normalizedCategory.includes('concert') || normalizedCategory.includes('jazz') || normalizedCategory.includes('dj')) {
+      return EVENT_THEME_COLORS.music;
+    }
+    if (normalizedCategory.includes('gallery') || normalizedCategory.includes('exhibit') || normalizedCategory.includes('design')) {
+      return EVENT_THEME_COLORS.art;
+    }
+    if (normalizedCategory.includes('workshop') || normalizedCategory.includes('seminar') || normalizedCategory.includes('lecture')) {
+      return EVENT_THEME_COLORS.education;
+    }
+    if (normalizedCategory.includes('networking') || normalizedCategory.includes('conference')) {
+      return EVENT_THEME_COLORS.business;
+    }
+    
+    return EVENT_THEME_COLORS.default;
+  };
+
   const handleCreateEvent = () => {
     if (!isProUser) {
       toast({ 
@@ -147,18 +176,16 @@ export default function Home() {
     }
   };
 
-  const handleQrScan = () => {
-    // Only request camera access when the modal opens
-    setShowCheckIn(true);
-  };
-
-  // Quick actions in 2x2 grid
+  // Quick actions in 2x2 grid - Modified QR Scan to prevent auto camera request
   const quickActions = [
     { 
       icon: QrCode, 
       label: 'QR Scan', 
       color: 'bg-purple-500', 
-      onClick: handleQrScan,
+      onClick: () => {
+        // Only show modal, don't request camera permission until user confirms
+        setShowCheckIn(true);
+      },
       pro: false
     },
     { 
@@ -213,13 +240,22 @@ export default function Home() {
   const itemsPerSlide = 2;
   const totalMyEventsSlides = Math.ceil(myEvents.length / itemsPerSlide);
 
-  // Calculate my events carousel navigation
+  // Handle my events carousel navigation
   const handleMyEventsPrev = () => {
     setMyEventsIndex(prev => (prev - 1 + totalMyEventsSlides) % totalMyEventsSlides);
   };
 
   const handleMyEventsNext = () => {
     setMyEventsIndex(prev => (prev + 1) % totalMyEventsSlides);
+  };
+
+  // Handle featured events navigation
+  const handleFeaturedPrev = () => {
+    setFeaturedIndex(prev => (prev - 1 + featuredEvents.length) % featuredEvents.length);
+  };
+
+  const handleFeaturedNext = () => {
+    setFeaturedIndex(prev => (prev + 1) % featuredEvents.length);
   };
 
   return (
@@ -449,6 +485,7 @@ export default function Home() {
                         .map((event) => {
                           const isBookmarked = user?.bookmarkedEvents?.includes(event.id);
                           const isCreated = event.organizerId === user?.id;
+                          const themeColor = getEventThemeColor(event.category);
                           
                           return (
                             <div 
@@ -475,7 +512,7 @@ export default function Home() {
                                   {isBookmarked && (
                                     <div 
                                       className="w-8 h-8 rounded-full flex items-center justify-center"
-                                      style={{ background: DESIGN.colors.primary }}
+                                      style={{ background: themeColor }}
                                     >
                                       <Bookmark className="w-4 h-4 text-white fill-white" />
                                     </div>
@@ -485,7 +522,7 @@ export default function Home() {
                                   <div className="absolute top-2 left-2">
                                     <div 
                                       className="px-2 py-1 rounded text-xs font-bold text-white"
-                                      style={{ background: `${DESIGN.colors.primary}90` }}
+                                      style={{ background: `${themeColor}90` }}
                                     >
                                       CREATED
                                     </div>
@@ -508,7 +545,10 @@ export default function Home() {
                                   <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                                     {event.category || 'Event'}
                                   </span>
-                                  <span className="text-xs font-semibold">
+                                  <span 
+                                    className="text-xs font-semibold"
+                                    style={{ color: themeColor }}
+                                  >
                                     {event.price === 0 ? 'FREE' : `N$${event.price}`}
                                   </span>
                                 </div>
@@ -574,7 +614,7 @@ export default function Home() {
           </section>
         )}
 
-        {/* Featured Events - Carousel with Illuminated Border */}
+        {/* Featured Events - Carousel */}
         {featuredEvents.length > 0 ? (
           <section className="mb-6">
             <div className="flex items-center justify-between mb-4">
@@ -599,166 +639,100 @@ export default function Home() {
                 style={{ scrollBehavior: 'smooth' }}
               >
                 {featuredEvents.map((event) => {
-                  const themeColor = getEventTheme(event.category);
+                  const themeColor = getEventThemeColor(event.category);
                   
                   return (
                     <div 
                       key={event.id} 
                       className="flex-shrink-0 w-full snap-start px-1"
                     >
-                      {/* Featured Event Card with Illuminated Border and Pointed Top Corners */}
-                      <div className="relative">
-                        {/* Illuminated Border Effect */}
-                        <div 
-                          className="absolute inset-0 rounded-[28px] animate-pulse"
-                          style={{
-                            background: `linear-gradient(90deg, transparent, ${themeColor}40, transparent)`,
-                            filter: 'blur(12px)',
-                            zIndex: 0,
-                            margin: '-2px'
-                          }}
-                        />
-                        
-                        {/* Inner Glow Effect */}
-                        <div 
-                          className="absolute inset-0 rounded-[26px]"
-                          style={{
-                            boxShadow: `0 0 30px ${themeColor}40, inset 0 0 20px ${themeColor}20`,
-                            zIndex: 1,
-                            margin: '1px',
-                            pointerEvents: 'none'
-                          }}
-                        />
-
-                        {/* Main Card Container */}
-                        <div 
-                          className="relative transition-all cursor-pointer active:scale-98 z-10"
-                          style={{ 
-                            background: DESIGN.colors.card,
-                            border: `1px solid ${DESIGN.colors.textSecondary}20`,
-                            borderRadius: '24px',
-                            transform: 'scale(0.95)',
-                            transformOrigin: 'center',
-                            overflow: 'hidden'
-                          }}
-                          onClick={() => navigate(`/event/${event.id}`)}
-                        >
-                          {/* Event Image Container with Pointed Top Corners */}
-                          <div className="relative">
-                            {/* Pointed Top Corners Overlay */}
-                            <div className="absolute inset-0 z-10 pointer-events-none">
-                              <div 
-                                className="absolute top-0 left-0 w-12 h-12"
-                                style={{
-                                  background: 'linear-gradient(135deg, transparent 50%, DESIGN.colors.card 50%)',
-                                  clipPath: 'polygon(0 0, 100% 0, 0 100%)',
-                                  opacity: 0.9
-                                }}
-                              />
-                              <div 
-                                className="absolute top-0 right-0 w-12 h-12"
-                                style={{
-                                  background: 'linear-gradient(225deg, transparent 50%, DESIGN.colors.card 50%)',
-                                  clipPath: 'polygon(100% 0, 0 0, 100% 100%)',
-                                  opacity: 0.9
-                                }}
-                              />
-                            </div>
-
-                            {/* Event Image with Pointed Top Corners */}
+                      {/* Featured Event Card with pure shaped top corners */}
+                      <div 
+                        className="transition-all cursor-pointer active:scale-98 overflow-hidden"
+                        style={{ 
+                          background: DESIGN.colors.card,
+                          border: `1px solid ${DESIGN.colors.textSecondary}20`,
+                          // Top corners are straight (pure shaped), bottom corners rounded
+                          borderTopLeftRadius: '0px',
+                          borderTopRightRadius: '0px',
+                          borderBottomLeftRadius: DESIGN.borderRadius.card,
+                          borderBottomRightRadius: DESIGN.borderRadius.card,
+                          transform: 'scale(0.95)',
+                          transformOrigin: 'center'
+                        }}
+                        onClick={() => navigate(`/event/${event.id}`)}
+                      >
+                        {/* Featured Event Image - Top corners straight */}
+                        <div className="relative h-44">
+                          <img 
+                            src={event.coverImage} 
+                            alt={event.name}
+                            className="w-full h-full object-cover"
+                            style={{
+                              borderTopLeftRadius: '0px',
+                              borderTopRightRadius: '0px'
+                            }}
+                            onError={(e) => {
+                              e.currentTarget.src = '/default-event.jpg';
+                            }}
+                          />
+                          <div className="absolute top-3 right-3">
                             <div 
-                              className="relative h-44 overflow-hidden"
-                              style={{
-                                clipPath: 'polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%, 0 12px)'
+                              className="w-10 h-10 rounded-full flex items-center justify-center"
+                              style={{ 
+                                background: 'rgba(251, 191, 36, 0.9)',
+                                backdropFilter: 'blur(4px)'
                               }}
                             >
-                              <img 
-                                src={event.coverImage} 
-                                alt={event.name}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  e.currentTarget.src = '/default-event.jpg';
-                                }}
-                              />
-                              
-                              {/* Theme-colored overlay gradient */}
-                              <div 
-                                className="absolute inset-0"
-                                style={{
-                                  background: `linear-gradient(to bottom, ${themeColor}20 0%, transparent 100%)`
-                                }}
-                              />
-                              
-                              {/* Star Badge */}
-                              <div className="absolute top-3 right-3">
-                                <div 
-                                  className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"
-                                  style={{ 
-                                    background: 'rgba(251, 191, 36, 0.9)',
-                                    boxShadow: '0 4px 12px rgba(251, 191, 36, 0.4)'
-                                  }}
-                                >
-                                  <Star className="w-5 h-5 text-black fill-black" />
-                                </div>
-                              </div>
-                              
-                              {/* Attendees Count */}
-                              <div 
-                                className="absolute bottom-3 left-3 text-white text-sm px-3 py-1.5 rounded-lg backdrop-blur-sm"
-                                style={{ 
-                                  background: 'rgba(0, 0, 0, 0.7)',
-                                  border: `1px solid ${themeColor}40`
-                                }}
-                              >
-                                {event.attendees || 0} going
-                              </div>
+                              <Star className="w-5 h-5 text-black fill-black" />
                             </div>
                           </div>
+                          <div 
+                            className="absolute bottom-3 left-3 text-white text-sm px-3 py-1 rounded"
+                            style={{ background: 'rgba(0, 0, 0, 0.7)' }}
+                          >
+                            {event.attendees || 0} going
+                          </div>
+                        </div>
+                        
+                        {/* Event Details */}
+                        <div className="p-3">
+                          <div className="flex items-start justify-between mb-2">
+                            <h3 className="text-base font-bold line-clamp-1">{event.name}</h3>
+                            {/* Event price in theme color */}
+                            <span 
+                              className="text-sm font-semibold"
+                              style={{ color: themeColor }}
+                            >
+                              {event.price === 0 ? 'FREE' : `N$${event.price}`}
+                            </span>
+                          </div>
                           
-                          {/* Event Details */}
-                          <div className="p-3">
-                            <div className="flex items-start justify-between mb-2">
-                              <h3 className="text-base font-bold line-clamp-1">{event.name}</h3>
-                              <span className="text-sm font-semibold">
-                                {event.price === 0 ? 'FREE' : `N$${event.price}`}
-                              </span>
-                            </div>
-                            
-                            <div className="flex items-center gap-2 mb-2">
-                              <span 
-                                className="px-2 py-1 text-xs font-medium rounded"
-                                style={{ 
-                                  background: `${themeColor}20`,
-                                  color: themeColor,
-                                  border: `1px solid ${themeColor}40`
-                                }}
-                              >
-                                {event.category || 'Event'}
-                              </span>
-                              <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                                {event.date || 'TBA'} • {event.time || 'TBA'}
-                              </span>
-                            </div>
-                            
-                            <p className="text-xs line-clamp-2 mb-2" style={{ color: DESIGN.colors.textSecondary }}>
-                              {event.description || 'Join this amazing event!'}
-                            </p>
-                            
-                            {/* Location with theme color accent */}
-                            <div className="flex items-center gap-2 pt-2" style={{ borderTop: `1px solid ${DESIGN.colors.textSecondary}20` }}>
-                              <div 
-                                className="w-6 h-6 rounded-full flex items-center justify-center"
-                                style={{ 
-                                  background: `${themeColor}20`,
-                                  border: `1px solid ${themeColor}40`
-                                }}
-                              >
-                                <Map className="w-3 h-3" style={{ color: themeColor }} />
-                              </div>
-                              <span className="text-xs line-clamp-1" style={{ color: DESIGN.colors.textSecondary }}>
-                                {event.location || 'Location not specified'}
-                              </span>
-                            </div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span 
+                              className="px-2 py-1 text-xs font-medium rounded"
+                              style={{ 
+                                background: `${themeColor}20`,
+                                color: themeColor
+                              }}
+                            >
+                              {event.category || 'Event'}
+                            </span>
+                            <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                              {event.date || 'TBA'} • {event.time || 'TBA'}
+                            </span>
+                          </div>
+                          
+                          <p className="text-xs line-clamp-2 mb-2" style={{ color: DESIGN.colors.textSecondary }}>
+                            {event.description || 'Join this amazing event!'}
+                          </p>
+                          
+                          {/* Location only */}
+                          <div className="flex items-center gap-2 pt-2" style={{ borderTop: `1px solid ${DESIGN.colors.textSecondary}20` }}>
+                            <Map className="w-3 h-3" style={{ color: DESIGN.colors.textSecondary }} />
+                            <span className="text-xs line-clamp-1" style={{ color: DESIGN.colors.textSecondary }}>
+                              {event.location || 'Location not specified'}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -767,7 +741,7 @@ export default function Home() {
                 })}
               </div>
 
-              {/* Featured Events Navigation - Carousel pills only */}
+              {/* Featured Events Navigation - Removed arrows, kept pills */}
               {featuredEvents.length > 1 && (
                 <div className="flex justify-center gap-1.5 mt-4">
                   {featuredEvents.map((_, index) => (
@@ -820,11 +794,11 @@ export default function Home() {
 
       <BottomNav />
 
-      {/* Modals */}
+      {/* Modals - Pass cameraPermissionChecked to prevent auto camera request */}
       <CheckInModal 
         isOpen={showCheckIn} 
-        onClose={() => setShowCheckIn(false)} 
-        requestCameraOnOpen={true} // Only request camera when modal opens
+        onClose={() => setShowCheckIn(false)}
+        preventAutoCamera={true}
       />
       <TicketsModal isOpen={showTickets} onClose={() => setShowTickets(false)} />
       <EventWizardModal isOpen={showEventWizard} onClose={() => setShowEventWizard(false)} />
