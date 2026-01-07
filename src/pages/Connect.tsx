@@ -10,7 +10,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-// Original Design System
+// Design Constants
 const DESIGN = {
   colors: {
     primary: '#C4B5FD',
@@ -20,26 +20,15 @@ const DESIGN = {
     card: '#2D2D2D',
     textPrimary: '#FFFFFF',
     textSecondary: '#B8B8B8'
-  },
-  spacing: {
-    sm: '8px',
-    md: '16px',
-    lg: '24px',
-    xl: '32px'
-  },
-  borderRadius: {
-    card: '24px',
-    button: '50%',
-    modal: '32px'
   }
 };
 
-// Apple HIG Constants
-const HIG = {
-  touchTarget: '44px',
-  buttonHeight: '50px',
-  modalRadius: '20px',
-  spring: { type: 'spring', stiffness: 300, damping: 30 }
+// Fixed heights for each section
+const HEIGHTS = {
+  header: '100px',      // Header + likes counter
+  cardStack: '380px',   // Fixed card height
+  buttons: '120px',     // Action buttons area
+  bottomSpacing: '20px' // Space above bottom nav
 };
 
 interface ProfileCardProps {
@@ -86,7 +75,7 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
       exit={{ x: exitX, opacity: 0, rotateZ: exitX > 0 ? 15 : -15 }}
       whileTap={{ scale: 0.95 }}
       style={{ zIndex: isTop ? 10 : 1 }}
-      transition={HIG.spring}
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
     >
       {/* Original Card Design */}
       <div 
@@ -218,173 +207,214 @@ export default function Connect() {
   if (!hasActiveEvents) {
     return (
       <div 
-        className="min-h-screen px-4"
+        className="fixed inset-0 overflow-hidden"
         style={{ background: DESIGN.colors.background }}
       >
-        <div className="flex flex-col items-center justify-center min-h-[80vh]">
-          <div 
-            className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
-            style={{ background: `${DESIGN.colors.primary}20`, borderRadius: '50%' }}
-          >
-            <Lock className="w-10 h-10" style={{ color: DESIGN.colors.primary }} />
+        <div className="h-full flex flex-col">
+          <div className="flex-1 flex flex-col items-center justify-center px-4">
+            <div 
+              className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
+              style={{ background: `${DESIGN.colors.primary}20`, borderRadius: '50%' }}
+            >
+              <Lock className="w-10 h-10" style={{ color: DESIGN.colors.primary }} />
+            </div>
+            <h2 className="text-2xl font-bold mb-3 text-center" style={{ color: DESIGN.colors.textPrimary }}>
+              Check In to Connect
+            </h2>
+            <p className="text-center mb-6 max-w-xs" style={{ color: DESIGN.colors.textSecondary }}>
+              Get tickets and check in to see who's there!
+            </p>
+            <Button 
+              onClick={() => navigate('/events')} 
+              className="w-full max-w-[280px] h-[50px] rounded-[12px]"
+              style={{ background: DESIGN.colors.primary, color: DESIGN.colors.background }}
+            >
+              <Sparkles className="w-5 h-5 mr-2" />
+              Browse Events
+            </Button>
           </div>
-          <h2 className="text-2xl font-bold mb-3 text-center" style={{ color: DESIGN.colors.textPrimary }}>
-            Check In to Connect
-          </h2>
-          <p className="text-center mb-6 max-w-xs" style={{ color: DESIGN.colors.textSecondary }}>
-            Get tickets and check in to see who's there!
-          </p>
-          <Button 
-            onClick={() => navigate('/events')} 
-            className="w-full max-w-[280px] h-[50px] rounded-[12px]"
-            style={{ background: DESIGN.colors.primary, color: DESIGN.colors.background }}
-          >
-            <Sparkles className="w-5 h-5 mr-2" />
-            Browse Events
-          </Button>
+          <div className="flex-shrink-0">
+            <BottomNav />
+          </div>
         </div>
-        <BottomNav />
       </div>
     );
   }
 
   return (
     <div 
-      className="px-4 pb-nav"
+      className="fixed inset-0 overflow-hidden"
       style={{ 
         background: DESIGN.colors.background,
-        minHeight: '100vh',
-        paddingBottom: '80px'
+        display: 'flex',
+        flexDirection: 'column'
       }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between pt-4 mb-4">
-        <div>
-          <h1 className="text-[28px] font-bold mb-1" style={{ color: DESIGN.colors.textPrimary }}>
-            {currentEventName}
-          </h1>
-          <p className="text-[14px]" style={{ color: DESIGN.colors.textSecondary }}>
-            {availableProfiles.length - currentIndex} people here
-          </p>
-        </div>
-        <div 
-          className="flex items-center gap-2 px-3 py-2 rounded-full"
-          style={{ background: `${DESIGN.colors.accentPink}20` }}
-        >
-          <Heart className="w-4 h-4" style={{ color: DESIGN.colors.accentPink }} />
-          <span className="text-sm font-bold" style={{ color: DESIGN.colors.accentPink }}>
-            {likesRemaining}
-          </span>
+      {/* Fixed Header */}
+      <div 
+        className="flex-shrink-0 px-4 pt-4"
+        style={{ height: HEIGHTS.header }}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-[28px] font-bold mb-1" style={{ color: DESIGN.colors.textPrimary }}>
+              {currentEventName}
+            </h1>
+            <p className="text-[14px]" style={{ color: DESIGN.colors.textSecondary }}>
+              {availableProfiles.length - currentIndex} people here
+            </p>
+          </div>
+          <div 
+            className="flex items-center gap-2 px-3 py-2 rounded-full"
+            style={{ background: `${DESIGN.colors.accentPink}20` }}
+          >
+            <Heart className="w-4 h-4" style={{ color: DESIGN.colors.accentPink }} />
+            <span className="text-sm font-bold" style={{ color: DESIGN.colors.accentPink }}>
+              {likesRemaining}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Card Stack */}
-      <div className="relative h-[380px] w-full mx-auto mb-4">
-        {noMoreProfiles ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center px-4">
-              <div 
-                className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-                style={{ background: `${DESIGN.colors.primary}20`, borderRadius: '50%' }}
-              >
-                <Heart className="w-8 h-8" style={{ color: DESIGN.colors.primary }} />
+      {/* Fixed Card Stack Area */}
+      <div 
+        className="flex-shrink-0 px-4"
+        style={{ height: HEIGHTS.cardStack }}
+      >
+        <div className="relative w-full h-full">
+          {noMoreProfiles ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center px-4">
+                <div 
+                  className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                  style={{ background: `${DESIGN.colors.primary}20`, borderRadius: '50%' }}
+                >
+                  <Heart className="w-8 h-8" style={{ color: DESIGN.colors.primary }} />
+                </div>
+                <h3 className="text-[22px] font-bold mb-2" style={{ color: DESIGN.colors.textPrimary }}>
+                  That's Everyone!
+                </h3>
+                <p className="text-sm mb-4" style={{ color: DESIGN.colors.textSecondary }}>
+                  Check back later for more connections.
+                </p>
               </div>
-              <h3 className="text-[22px] font-bold mb-2" style={{ color: DESIGN.colors.textPrimary }}>
-                That's Everyone!
-              </h3>
-              <p className="text-sm mb-4" style={{ color: DESIGN.colors.textSecondary }}>
-                Check back later for more connections.
-              </p>
             </div>
-          </div>
+          ) : (
+            <AnimatePresence mode="popLayout">
+              {visibleProfiles.map((profile, index) => (
+                <ProfileCard
+                  key={profile.id}
+                  profile={profile}
+                  onSwipe={handleSwipe}
+                  isTop={index === visibleProfiles.length - 1}
+                  onViewProfile={() => setViewingProfile(profile)}
+                />
+              ))}
+            </AnimatePresence>
+          )}
+        </div>
+      </div>
+
+      {/* Fixed Buttons Area */}
+      <div 
+        className="flex-shrink-0 px-4"
+        style={{ 
+          height: HEIGHTS.buttons,
+          marginTop: 'auto',
+          marginBottom: HEIGHTS.bottomSpacing
+        }}
+      >
+        {!noMoreProfiles ? (
+          <>
+            <div className="flex justify-center items-center gap-4">
+              {/* Pass Button */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => handleSwipe('left')}
+                className="flex items-center justify-center"
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  background: '#4A4A4A',
+                  color: DESIGN.colors.textPrimary,
+                  borderRadius: '50%',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
+                }}
+              >
+                <X className="w-6 h-6" />
+              </motion.button>
+
+              {/* Undo Button */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleUndo}
+                disabled={history.length === 0}
+                className={cn(
+                  "flex items-center justify-center",
+                  history.length === 0 && "opacity-30 cursor-not-allowed"
+                )}
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  background: 'transparent',
+                  color: DESIGN.colors.textSecondary,
+                  borderRadius: '50%',
+                  border: `2px solid ${DESIGN.colors.textSecondary}`
+                }}
+              >
+                <RotateCcw className="w-4 h-4" />
+              </motion.button>
+
+              {/* Like Button */}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => handleSwipe('right')}
+                className="flex items-center justify-center"
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  background: DESIGN.colors.accentPink,
+                  color: DESIGN.colors.background,
+                  borderRadius: '50%',
+                  boxShadow: '0 4px 16px rgba(255, 184, 230, 0.4)'
+                }}
+              >
+                <Heart className="w-6 h-6" />
+              </motion.button>
+            </div>
+
+            {/* Maybe Later Button */}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              className="mx-auto block text-sm italic mt-3"
+              style={{ color: DESIGN.colors.textSecondary }}
+            >
+              Maybe Later
+            </motion.button>
+          </>
         ) : (
-          <AnimatePresence mode="popLayout">
-            {visibleProfiles.map((profile, index) => (
-              <ProfileCard
-                key={profile.id}
-                profile={profile}
-                onSwipe={handleSwipe}
-                isTop={index === visibleProfiles.length - 1}
-                onViewProfile={() => setViewingProfile(profile)}
-              />
-            ))}
-          </AnimatePresence>
+          <div className="flex justify-center">
+            <Button
+              onClick={() => navigate('/events')}
+              className="w-full max-w-[200px] h-[50px] rounded-[12px]"
+              style={{ 
+                background: DESIGN.colors.primary,
+                color: DESIGN.colors.background
+              }}
+            >
+              Find More Events
+            </Button>
+          </div>
         )}
       </div>
 
-      {/* Action Buttons */}
-      {!noMoreProfiles && (
-        <>
-          <div className="flex justify-center items-center gap-4 mb-4">
-            {/* Pass Button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => handleSwipe('left')}
-              className="flex items-center justify-center"
-              style={{
-                width: '64px',
-                height: '64px',
-                background: '#4A4A4A',
-                color: DESIGN.colors.textPrimary,
-                borderRadius: '50%',
-                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)'
-              }}
-            >
-              <X className="w-6 h-6" />
-            </motion.button>
-
-            {/* Undo Button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleUndo}
-              disabled={history.length === 0}
-              className={cn(
-                "flex items-center justify-center",
-                history.length === 0 && "opacity-30"
-              )}
-              style={{
-                width: '44px',
-                height: '44px',
-                background: 'transparent',
-                color: DESIGN.colors.textSecondary,
-                borderRadius: '50%',
-                border: `2px solid ${DESIGN.colors.textSecondary}`
-              }}
-            >
-              <RotateCcw className="w-4 h-4" />
-            </motion.button>
-
-            {/* Like Button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => handleSwipe('right')}
-              className="flex items-center justify-center"
-              style={{
-                width: '64px',
-                height: '64px',
-                background: DESIGN.colors.accentPink,
-                color: DESIGN.colors.background,
-                borderRadius: '50%',
-                boxShadow: '0 4px 16px rgba(255, 184, 230, 0.4)'
-              }}
-            >
-              <Heart className="w-6 h-6" />
-            </motion.button>
-          </div>
-
-          {/* Maybe Later Button */}
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            className="mx-auto block text-sm italic"
-            style={{ color: DESIGN.colors.textSecondary }}
-          >
-            Maybe Later
-          </motion.button>
-        </>
-      )}
+      {/* Bottom Navigation */}
+      <div className="flex-shrink-0">
+        <BottomNav />
+      </div>
 
       {/* Match Modal - Bottom Sheet */}
       <Dialog open={!!matchModal} onOpenChange={() => setMatchModal(null)}>
@@ -408,7 +438,7 @@ export default function Connect() {
             className="py-6 px-5"
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={HIG.spring}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           >
             <div className="relative w-20 h-20 mx-auto mb-5">
               <motion.div 
@@ -597,9 +627,6 @@ export default function Connect() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <div className="h-4" />
-      <BottomNav />
     </div>
   );
 }
