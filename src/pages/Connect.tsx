@@ -489,8 +489,8 @@ export default function Connect() {
             maxHeight: '85vh'
           }}
         >
-          {/* Drag handle */}
-          <div className="w-full flex justify-center pt-3 pb-1">
+          {/* Drag handle with top spacing */}
+          <div className="w-full flex justify-center pt-4 pb-1">
             <div className="w-12 h-1 rounded-full" style={{ 
               background: DESIGN.colors.textSecondary,
               opacity: 0.5
@@ -614,13 +614,13 @@ export default function Connect() {
             maxHeight: '95vh'
           }}
         >
-          {/* Drag handle */}
-          <div className="w-full flex justify-center pt-3 pb-1">
-            <div className="w-12 h-1 rounded-full" style={{ 
-              background: DESIGN.colors.textSecondary,
-              opacity: 0.5
-            }} />
-          </div>
+          {/* Drag handle with top spacing */}
+        <div className="w-full flex justify-center pt-4 pb-1">
+          <div className="w-12 h-1 rounded-full" style={{ 
+            background: DESIGN.colors.textSecondary,
+            opacity: 0.5
+          }} />
+        </div>
 
           <motion.div 
             className="overflow-y-auto max-h-[90vh]"
