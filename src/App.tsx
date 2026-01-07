@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { HashRouter, Routes, Route, Navigate } from "react-router-dom"; // Changed from BrowserRouter to HashRouter
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AppProvider, useApp } from "./contexts/AppContext";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
@@ -23,19 +23,66 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useApp();
-  return isAuthenticated ? <>{children}</> : <Navigate to="/auth" replace />;
+  const { isAuthenticated, isLoading } = useApp();
+  const location = useLocation();
+  
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  // If not authenticated, redirect to auth but preserve the intended destination
+  if (!isAuthenticated) {
+    return <Navigate to={`/auth?redirect=${encodeURIComponent(location.pathname)}`} replace />;
+  }
+  
+  return <>{children}</>;
+}
+
+function PublicRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useApp();
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  // If authenticated, redirect to home
+  if (isAuthenticated) {
+    return <Navigate to="/home" replace />;
+  }
+  
+  return <>{children}</>;
 }
 
 function AppRoutes() {
-  const { isAuthenticated } = useApp();
-
+  const { isLoading } = useApp();
+  
+  // Show loading screen while app initializes
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <Routes>
       {/* Public Routes */}
-      <Route path="/" element={isAuthenticated ? <Navigate to="/home" replace /> : <Landing />} />
-      <Route path="/landing" element={<Landing />} />
-      <Route path="/auth" element={isAuthenticated ? <Navigate to="/home" replace /> : <Auth />} />
+      <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
+      <Route path="/landing" element={<PublicRoute><Landing /></PublicRoute>} />
+      <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
       
       {/* Protected Routes */}
       <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
@@ -48,6 +95,7 @@ function AppRoutes() {
       <Route path="/social" element={<ProtectedRoute><Social /></ProtectedRoute>} />
       <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
       <Route path="/event-manager" element={<ProtectedRoute><EventManager /></ProtectedRoute>} />
+      
       {/* Settings Routes */}
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/settings/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
@@ -65,9 +113,9 @@ const App = () => (
       <AppProvider>
         <Toaster />
         <Sonner />
-        <HashRouter> {/* Changed from BrowserRouter to HashRouter */}
+        <BrowserRouter>
           <AppRoutes />
-        </HashRouter>
+        </BrowserRouter>
       </AppProvider>
     </TooltipProvider>
   </QueryClientProvider>
