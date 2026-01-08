@@ -5,7 +5,8 @@ import {
   DollarSign, Palette, ChevronRight, Edit2, Music, Cpu, Users, 
   Brush, Globe, Camera, Map as MapIcon, Radio, Eye, Utensils,
   Coffee, Beer, Hotel, ShoppingBag, Trees, School, Hospital,
-  Building, Navigation, Home, Landmark, Play, Pause
+  Building, Navigation, Home, Landmark, Play, Pause,
+  Film, Grid3x3
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Input } from '@/components/ui/input';
@@ -86,6 +87,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const { addEvent, user } = useApp();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
+  const [mediaType, setMediaType] = useState<'video' | 'carousel'>('carousel'); // Add this state
   const [eventData, setEventData] = useState({
     name: '',
     description: '',
@@ -103,7 +105,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     videoFiles: [] as File[],
     themeColor: '#8B5CF6',
     isFree: true,
-    mediaType: 'carousel' as 'video' | 'carousel' // NEW: Track media type
+    mediaType: 'carousel' as 'video' | 'carousel', // Track media type
+    selectedVideoIndex: 0, // For video selection if multiple
   });
   const [createdEvent, setCreatedEvent] = useState<Event | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -174,6 +177,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   useEffect(() => {
     if (isOpen) {
       setStep(1);
+      setMediaType('carousel');
       setEventData({
         name: '',
         description: '',
@@ -191,7 +195,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         videoFiles: [],
         themeColor: '#8B5CF6',
         isFree: true,
-        mediaType: 'carousel'
+        mediaType: 'carousel',
+        selectedVideoIndex: 0,
       });
       setImageFiles([]);
       setVideoFile(null);
@@ -922,7 +927,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     setEventData(prev => ({
       ...prev,
       videos: [],
-      videoFiles: []
+      videoFiles: [],
+      mediaType: 'carousel' // Reset to carousel if video is removed
     }));
     setVideoFile(null);
     setIsVideoPlaying(false);
@@ -952,10 +958,13 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       // Parse price - ensure it's a number
       const price = eventData.isFree ? 0 : parseFloat(eventData.price) || 0;
       
+      // Determine media type
+      const hasVideo = eventData.videos.length > 0;
+      const mediaType = hasVideo ? 'video' : 'carousel';
+      
       // In a real app, you would upload files to a server/storage service
       // For demo purposes, we'll keep the object URLs
       const videoUrls = eventData.videos;
-      // In production, you would upload the videoFiles to storage and get URLs
       
       const newEvent: Event = {
         id: crypto.randomUUID(),
@@ -981,7 +990,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         tags: [eventData.category],
         isFeatured: user?.subscription?.tier === 'max',
         hasVideo: videoUrls.length > 0,
-        mediaType: eventData.mediaType // NEW: Store media type
+        mediaType: mediaType, // Store the media type
+        selectedVideoIndex: 0
       };
 
       await addEvent(newEvent);
@@ -1432,17 +1442,20 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </p>
                 </div>
 
-                {/* Media Type Selector - NEW */}
+                {/* Media Type Selector */}
                 <div className="space-y-3">
                   <label className="text-[13px] font-semibold block uppercase tracking-wider" 
                          style={{ color: DESIGN.colors.textSecondary }}>
-                    Select Media Type *
+                    Media Type *
                   </label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
-                      onClick={() => setEventData(prev => ({ ...prev, mediaType: 'carousel' }))}
+                      onClick={() => {
+                        setEventData(prev => ({ ...prev, mediaType: 'carousel' }));
+                        setMediaType('carousel');
+                      }}
                       className={cn(
-                        'p-4 border transition-all text-center',
+                        'p-4 border transition-all flex flex-col items-center justify-center gap-2',
                         eventData.mediaType === 'carousel'
                           ? 'border-primary'
                           : 'border-border hover:border-primary'
@@ -1454,22 +1467,23 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                           : 'transparent'
                       }}
                     >
-                      <div className="flex flex-col items-center gap-2">
-                        <Image className="w-6 h-6" 
-                               style={{ color: eventData.mediaType === 'carousel' ? eventData.themeColor : DESIGN.colors.textSecondary }} />
-                        <span className="text-sm font-medium"
-                              style={{ color: eventData.mediaType === 'carousel' ? eventData.themeColor : DESIGN.colors.textPrimary }}>
-                          Image Carousel
-                        </span>
-                        <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                          Multiple photos
-                        </p>
-                      </div>
+                      <Grid3x3 className="w-6 h-6" 
+                              style={{ color: eventData.mediaType === 'carousel' ? eventData.themeColor : DESIGN.colors.textSecondary }} />
+                      <span className="text-sm font-medium" 
+                            style={{ color: eventData.mediaType === 'carousel' ? eventData.themeColor : DESIGN.colors.textPrimary }}>
+                        Image Carousel
+                      </span>
+                      <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                        Multiple images in slideshow
+                      </p>
                     </button>
                     <button
-                      onClick={() => setEventData(prev => ({ ...prev, mediaType: 'video' }))}
+                      onClick={() => {
+                        setEventData(prev => ({ ...prev, mediaType: 'video' }));
+                        setMediaType('video');
+                      }}
                       className={cn(
-                        'p-4 border transition-all text-center',
+                        'p-4 border transition-all flex flex-col items-center justify-center gap-2',
                         eventData.mediaType === 'video'
                           ? 'border-primary'
                           : 'border-border hover:border-primary'
@@ -1481,22 +1495,20 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                           : 'transparent'
                       }}
                     >
-                      <div className="flex flex-col items-center gap-2">
-                        <Video className="w-6 h-6" 
-                               style={{ color: eventData.mediaType === 'video' ? eventData.themeColor : DESIGN.colors.textSecondary }} />
-                        <span className="text-sm font-medium"
-                              style={{ color: eventData.mediaType === 'video' ? eventData.themeColor : DESIGN.colors.textPrimary }}>
-                          Video Preview
-                        </span>
-                        <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                          Auto-play video
-                        </p>
-                      </div>
+                      <Film className="w-6 h-6" 
+                            style={{ color: eventData.mediaType === 'video' ? eventData.themeColor : DESIGN.colors.textSecondary }} />
+                      <span className="text-sm font-medium" 
+                            style={{ color: eventData.mediaType === 'video' ? eventData.themeColor : DESIGN.colors.textPrimary }}>
+                        Video
+                      </span>
+                      <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                        Auto-play muted video
+                      </p>
                     </button>
                   </div>
                 </div>
 
-                {/* Primary Event Photo - Always required */}
+                {/* Primary Event Photo (ALWAYS REQUIRED FOR EVENT CARD) */}
                 <div className="space-y-3">
                   <label className="text-[13px] font-semibold block uppercase tracking-wider" 
                          style={{ color: DESIGN.colors.textSecondary }}>
@@ -1637,8 +1649,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   />
                 </div>
 
-                {/* Additional Photos (Only for carousel) */}
-                {eventData.mediaType === 'carousel' && (
+                {/* Conditional Content Based on Media Type */}
+                {eventData.mediaType === 'carousel' ? (
+                  /* Additional Photos for Carousel */
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <label className="text-[13px] font-semibold uppercase tracking-wider" 
@@ -1652,7 +1665,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     <div className="grid grid-cols-4 gap-2">
                       {imageFiles.slice(1).map((_, index) => (
                         <div key={index} className="relative aspect-square overflow-hidden"
-                            style={{ borderRadius: DESIGN.borderRadius.button }}>
+                             style={{ borderRadius: DESIGN.borderRadius.button }}>
                           <img
                             src={eventData.images[index + 1]}
                             alt={`Additional photo ${index + 1}`}
@@ -1695,10 +1708,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       disabled={isSubmitting}
                     />
                   </div>
-                )}
-
-                {/* Event Video (Only for video type) */}
-                {eventData.mediaType === 'video' && (
+                ) : (
+                  /* Video Upload for Video Type */
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <label className="text-[13px] font-semibold uppercase tracking-wider" 
@@ -1774,9 +1785,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                           
                           {/* Video info overlay */}
                           <div className="absolute top-3 left-3 flex items-center gap-2 px-2 py-1 rounded-full backdrop-blur-sm"
-                              style={{
-                                background: 'rgba(0, 0, 0, 0.6)'
-                              }}>
+                               style={{
+                                 background: 'rgba(0, 0, 0, 0.6)'
+                               }}>
                             <Video className="w-3 h-3 text-white" />
                             <span className="text-xs text-white">
                               {videoFile.type.split('/')[1].toUpperCase()}
@@ -1818,8 +1829,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     />
                     <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                       {videoFile 
-                        ? 'Click play/pause to preview • Video will auto-play muted on event cards' 
-                        : 'Video will auto-play muted on loop in event details'}
+                        ? 'Click play/pause to preview • Video will auto-play muted on event details page' 
+                        : 'Video will auto-play muted on loop in event details page'}
                     </p>
                   </div>
                 )}
@@ -1839,16 +1850,16 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-12 h-12 rounded-lg flex items-center justify-center"
                            style={{
-                             background: `linear-gradient(to bottom right, ${eventData.themeColor}30, ${eventData.themeColor}10)`
+                             background: `linear-gradient(to bottom right, ${eventData.themeColor}30, ${eventData.themeColor}10`
                            }}>
                         <Eye className="w-6 h-6" style={{ color: eventData.themeColor }} />
                       </div>
                       <div>
                         <p className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>
-                          Event Card Preview
+                          {eventData.mediaType === 'video' ? 'Video Preview' : 'Carousel Preview'}
                         </p>
                         <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                          Shows how your media appears
+                          Shows how your media appears on event details
                         </p>
                       </div>
                     </div>
@@ -1870,15 +1881,22 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             </div>
                           </div>
                         ) : imageFiles.length > 0 ? (
-                          <img
-                            src={eventData.images[0]}
-                            alt="Preview"
-                            className="w-full h-full object-cover"
-                            style={{
-                              objectPosition: `${imagePosition.x}% ${imagePosition.y}%`,
-                              transform: `scale(${imageZoom / 100})`
-                            }}
-                          />
+                          <>
+                            <img
+                              src={eventData.images[0]}
+                              alt="Preview"
+                              className="w-full h-full object-cover"
+                              style={{
+                                objectPosition: `${imagePosition.x}% ${imagePosition.y}%`,
+                                transform: `scale(${imageZoom / 100})`
+                              }}
+                            />
+                            {imageFiles.length > 1 && (
+                              <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                                {imageFiles.length} images
+                              </div>
+                            )}
+                          </>
                         ) : (
                           <Image className="w-12 h-12" style={{ color: DESIGN.colors.textSecondary }} />
                         )}
@@ -2344,21 +2362,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       <div className="overflow-hidden" style={{ borderRadius: DESIGN.borderRadius.button, border: `1px solid ${DESIGN.colors.border}` }}>
                         <div className="h-32 flex items-center justify-center relative overflow-hidden"
                              style={{ background: `linear-gradient(to right, ${eventData.themeColor}10, ${eventData.themeColor}5)` }}>
-                          {eventData.mediaType === 'video' && eventData.videos[0] ? (
-                            <div className="relative w-full h-full">
-                              <video
-                                src={eventData.videos[0]}
-                                className="w-full h-full object-cover"
-                                muted
-                                playsInline
-                                loop
-                                autoPlay
-                              />
-                              <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                                Video
-                              </div>
-                            </div>
-                          ) : imageFiles.length > 0 ? (
+                          {/* Always show the primary image on event card */}
+                          {imageFiles.length > 0 ? (
                             <img
                               src={eventData.images[0]}
                               alt="Event preview"
@@ -2404,7 +2409,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     {/* Event Details Preview */}
                     <div className="p-4">
                       <p className="text-sm font-medium mb-2" style={{ color: DESIGN.colors.textPrimary }}>
-                        Event Details
+                        Event Details Page
                       </p>
                       <div className="space-y-3 text-sm">
                         <div className="flex items-center gap-2">
@@ -2424,15 +2429,11 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                           <span style={{ color: DESIGN.colors.textPrimary }}>Check-in radius: {eventData.geofenceRadius}m</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          {eventData.mediaType === 'video' ? (
-                            <Video className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
-                          ) : (
-                            <Image className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
-                          )}
+                          {eventData.mediaType === 'video' ? <Video className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} /> : <Grid3x3 className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />}
                           <span style={{ color: DESIGN.colors.textPrimary }}>
                             {eventData.mediaType === 'video' 
-                              ? (eventData.videos[0] ? 'Video preview' : 'No video uploaded')
-                              : `${imageFiles.length} photos (carousel)`}
+                              ? 'Video will auto-play muted' 
+                              : `Carousel with ${imageFiles.length} image${imageFiles.length !== 1 ? 's' : ''}`}
                           </span>
                         </div>
                       </div>
@@ -2475,14 +2476,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     <div className="p-4 border-b" style={{ borderBottomColor: DESIGN.colors.border }}>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          {eventData.mediaType === 'video' ? (
-                            <Video className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
-                          ) : (
-                            <Image className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
-                          )}
-                          <span className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>
-                            {eventData.mediaType === 'video' ? 'Video' : 'Carousel'}
-                          </span>
+                          {eventData.mediaType === 'video' ? <Video className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} /> : <Camera className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />}
+                          <span className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>Media</span>
                         </div>
                         <button 
                           onClick={() => setStep(2)}
@@ -2494,14 +2489,13 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         </button>
                       </div>
                       <div className="space-y-1 text-sm">
-                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Type:</span> <span style={{ color: DESIGN.colors.textPrimary }}>
-                          {eventData.mediaType === 'video' ? 'Video (auto-plays on details)' : 'Image Carousel'}
-                        </span></p>
-                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Content:</span> <span style={{ color: DESIGN.colors.textPrimary }}>
-                          {eventData.mediaType === 'video' 
-                            ? (eventData.videos[0] ? '1 video uploaded' : 'No video')
-                            : `${imageFiles.length} photos`}
-                        </span></p>
+                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Type:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.mediaType === 'video' ? 'Video' : 'Image Carousel'}</span></p>
+                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Primary Photo:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{imageFiles.length > 0 ? 'Uploaded' : 'Required'}</span></p>
+                        {eventData.mediaType === 'video' ? (
+                          <p><span style={{ color: DESIGN.colors.textSecondary }}>Video:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{videoFile ? 'Uploaded (auto-plays muted)' : 'Required'}</span></p>
+                        ) : (
+                          <p><span style={{ color: DESIGN.colors.textSecondary }}>Additional Photos:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{imageFiles.length - 1}</span></p>
+                        )}
                       </div>
                     </div>
                     
@@ -2626,7 +2620,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   disabled={
                     isSubmitting ||
                     (step === 1 && !isStep1Valid) ||
-                    (step === 2 && ((eventData.mediaType === 'video' && !videoFile) || (eventData.mediaType === 'carousel' && imageFiles.length === 0))) ||
+                    (step === 2 && imageFiles.length === 0) ||
+                    (step === 2 && eventData.mediaType === 'video' && !videoFile) ||
                     (step === 3 && !isStep3Valid)
                   }
                   style={{ 
