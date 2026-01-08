@@ -23,6 +23,35 @@ import debounce from 'lodash/debounce';
 const MAPBOX_TOKEN = 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg';
 mapboxgl.accessToken = MAPBOX_TOKEN;
 
+// Design Constants - Applied from previous file
+const DESIGN = {
+  colors: {
+    primary: '#8B5CF6',
+    lavenderLight: '#E9D5FF',
+    accentPink: '#FFB8E6',
+    background: '#1A1A1A',
+    card: '#2D2D2D',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#B8B8B8',
+    muted: '#4A4A4A',
+    border: '#404040'
+  },
+  borderRadius: {
+    card: '24px',
+    innerCard: '20px',
+    button: '12px',
+    roundButton: '50%',
+    modalTop: '20px',
+    smallPill: '8px',
+    input: '12px'
+  },
+  shadows: {
+    card: '0 8px 32px rgba(0, 0, 0, 0.4)',
+    button: '0 4px 16px rgba(0, 0, 0, 0.3)',
+    modal: '0 20px 60px rgba(0, 0, 0, 0.4)'
+  }
+};
+
 interface EventWizardModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -204,7 +233,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       // Reset initialization flags
       mapsInitialized.current = { map1: false, map2: false };
     }
-  }, [isOpen]); // Only depends on isOpen
+  }, [isOpen]);
 
   // Initialize map for step 3
   useEffect(() => {
@@ -273,16 +302,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   }, [step, isOpen, eventData.coordinates]);
 
-  // Add this useEffect to ensure proper map rendering when switching steps
   useEffect(() => {
     if (isOpen) {
-      // Small delay to ensure DOM is ready
       const timer = setTimeout(() => {
-        // Resize maps based on current step
         if (step === 3 && map1.current && mapsInitialized.current.map1) {
           try {
             map1.current.resize();
-            // Trigger a re-render
             const center = map1.current.getCenter();
             map1.current.jumpTo({ center, zoom: map1.current.getZoom() });
           } catch (error) {
@@ -313,10 +338,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
     
     try {
-      // Clear any existing error
       setMapError(null);
-      
-      // Set a minimum height for the container to prevent black screen
       container.style.minHeight = '320px';
       
       const mapInstance = new mapboxgl.Map({
@@ -332,13 +354,11 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         preserveDrawingBuffer: true,
       });
 
-      // Add error handler
       mapInstance.on('error', (e) => {
         console.error('Mapbox error:', e);
         setMapError('Map failed to load. Please refresh the page.');
       });
 
-      // Wait for map to load
       await new Promise<void>((resolve) => {
         mapInstance.on('load', () => {
           console.log(`Map ${mapNumber} loaded successfully`);
@@ -346,7 +366,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           if (mapNumber === 1) {
             map1.current = mapInstance;
             
-            // Add marker for map 1
             marker1.current = new mapboxgl.Marker({ 
               color: eventData.themeColor,
               draggable: true 
@@ -354,7 +373,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               .setLngLat([eventData.coordinates.lng, eventData.coordinates.lat])
               .addTo(mapInstance);
 
-            // Handle marker drag
             marker1.current.on('dragend', () => {
               if (marker1.current) {
                 const lngLat = marker1.current.getLngLat();
@@ -366,7 +384,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               }
             });
 
-            // Click to set location
             mapInstance.on('click', (e) => {
               const { lng, lat } = e.lngLat;
               setEventData(prev => ({ ...prev, coordinates: { lat, lng } }));
@@ -382,21 +399,17 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           } else {
             map2.current = mapInstance;
             
-            // Add marker for map 2
             marker2.current = new mapboxgl.Marker({ 
               color: eventData.themeColor 
             })
               .setLngLat([eventData.coordinates.lng, eventData.coordinates.lat])
               .addTo(mapInstance);
 
-            // Add geofence circle
             updateGeofenceCircle(mapInstance);
           }
 
-          // Add navigation controls
           mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
           
-          // Add geolocate control
           const geolocateControl = new mapboxgl.GeolocateControl({
             positionOptions: { enableHighAccuracy: true },
             trackUserLocation: true,
@@ -414,7 +427,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           
           mapInstance.addControl(geolocateControl, 'top-right');
           
-          // Force a resize to ensure proper rendering
           setTimeout(() => {
             mapInstance.resize();
           }, 100);
@@ -422,7 +434,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           resolve();
         });
 
-        // Set a timeout in case map fails to load
         setTimeout(() => {
           resolve();
         }, 5000);
@@ -435,14 +446,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   }, [eventData.themeColor, eventData.coordinates]);
 
-  // Update geofence circle when radius changes
   const updateGeofenceCircle = useCallback((mapInstance: mapboxgl.Map) => {
     if (!mapInstance.loaded()) return;
 
     const { lat, lng } = eventData.coordinates;
     const radiusInKm = eventData.geofenceRadius / 1000;
     
-    // Generate circle coordinates
     const points = 64;
     const coords: [number, number][] = [];
     for (let i = 0; i < points; i++) {
@@ -451,7 +460,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       const dy = radiusInKm * Math.sin(angle) / (111.32 * Math.cos(lat * Math.PI / 180));
       coords.push([lng + dy, lat + dx]);
     }
-    coords.push(coords[0]); // Close the circle
+    coords.push(coords[0]);
 
     const sourceId = 'geofence-circle';
     const fillLayerId = 'geofence-fill';
@@ -496,7 +505,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         });
       }
 
-      // Update layer colors if theme changes
       if (mapInstance.getLayer(fillLayerId)) {
         mapInstance.setPaintProperty(fillLayerId, 'fill-color', eventData.themeColor);
       }
@@ -529,13 +537,11 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         const properties = place.properties || {};
         const context = properties.context || {};
         
-        // Extract address components from v6 API structure
         const street = properties.name || properties.full_address || '';
         const locality = context.place?.name || '';
         const region = context.region?.name || '';
         const country = context.country?.name || '';
         
-        // Build full address
         const fullAddress = [
           street,
           locality,
@@ -555,7 +561,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           address: fullAddress || properties.full_address || '',
         });
         
-        // Update search input
         if (searchInputRef.current) {
           searchInputRef.current.value = fullAddress || properties.name || '';
         }
@@ -572,7 +577,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   };
 
-  // Debounced search function for location autocomplete - Namibia focused
   const searchLocation = useCallback(
     debounce(async (query: string) => {
       if (!query.trim() || query.length < 2) {
@@ -584,16 +588,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       setIsSearching(true);
       
       try {
-        // Correct Geocoding v6 API endpoint and parameters
         const response = await fetch(
           `https://api.mapbox.com/search/geocode/v6/forward?` +
           `q=${encodeURIComponent(query)}&` +
           `access_token=${MAPBOX_TOKEN}&` +
-          `country=NA&` + // Restrict to Namibia
-          `bbox=11.7,-28.97,25.27,-16.96&` + // Namibia bounding box
+          `country=NA&` +
+          `bbox=11.7,-28.97,25.27,-16.96&` +
           `proximity=${userLocation.lng},${userLocation.lat}&` +
           `language=en&` +
-          `types=address,place,poi&` + // Filter for relevant features
+          `types=address,place,poi&` +
           `limit=10`
         );
         
@@ -604,10 +607,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         const data = await response.json();
         
         if (data.features && data.features.length > 0) {
-          // For v6 API, check if results are from Namibia
           const namibianResults = data.features
             .filter((feature: any) => {
-              // In v6, country info might be in properties.context.country
               const countryCode = feature.properties?.context?.country?.iso_3166_1_alpha_2;
               return countryCode === 'NA';
             })
@@ -660,7 +661,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     const primaryText = properties.name || feature.text || '';
     const secondaryText = properties.full_address || properties.place_formatted || '';
     
-    // For v6 API, use properties.type instead of place_type
     const placeTypes = properties.type ? [properties.type] : feature.place_type || [];
     const icon = getSuggestionIcon(placeTypes, properties.category);
     
@@ -696,12 +696,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     setLocationSuggestions([]);
     setShowSuggestions(false);
     
-    // Update search input
     if (searchInputRef.current) {
       searchInputRef.current.value = address;
     }
     
-    // Update both maps if they exist and fly to location
     if (map1.current) {
       map1.current.flyTo({
         center: [lng, lat],
@@ -758,14 +756,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       const newImages = Array.from(files).slice(0, 5 - imageFiles.length);
       setImageFiles(prev => [...prev, ...newImages]);
       
-      // Create preview URLs
       const imageUrls = newImages.map(file => URL.createObjectURL(file));
       setEventData(prev => ({
         ...prev,
         images: [...prev.images, ...imageUrls]
       }));
       
-      // Reset file input
       e.target.value = '';
     }
   };
@@ -773,7 +769,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const handlePrimaryPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files[0]) {
-      // If this is the first photo, treat as primary
       if (imageFiles.length === 0) {
         const newFile = files[0];
         setImageFiles([newFile]);
@@ -781,7 +776,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           ...prev,
           images: [URL.createObjectURL(newFile)]
         }));
-        // Reset position and zoom for new image
         setImagePosition({ x: 50, y: 50 });
         setImageZoom(100);
       }
@@ -808,7 +802,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       const newVideo = files[0];
       setVideoFile(newVideo);
       
-      // Create preview URL
       const videoUrl = URL.createObjectURL(newVideo);
       setEventData(prev => ({
         ...prev,
@@ -820,7 +813,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   };
 
   const removeImage = (index: number) => {
-    // Revoke the object URL to prevent memory leaks
     URL.revokeObjectURL(eventData.images[index]);
     
     setEventData(prev => ({
@@ -857,7 +849,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     try {
       const qrCode = `${eventData.name.replace(/\s+/g, '-').toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
       
-      // Parse price - ensure it's a number
       const price = eventData.isFree ? 0 : parseFloat(eventData.price) || 0;
       
       const newEvent: Event = {
@@ -927,23 +918,38 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
   if (!isOpen) return null;
 
-  // Get current date for date input min
   const today = new Date().toISOString().split('T')[0];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" 
+         style={{ 
+           background: 'rgba(0, 0, 0, 0.5)',
+           backdropFilter: 'blur(8px)'
+         }}>
       <div 
         ref={modalRef}
-        className="bg-background rounded-2xl flex flex-col w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl border border-border"
+        className="flex flex-col w-full max-w-2xl max-h-[90vh] overflow-hidden"
+        style={{
+          background: DESIGN.colors.background,
+          borderRadius: DESIGN.borderRadius.modalTop,
+          boxShadow: DESIGN.shadows.modal,
+          border: `1px solid ${DESIGN.colors.border}`
+        }}
       >
         {/* Header - Redesigned to be compact */}
-        <div className="border-b border-border shrink-0">
+        <div style={{ borderBottom: `1px solid ${DESIGN.colors.border}`, flexShrink: 0 }}>
           {/* Row 1: Title and Close */}
           <div className="flex items-center justify-between px-6 h-14">
-            <h2 className="text-xl font-semibold">Create Event</h2>
+            <h2 className="text-[28px] font-bold" style={{ color: DESIGN.colors.textPrimary }}>
+              Create Event
+            </h2>
             <button 
               onClick={onClose} 
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+              className="w-8 h-8 flex items-center justify-center transition-colors"
+              style={{ 
+                borderRadius: '50%',
+                color: DESIGN.colors.textSecondary
+              }}
               disabled={isSubmitting}
             >
               <X className="w-5 h-5" />
@@ -958,16 +964,22 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   <div key={s} className="flex items-center">
                     <div
                       className={cn(
-                        'w-2 h-2 rounded-full transition-all duration-300',
+                        'transition-all duration-300',
                         s < step ? 'bg-primary' : 
-                        s === step ? 'bg-primary w-3 h-3' : 'bg-muted'
+                        s === step ? 'bg-primary' : DESIGN.colors.muted
                       )}
+                      style={{ 
+                        width: s === step ? '12px' : '8px',
+                        height: s === step ? '12px' : '8px',
+                        borderRadius: '50%'
+                      }}
                     />
                     {s < 5 && (
                       <div className={cn(
-                        'w-3 h-0.5 mx-1 transition-colors duration-300',
-                        s < step ? 'bg-primary' : 'bg-muted'
-                      )} />
+                        'h-0.5 mx-1 transition-colors duration-300',
+                        s < step ? 'bg-primary' : DESIGN.colors.muted
+                      )} 
+                      style={{ width: '12px' }} />
                     )}
                   </div>
                 ))}
@@ -978,7 +990,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           {/* Row 3: Current Step Title */}
           {step < 6 && (
             <div className="flex justify-center items-center h-8 pb-2">
-              <span className="text-sm text-muted-foreground">
+              <span className="text-[14px]" style={{ color: DESIGN.colors.textSecondary }}>
                 {stepTitles[step - 1]}
               </span>
             </div>
@@ -992,48 +1004,71 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             {step === 1 && (
               <div className="space-y-6 animate-fade-in">
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Event Details</h3>
+                  <h3 className="text-[22px] font-bold mb-1" style={{ color: DESIGN.colors.textPrimary }}>
+                    Event Details
+                  </h3>
                 </div>
 
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Event Name *</label>
+                    <label className="text-[13px] font-semibold mb-2 block uppercase tracking-wider" 
+                           style={{ color: DESIGN.colors.textSecondary }}>
+                      Event Name *
+                    </label>
                     <div className="relative">
                       <Input
                         value={eventData.name}
                         onChange={(e) => setEventData({ ...eventData, name: e.target.value })}
                         placeholder="Summer Music Festival"
-                        className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary"
+                        className="h-11"
+                        style={{
+                          borderRadius: DESIGN.borderRadius.input,
+                          borderColor: DESIGN.colors.border,
+                          background: DESIGN.colors.card,
+                          color: DESIGN.colors.textPrimary
+                        }}
                         disabled={isSubmitting}
                         maxLength={50}
                       />
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs" 
+                           style={{ color: DESIGN.colors.textSecondary }}>
                         {50 - eventData.name.length}
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>
                       {50 - eventData.name.length} characters remaining
                     </p>
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Description *</label>
+                    <label className="text-[13px] font-semibold mb-2 block uppercase tracking-wider" 
+                           style={{ color: DESIGN.colors.textSecondary }}>
+                      Description *
+                    </label>
                     <Textarea
                       value={eventData.description}
                       onChange={(e) => setEventData({ ...eventData, description: e.target.value })}
                       placeholder="Tell attendees what to expect..."
                       rows={4}
-                      className="rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary"
+                      style={{
+                        borderRadius: DESIGN.borderRadius.input,
+                        borderColor: DESIGN.colors.border,
+                        background: DESIGN.colors.card,
+                        color: DESIGN.colors.textPrimary
+                      }}
                       disabled={isSubmitting}
                       maxLength={500}
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>
                       {500 - eventData.description.length} characters remaining
                     </p>
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Category *</label>
+                    <label className="text-[13px] font-semibold mb-2 block uppercase tracking-wider" 
+                           style={{ color: DESIGN.colors.textSecondary }}>
+                      Category *
+                    </label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {categories.map((cat) => {
                         const Icon = cat.icon;
@@ -1043,14 +1078,24 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             onClick={() => setEventData({ ...eventData, category: cat.value })}
                             disabled={isSubmitting}
                             className={cn(
-                              'flex flex-col items-center justify-center p-3 rounded-lg border transition-all',
+                              'flex flex-col items-center justify-center p-3 border transition-all',
                               eventData.category === cat.value
-                                ? 'border-primary bg-primary/5'
-                                : 'border-border hover:border-primary hover:bg-primary/5'
+                                ? 'border-primary'
+                                : 'border-border hover:border-primary'
                             )}
+                            style={{
+                              borderRadius: DESIGN.borderRadius.button,
+                              background: eventData.category === cat.value 
+                                ? `${eventData.themeColor}20` 
+                                : 'transparent'
+                            }}
                           >
-                            <Icon className="w-5 h-5 mb-1" />
-                            <span className="text-xs font-medium">{cat.label}</span>
+                            <Icon className="w-5 h-5 mb-1" 
+                                  style={{ color: eventData.category === cat.value ? eventData.themeColor : DESIGN.colors.textSecondary }} />
+                            <span className="text-xs font-medium" 
+                                  style={{ color: eventData.category === cat.value ? eventData.themeColor : DESIGN.colors.textPrimary }}>
+                              {cat.label}
+                            </span>
                           </button>
                         );
                       })}
@@ -1059,28 +1104,48 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-sm font-medium mb-2 block">Date *</label>
+                      <label className="text-[13px] font-semibold mb-2 block uppercase tracking-wider" 
+                             style={{ color: DESIGN.colors.textSecondary }}>
+                        Date *
+                      </label>
                       <div className="relative">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" 
+                                 style={{ color: DESIGN.colors.textSecondary }} />
                         <Input
                           type="date"
                           value={eventData.date}
                           onChange={(e) => setEventData({ ...eventData, date: e.target.value })}
-                          className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10"
+                          className="h-11 pl-10"
+                          style={{
+                            borderRadius: DESIGN.borderRadius.input,
+                            borderColor: DESIGN.colors.border,
+                            background: DESIGN.colors.card,
+                            color: DESIGN.colors.textPrimary
+                          }}
                           disabled={isSubmitting}
                           min={today}
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="text-sm font-medium mb-2 block">Time *</label>
+                      <label className="text-[13px] font-semibold mb-2 block uppercase tracking-wider" 
+                             style={{ color: DESIGN.colors.textSecondary }}>
+                        Time *
+                      </label>
                       <div className="relative">
-                        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" 
+                              style={{ color: DESIGN.colors.textSecondary }} />
                         <Input
                           type="time"
                           value={eventData.time}
                           onChange={(e) => setEventData({ ...eventData, time: e.target.value })}
-                          className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10"
+                          className="h-11 pl-10"
+                          style={{
+                            borderRadius: DESIGN.borderRadius.input,
+                            borderColor: DESIGN.colors.border,
+                            background: DESIGN.colors.card,
+                            color: DESIGN.colors.textPrimary
+                          }}
                           disabled={isSubmitting}
                         />
                       </div>
@@ -1089,7 +1154,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
                   {/* Theme Color Section */}
                   <div>
-                    <label className="text-sm font-medium mb-3 block">Event Theme Color</label>
+                    <label className="text-[13px] font-semibold mb-3 block uppercase tracking-wider" 
+                           style={{ color: DESIGN.colors.textSecondary }}>
+                      Event Theme Color
+                    </label>
                     {user?.subscription?.tier === 'max' ? (
                       <div className="space-y-3">
                         <div className="flex gap-2 flex-wrap">
@@ -1097,10 +1165,11 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             <button
                               key={index}
                               onClick={() => setEventData({ ...eventData, themeColor: color })}
-                              className="w-8 h-8 rounded-full border-2 hover:scale-110 transition-transform"
+                              className="w-8 h-8 transition-transform hover:scale-110"
                               style={{ 
                                 backgroundColor: color,
-                                borderColor: eventData.themeColor === color ? color : 'transparent'
+                                borderRadius: '50%',
+                                border: `2px solid ${eventData.themeColor === color ? color : 'transparent'}`
                               }}
                               title={color}
                             />
@@ -1111,18 +1180,29 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             type="color"
                             value={eventData.themeColor}
                             onChange={(e) => setEventData({ ...eventData, themeColor: e.target.value })}
-                            className="w-10 h-10 cursor-pointer rounded-lg border border-border"
+                            className="w-10 h-10 cursor-pointer border"
+                            style={{
+                              borderRadius: DESIGN.borderRadius.input,
+                              borderColor: DESIGN.colors.border
+                            }}
                           />
                           <div>
-                            <p className="text-sm font-medium">Custom Color</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>
+                              Custom Color
+                            </p>
+                            <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                               Applied to buttons and accents
                             </p>
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="border border-border rounded-lg p-4 bg-gradient-to-r from-primary/5 to-primary/10">
+                      <div className="p-4"
+                           style={{
+                             borderRadius: DESIGN.borderRadius.input,
+                             border: `1px solid ${DESIGN.colors.border}`,
+                             background: `linear-gradient(to right, ${eventData.themeColor}10, ${eventData.themeColor}20)`
+                           }}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div 
@@ -1133,16 +1213,22 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                               }}
                             />
                             <div>
-                              <p className="text-sm font-medium">Current Theme</p>
-                              <p className="text-xs text-muted-foreground">Purple theme selected</p>
+                              <p className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>
+                                Current Theme
+                              </p>
+                              <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                                Purple theme selected
+                              </p>
                             </div>
                           </div>
-                          <Button size="sm" variant="outline" className="rounded-lg">
+                          <Button size="sm" variant="outline" 
+                                  className="rounded-lg"
+                                  style={{ borderRadius: DESIGN.borderRadius.button }}>
                             Upgrade to Max
                             <ChevronRight className="w-4 h-4 ml-1" />
                           </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-3">
+                        <p className="text-xs mt-3" style={{ color: DESIGN.colors.textSecondary }}>
                           🎨 Unlock 20+ theme colors and custom color picker with Max subscription
                         </p>
                       </div>
@@ -1151,50 +1237,71 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
                   {/* Ticket Price - Fixed empty state */}
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Event Access</label>
+                    <label className="text-[13px] font-semibold mb-2 block uppercase tracking-wider" 
+                           style={{ color: DESIGN.colors.textSecondary }}>
+                      Event Access
+                    </label>
                     <div className="flex items-center gap-4 mb-3">
                       <button
                         onClick={() => setEventData(prev => ({ ...prev, isFree: true, price: '' }))}
                         className={cn(
-                          'px-4 py-2 rounded-lg border transition-colors',
+                          'px-4 py-2 border transition-colors',
                           eventData.isFree
-                            ? 'border-primary bg-primary/5 text-primary'
+                            ? 'border-primary text-primary'
                             : 'border-border hover:border-primary'
                         )}
+                        style={{
+                          borderRadius: DESIGN.borderRadius.button,
+                          background: eventData.isFree ? `${eventData.themeColor}20` : 'transparent',
+                          color: eventData.isFree ? eventData.themeColor : DESIGN.colors.textPrimary
+                        }}
                       >
                         Free Event
                       </button>
                       <button
                         onClick={() => setEventData(prev => ({ ...prev, isFree: false }))}
                         className={cn(
-                          'px-4 py-2 rounded-lg border transition-colors',
+                          'px-4 py-2 border transition-colors',
                           !eventData.isFree
-                            ? 'border-primary bg-primary/5 text-primary'
+                            ? 'border-primary text-primary'
                             : 'border-border hover:border-primary'
                         )}
+                        style={{
+                          borderRadius: DESIGN.borderRadius.button,
+                          background: !eventData.isFree ? `${eventData.themeColor}20` : 'transparent',
+                          color: !eventData.isFree ? eventData.themeColor : DESIGN.colors.textPrimary
+                        }}
                       >
                         Paid Event
                       </button>
                     </div>
                     {!eventData.isFree && (
                       <div className="relative">
-                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" 
+                                   style={{ color: DESIGN.colors.textSecondary }} />
                         <Input
                           type="number"
                           value={eventData.price}
                           onChange={(e) => setEventData({ ...eventData, price: e.target.value })}
                           placeholder="0.00"
-                          className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10"
+                          className="h-11 pl-10"
+                          style={{
+                            borderRadius: DESIGN.borderRadius.input,
+                            borderColor: DESIGN.colors.border,
+                            background: DESIGN.colors.card,
+                            color: DESIGN.colors.textPrimary
+                          }}
                           disabled={isSubmitting}
                           min="0"
                           step="0.01"
                         />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm" 
+                             style={{ color: DESIGN.colors.textSecondary }}>
                           NAD
                         </div>
                       </div>
                     )}
-                    <p className="text-xs text-muted-foreground mt-2">
+                    <p className="text-xs mt-2" style={{ color: DESIGN.colors.textSecondary }}>
                       {eventData.isFree 
                         ? 'Attendees can join for free' 
                         : 'Enter the ticket price for your event'}
@@ -1208,21 +1315,32 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             {step === 2 && (
               <div className="space-y-6 animate-fade-in">
                 <div>
-                  <h3 className="text-lg font-semibold mb-1">Add Photos & Videos</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
+                  <h3 className="text-[22px] font-bold mb-1" style={{ color: DESIGN.colors.textPrimary }}>
+                    Add Photos & Videos
+                  </h3>
+                  <p className="text-[14px] mb-4" style={{ color: DESIGN.colors.textSecondary }}>
                     Make your event visually appealing
                   </p>
                 </div>
 
                 {/* Primary Event Photo */}
                 <div className="space-y-3">
-                  <label className="text-sm font-medium block">Primary Event Photo *</label>
+                  <label className="text-[13px] font-semibold block uppercase tracking-wider" 
+                         style={{ color: DESIGN.colors.textSecondary }}>
+                    Primary Event Photo *
+                  </label>
                   <div 
                     className={cn(
-                      "border-2 border-dashed rounded-xl h-48 flex flex-col items-center justify-center cursor-pointer transition-colors overflow-hidden",
-                      "hover:border-primary hover:bg-primary/5",
+                      "border-2 flex flex-col items-center justify-center cursor-pointer transition-colors overflow-hidden",
+                      "hover:border-primary",
                       imageFiles.length > 0 ? "border-solid" : "border-dashed"
                     )}
+                    style={{
+                      borderRadius: DESIGN.borderRadius.card,
+                      borderColor: imageFiles.length > 0 ? DESIGN.colors.border : DESIGN.colors.muted,
+                      height: '192px',
+                      background: imageFiles.length > 0 ? 'transparent' : `${DESIGN.colors.primary}10`
+                    }}
                     onClick={() => !imageFiles.length && primaryPhotoRef.current?.click()}
                     onMouseDown={(e) => {
                       if (imageFiles.length > 0) {
@@ -1254,7 +1372,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                               e.stopPropagation();
                               setImageZoom(prev => Math.min(150, prev + 10));
                             }}
-                            className="w-8 h-8 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80 backdrop-blur-sm"
+                            className="w-8 h-8 backdrop-blur-sm flex items-center justify-center"
+                            style={{
+                              borderRadius: '50%',
+                              background: 'rgba(0, 0, 0, 0.6)',
+                              color: DESIGN.colors.textPrimary
+                            }}
                             title="Zoom in"
                           >
                             <span className="text-lg font-bold">+</span>
@@ -1264,7 +1387,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                               e.stopPropagation();
                               setImageZoom(prev => Math.max(50, prev - 10));
                             }}
-                            className="w-8 h-8 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80 backdrop-blur-sm"
+                            className="w-8 h-8 backdrop-blur-sm flex items-center justify-center"
+                            style={{
+                              borderRadius: '50%',
+                              background: 'rgba(0, 0, 0, 0.6)',
+                              color: DESIGN.colors.textPrimary
+                            }}
                             title="Zoom out"
                           >
                             <span className="text-lg font-bold">−</span>
@@ -1274,7 +1402,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                               e.stopPropagation();
                               primaryPhotoRef.current?.click();
                             }}
-                            className="w-8 h-8 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80 backdrop-blur-sm"
+                            className="w-8 h-8 backdrop-blur-sm flex items-center justify-center"
+                            style={{
+                              borderRadius: '50%',
+                              background: 'rgba(0, 0, 0, 0.6)',
+                              color: DESIGN.colors.textPrimary
+                            }}
                             title="Change photo"
                           >
                             <Edit2 className="w-4 h-4" />
@@ -1287,26 +1420,36 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             setImagePosition({ x: 50, y: 50 });
                             setImageZoom(100);
                           }}
-                          className="absolute top-3 right-3 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                          className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center"
+                          style={{
+                            borderRadius: '50%',
+                            background: '#EF4444',
+                            color: DESIGN.colors.textPrimary
+                          }}
                         >
                           <X className="w-4 h-4" />
                         </button>
-                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">
+                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs px-3 py-1.5 backdrop-blur-sm"
+                             style={{
+                               borderRadius: '9999px',
+                               background: 'rgba(0, 0, 0, 0.6)',
+                               color: DESIGN.colors.textPrimary
+                             }}>
                           {isDraggingImage ? 'Positioning...' : 'Click and drag to adjust'}
                         </div>
                       </div>
                     ) : (
                       <>
-                        <Camera className="w-12 h-12 text-muted-foreground mb-3" />
-                        <p className="text-sm font-medium">Click to upload</p>
-                        <p className="text-xs text-muted-foreground mt-1">or drag & drop</p>
-                        <p className="text-xs text-muted-foreground mt-3">
+                        <Camera className="w-12 h-12 mb-3" style={{ color: DESIGN.colors.textSecondary }} />
+                        <p className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>Click to upload</p>
+                        <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>or drag & drop</p>
+                        <p className="text-xs mt-3" style={{ color: DESIGN.colors.textSecondary }}>
                           JPG, PNG, WEBP • Max 10MB
                         </p>
                       </>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                     {imageFiles.length > 0 
                       ? 'Click and drag to reposition • Use +/− to zoom' 
                       : 'This photo appears on event cards'}
@@ -1324,14 +1467,18 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 {/* Additional Photos */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium">Additional Photos (Optional)</label>
-                    <span className="text-xs text-muted-foreground">
+                    <label className="text-[13px] font-semibold uppercase tracking-wider" 
+                           style={{ color: DESIGN.colors.textSecondary }}>
+                      Additional Photos (Optional)
+                    </label>
+                    <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                       {imageFiles.length - 1}/4
                     </span>
                   </div>
                   <div className="grid grid-cols-4 gap-2">
                     {imageFiles.slice(1).map((_, index) => (
-                      <div key={index} className="relative aspect-square rounded-lg overflow-hidden">
+                      <div key={index} className="relative aspect-square overflow-hidden"
+                           style={{ borderRadius: DESIGN.borderRadius.button }}>
                         <img
                           src={eventData.images[index + 1]}
                           alt={`Additional photo ${index + 1}`}
@@ -1339,7 +1486,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         />
                         <button
                           onClick={() => removeImage(index + 1)}
-                          className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
+                          className="absolute top-1 right-1 w-6 h-6 text-xs flex items-center justify-center"
+                          style={{
+                            borderRadius: '50%',
+                            background: '#EF4444',
+                            color: DESIGN.colors.textPrimary
+                          }}
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -1347,10 +1499,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     ))}
                     {imageFiles.length < 5 && (
                       <div 
-                        className="aspect-square rounded-lg border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5"
+                        className="aspect-square flex items-center justify-center cursor-pointer"
+                        style={{
+                          borderRadius: DESIGN.borderRadius.button,
+                          border: `2px dashed ${DESIGN.colors.border}`,
+                          background: `${DESIGN.colors.primary}10`
+                        }}
                         onClick={() => fileInputRef.current?.click()}
                       >
-                        <Upload className="w-6 h-6 text-muted-foreground" />
+                        <Upload className="w-6 h-6" style={{ color: DESIGN.colors.textSecondary }} />
                       </div>
                     )}
                   </div>
@@ -1367,45 +1524,61 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
                 {/* Event Video */}
                 <div className="space-y-3">
-                  <label className="text-sm font-medium block">Event Video (Optional)</label>
+                  <label className="text-[13px] font-semibold block uppercase tracking-wider" 
+                         style={{ color: DESIGN.colors.textSecondary }}>
+                    Event Video (Optional)
+                  </label>
                   <div 
                     className={cn(
-                      "border-2 border-dashed rounded-xl h-32 flex flex-col items-center justify-center cursor-pointer transition-colors",
-                      "hover:border-primary hover:bg-primary/5",
+                      "border-2 flex flex-col items-center justify-center cursor-pointer transition-colors",
+                      "hover:border-primary",
                       videoFile ? "border-solid" : "border-dashed"
                     )}
+                    style={{
+                      borderRadius: DESIGN.borderRadius.card,
+                      borderColor: videoFile ? DESIGN.colors.border : DESIGN.colors.muted,
+                      height: '128px',
+                      background: videoFile ? 'transparent' : `${DESIGN.colors.primary}10`
+                    }}
                     onClick={() => videoInputRef.current?.click()}
                   >
                     {videoFile ? (
                       <div className="relative w-full h-full">
                         <video
                           src={eventData.videos[0]}
-                          className="w-full h-full object-cover rounded-xl"
+                          className="w-full h-full object-cover"
+                          style={{ borderRadius: DESIGN.borderRadius.card }}
                         />
-                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                          <Video className="w-8 h-8 text-white" />
+                        <div className="absolute inset-0 flex items-center justify-center"
+                             style={{ background: 'rgba(0, 0, 0, 0.2)' }}>
+                          <Video className="w-8 h-8" style={{ color: DESIGN.colors.textPrimary }} />
                         </div>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             removeVideo();
                           }}
-                          className="absolute top-3 right-3 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                          className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center"
+                          style={{
+                            borderRadius: '50%',
+                            background: '#EF4444',
+                            color: DESIGN.colors.textPrimary
+                          }}
                         >
                           <X className="w-4 h-4" />
                         </button>
                       </div>
                     ) : (
                       <>
-                        <Video className="w-10 h-10 text-muted-foreground mb-2" />
-                        <p className="text-sm font-medium">Upload event video</p>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <Video className="w-10 h-10 mb-2" style={{ color: DESIGN.colors.textSecondary }} />
+                        <p className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>Upload event video</p>
+                        <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>
                           MP4, MOV, WebM • Max 50MB
                         </p>
                       </>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                     Video will auto-play muted on loop
                   </p>
                   <input
@@ -1420,21 +1593,35 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
                 {/* Preview */}
                 <div className="space-y-3">
-                  <label className="text-sm font-medium block">Preview</label>
-                  <div className="border border-border rounded-xl p-4 bg-card">
+                  <label className="text-[13px] font-semibold block uppercase tracking-wider" 
+                         style={{ color: DESIGN.colors.textSecondary }}>
+                    Preview
+                  </label>
+                  <div className="p-4"
+                       style={{
+                         borderRadius: DESIGN.borderRadius.card,
+                         border: `1px solid ${DESIGN.colors.border}`,
+                         background: DESIGN.colors.card
+                       }}>
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                        <Eye className="w-6 h-6 text-primary" />
+                      <div className="w-12 h-12 rounded-lg flex items-center justify-center"
+                           style={{
+                             background: `linear-gradient(to bottom right, ${eventData.themeColor}30, ${eventData.themeColor}10)`
+                           }}>
+                        <Eye className="w-6 h-6" style={{ color: eventData.themeColor }} />
                       </div>
                       <div>
-                        <p className="text-sm font-medium">Event Card Preview</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>
+                          Event Card Preview
+                        </p>
+                        <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                           Shows how your primary photo appears
                         </p>
                       </div>
                     </div>
-                    <div className="border border-border rounded-lg overflow-hidden">
-                      <div className="h-32 bg-gradient-to-r from-primary/10 to-primary/5 flex items-center justify-center overflow-hidden">
+                    <div className="overflow-hidden" style={{ borderRadius: DESIGN.borderRadius.button, border: `1px solid ${DESIGN.colors.border}` }}>
+                      <div className="h-32 flex items-center justify-center overflow-hidden"
+                           style={{ background: `linear-gradient(to right, ${eventData.themeColor}10, ${eventData.themeColor}5)` }}>
                         {imageFiles.length > 0 ? (
                           <img
                             src={eventData.images[0]}
@@ -1446,12 +1633,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             }}
                           />
                         ) : (
-                          <Image className="w-12 h-12 text-muted-foreground" />
+                          <Image className="w-12 h-12" style={{ color: DESIGN.colors.textSecondary }} />
                         )}
                       </div>
                       <div className="p-3">
-                        <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                        <div className="h-3 bg-muted rounded w-1/2"></div>
+                        <div className="h-4 mb-2" style={{ borderRadius: '4px', background: DESIGN.colors.muted, width: '75%' }}></div>
+                        <div className="h-3" style={{ borderRadius: '4px', background: DESIGN.colors.muted, width: '50%' }}></div>
                       </div>
                     </div>
                   </div>
@@ -1463,17 +1650,23 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             {step === 3 && (
               <div className="space-y-6 animate-fade-in">
                 <div>
-                  <h3 className="text-lg font-semibold mb-1">Event Location</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
+                  <h3 className="text-[22px] font-bold mb-1" style={{ color: DESIGN.colors.textPrimary }}>
+                    Event Location
+                  </h3>
+                  <p className="text-[14px] mb-4" style={{ color: DESIGN.colors.textSecondary }}>
                     Search and select your venue
                   </p>
                 </div>
 
                 {/* Search Input with Autocomplete */}
                 <div className="relative">
-                  <label className="text-sm font-medium mb-2 block">Search venue or address *</label>
+                  <label className="text-[13px] font-semibold mb-2 block uppercase tracking-wider" 
+                         style={{ color: DESIGN.colors.textSecondary }}>
+                    Search venue or address *
+                  </label>
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" 
+                           style={{ color: DESIGN.colors.textSecondary }} />
                     <Input
                       ref={searchInputRef}
                       defaultValue={eventData.address || eventData.location}
@@ -1498,26 +1691,38 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         }
                       }}
                       onBlur={() => {
-                        // Delay hiding suggestions to allow click
                         setTimeout(() => setShowSuggestions(false), 200);
                       }}
                       placeholder="Search for a location, street, or venue..."
-                      className="h-11 rounded-lg border-border focus:border-primary focus:ring-1 focus:ring-primary pl-10"
+                      className="h-11 pl-10"
+                      style={{
+                        borderRadius: DESIGN.borderRadius.input,
+                        borderColor: DESIGN.colors.border,
+                        background: DESIGN.colors.card,
+                        color: DESIGN.colors.textPrimary
+                      }}
                       disabled={isSubmitting}
                     />
                     {isSearching && (
                       <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                        <Loader2 className="w-4 h-4 animate-spin" 
+                                style={{ color: DESIGN.colors.textSecondary }} />
                       </div>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>
                     Press Enter to select first result
                   </p>
                   
                   {/* Autocomplete Dropdown */}
                   {showSuggestions && locationSuggestions.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden">
+                    <div className="absolute z-50 w-full mt-1 overflow-hidden"
+                         style={{
+                           borderRadius: DESIGN.borderRadius.button,
+                           border: `1px solid ${DESIGN.colors.border}`,
+                           background: DESIGN.colors.card,
+                           boxShadow: DESIGN.shadows.card
+                         }}>
                       {locationSuggestions.map((place, index) => {
                         const formatted = formatSuggestion(place);
                         return (
@@ -1525,19 +1730,23 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             key={place.id || index}
                             onClick={() => handleLocationSelect(place)}
                             className={cn(
-                              "w-full px-4 py-3 flex items-start gap-3 transition-colors text-left border-border",
+                              "w-full px-4 py-3 flex items-start gap-3 transition-colors text-left",
                               index < locationSuggestions.length - 1 && "border-b",
-                              "hover:bg-accent bg-gray-50"
+                              "hover:bg-primary/5"
                             )}
+                            style={{ 
+                              borderBottomColor: `${DESIGN.colors.border}50`,
+                              color: DESIGN.colors.textPrimary
+                            }}
                           >
-                            <span className="text-muted-foreground mt-0.5 flex-shrink-0">
+                            <span className="mt-0.5 flex-shrink-0" style={{ color: DESIGN.colors.textSecondary }}>
                               {formatted.icon}
                             </span>
                             <div className="flex-1 min-w-0">
                               <div className="font-medium truncate">
                                 {formatted.primary}
                               </div>
-                              <div className="text-sm text-muted-foreground truncate">
+                              <div className="text-sm truncate" style={{ color: DESIGN.colors.textSecondary }}>
                                 {formatted.secondary}
                               </div>
                             </div>
@@ -1551,10 +1760,14 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 {/* Map - Now with error handling */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium">Map View</label>
+                    <label className="text-[13px] font-semibold uppercase tracking-wider" 
+                           style={{ color: DESIGN.colors.textSecondary }}>
+                      Map View
+                    </label>
                     <div className="flex gap-2">
                       <button 
-                        className="text-xs text-muted-foreground hover:text-primary"
+                        className="text-xs hover:text-primary"
+                        style={{ color: DESIGN.colors.textSecondary }}
                         onClick={() => {
                           if (map1.current) {
                             map1.current.flyTo({
@@ -1568,7 +1781,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       </button>
                       {mapError && (
                         <button 
-                          className="text-xs text-red-500 hover:text-red-600"
+                          className="text-xs hover:text-red-600"
+                          style={{ color: '#EF4444' }}
                           onClick={() => {
                             if (mapContainer1.current && map1.current) {
                               map1.current.remove();
@@ -1584,12 +1798,18 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       )}
                     </div>
                   </div>
-                  <div className="relative w-full h-80 rounded-xl overflow-hidden border border-border bg-gray-100">
+                  <div className="relative w-full h-80 overflow-hidden border"
+                       style={{
+                         borderRadius: DESIGN.borderRadius.card,
+                         borderColor: DESIGN.colors.border,
+                         background: `${DESIGN.colors.primary}10`
+                       }}>
                     {mapError ? (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-                        <Map className="w-12 h-12 text-red-500 mb-3" />
-                        <p className="text-sm font-medium text-red-600 mb-2">{mapError}</p>
-                        <p className="text-xs text-muted-foreground text-center mb-4">
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-4"
+                           style={{ background: DESIGN.colors.card }}>
+                        <Map className="w-12 h-12 mb-3" style={{ color: '#EF4444' }} />
+                        <p className="text-sm font-medium mb-2" style={{ color: '#EF4444' }}>{mapError}</p>
+                        <p className="text-xs text-center mb-4" style={{ color: DESIGN.colors.textSecondary }}>
                           Check your internet connection and Mapbox token
                         </p>
                         <Button
@@ -1602,6 +1822,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                               initializeMap(mapContainer1.current, 1);
                             }
                           }}
+                          style={{ borderRadius: DESIGN.borderRadius.button }}
                         >
                           <Loader2 className="w-3 h-3 mr-2" />
                           Reload Map
@@ -1617,7 +1838,13 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             display: step === 3 ? 'block' : 'none' 
                           }}
                         />
-                        <div className="absolute top-3 left-3 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs border border-border">
+                        <div className="absolute top-3 left-3 px-3 py-1.5 text-xs border backdrop-blur-sm"
+                             style={{
+                               borderRadius: DESIGN.borderRadius.button,
+                               background: `${DESIGN.colors.background}80`,
+                               borderColor: DESIGN.colors.border,
+                               color: DESIGN.colors.textPrimary
+                             }}>
                           {isReverseGeocoding ? (
                             <div className="flex items-center gap-1">
                               <Loader2 className="w-3 h-3 animate-spin" />
@@ -1635,20 +1862,29 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 {/* Venue Details */}
                 {selectedVenueDetails && (
                   <div className="space-y-3">
-                    <label className="text-sm font-medium">Venue Details</label>
-                    <div className="border border-border rounded-xl p-4 bg-card">
+                    <label className="text-[13px] font-semibold uppercase tracking-wider" 
+                           style={{ color: DESIGN.colors.textSecondary }}>
+                      Venue Details
+                    </label>
+                    <div className="p-4"
+                         style={{
+                           borderRadius: DESIGN.borderRadius.card,
+                           border: `1px solid ${DESIGN.colors.border}`,
+                           background: DESIGN.colors.card
+                         }}>
                       <div className="flex items-start gap-3">
-                        <MapPin className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                        <MapPin className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: eventData.themeColor }} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
+                          <p className="text-sm font-medium truncate" style={{ color: DESIGN.colors.textPrimary }}>
                             {selectedVenueDetails.name}
                           </p>
-                          <p className="text-xs text-muted-foreground truncate">
+                          <p className="text-xs truncate" style={{ color: DESIGN.colors.textSecondary }}>
                             {selectedVenueDetails.address}
                           </p>
                         </div>
                         <button 
-                          className="text-xs text-primary hover:underline"
+                          className="text-xs hover:underline"
+                          style={{ color: eventData.themeColor }}
                           onClick={() => {
                             searchInputRef.current?.focus();
                             setShowSuggestions(true);
@@ -1667,8 +1903,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             {step === 4 && (
               <div className="space-y-6 animate-fade-in">
                 <div>
-                  <h3 className="text-lg font-semibold mb-1">Check-In Radius</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
+                  <h3 className="text-[22px] font-bold mb-1" style={{ color: DESIGN.colors.textPrimary }}>
+                    Check-In Radius
+                  </h3>
+                  <p className="text-[14px] mb-4" style={{ color: DESIGN.colors.textSecondary }}>
                     Set how close attendees must be to check in
                   </p>
                 </div>
@@ -1676,14 +1914,18 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 {/* Map with Radius */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium">Geofence Area</label>
+                    <label className="text-[13px] font-semibold uppercase tracking-wider" 
+                           style={{ color: DESIGN.colors.textSecondary }}>
+                      Geofence Area
+                    </label>
                     <div className="flex gap-2">
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                         Drag marker to adjust location
                       </span>
                       {mapError && (
                         <button 
-                          className="text-xs text-red-500 hover:text-red-600"
+                          className="text-xs hover:text-red-600"
+                          style={{ color: '#EF4444' }}
                           onClick={() => {
                             if (mapContainer2.current && map2.current) {
                               map2.current.remove();
@@ -1699,12 +1941,18 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       )}
                     </div>
                   </div>
-                  <div className="relative w-full h-96 rounded-xl overflow-hidden border border-border bg-gray-100">
+                  <div className="relative w-full h-96 overflow-hidden border"
+                       style={{
+                         borderRadius: DESIGN.borderRadius.card,
+                         borderColor: DESIGN.colors.border,
+                         background: `${DESIGN.colors.primary}10`
+                       }}>
                     {mapError ? (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-                        <Map className="w-12 h-12 text-red-500 mb-3" />
-                        <p className="text-sm font-medium text-red-600 mb-2">{mapError}</p>
-                        <p className="text-xs text-muted-foreground text-center mb-4">
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-4"
+                           style={{ background: DESIGN.colors.card }}>
+                        <Map className="w-12 h-12 mb-3" style={{ color: '#EF4444' }} />
+                        <p className="text-sm font-medium mb-2" style={{ color: '#EF4444' }}>{mapError}</p>
+                        <p className="text-xs text-center mb-4" style={{ color: DESIGN.colors.textSecondary }}>
                           Check your internet connection and Mapbox token
                         </p>
                         <Button
@@ -1717,6 +1965,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                               initializeMap(mapContainer2.current, 2);
                             }
                           }}
+                          style={{ borderRadius: DESIGN.borderRadius.button }}
                         >
                           <Loader2 className="w-3 h-3 mr-2" />
                           Reload Map
@@ -1732,12 +1981,18 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             display: step === 4 ? 'block' : 'none' 
                           }}
                         />
-                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-background/80 backdrop-blur-sm px-4 py-2 rounded-lg text-sm border border-border flex items-center gap-2">
+                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-4 py-2 text-sm border backdrop-blur-sm flex items-center gap-2"
+                             style={{
+                               borderRadius: DESIGN.borderRadius.button,
+                               background: `${DESIGN.colors.background}80`,
+                               borderColor: DESIGN.colors.border,
+                               color: eventData.themeColor
+                             }}>
                           <div 
                             className="w-3 h-3 rounded-full"
                             style={{ backgroundColor: eventData.themeColor }}
                           />
-                          <span className="font-medium" style={{ color: eventData.themeColor }}>
+                          <span className="font-medium">
                             {eventData.geofenceRadius}m radius
                           </span>
                         </div>
@@ -1749,7 +2004,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 {/* Radius Slider */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium">Adjust Radius</label>
+                    <label className="text-[13px] font-semibold uppercase tracking-wider" 
+                           style={{ color: DESIGN.colors.textSecondary }}>
+                      Adjust Radius
+                    </label>
                     <span 
                       className="text-lg font-bold"
                       style={{ color: eventData.themeColor }}
@@ -1766,7 +2024,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     className="w-full"
                     disabled={isSubmitting}
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground">
+                  <div className="flex justify-between text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                     <span>10m</span>
                     <span>150m</span>
                     <span>300m</span>
@@ -1774,21 +2032,26 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 </div>
 
                 {/* Helper Text */}
-                <div className="border border-border rounded-xl p-4 bg-card">
-                  <p className="text-sm text-muted-foreground">
-                    💡 <span className="font-medium">Recommended:</span> 50-100m for most venues
+                <div className="p-4"
+                     style={{
+                       borderRadius: DESIGN.borderRadius.card,
+                       border: `1px solid ${DESIGN.colors.border}`,
+                       background: DESIGN.colors.card
+                     }}>
+                  <p className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
+                    💡 <span className="font-medium" style={{ color: DESIGN.colors.textPrimary }}>Recommended:</span> 50-100m for most venues
                   </p>
-                  <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                  <div className="mt-2 text-xs space-y-1" style={{ color: DESIGN.colors.textSecondary }}>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      <div className="w-2 h-2 rounded-full" style={{ background: '#10B981' }}></div>
                       <span>10-50m: High precision (small venues)</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                      <div className="w-2 h-2 rounded-full" style={{ background: '#3B82F6' }}></div>
                       <span>50-100m: Standard events</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                      <div className="w-2 h-2 rounded-full" style={{ background: '#8B5CF6' }}></div>
                       <span>100-300m: Large venues & outdoor events</span>
                     </div>
                   </div>
@@ -1800,21 +2063,34 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             {step === 5 && (
               <div className="space-y-6 animate-fade-in">
                 <div>
-                  <h3 className="text-lg font-semibold mb-1">Review Your Event</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
+                  <h3 className="text-[22px] font-bold mb-1" style={{ color: DESIGN.colors.textPrimary }}>
+                    Review Your Event
+                  </h3>
+                  <p className="text-[14px] mb-4" style={{ color: DESIGN.colors.textSecondary }}>
                     Check everything before publishing
                   </p>
                 </div>
 
                 {/* Event Preview */}
                 <div className="space-y-3">
-                  <label className="text-sm font-medium">Event Preview</label>
-                  <div className="border border-border rounded-xl overflow-hidden bg-card">
+                  <label className="text-[13px] font-semibold uppercase tracking-wider" 
+                         style={{ color: DESIGN.colors.textSecondary }}>
+                    Event Preview
+                  </label>
+                  <div className="overflow-hidden"
+                       style={{
+                         borderRadius: DESIGN.borderRadius.card,
+                         border: `1px solid ${DESIGN.colors.border}`,
+                         background: DESIGN.colors.card
+                       }}>
                     {/* Event Card Preview */}
-                    <div className="p-4 border-b border-border">
-                      <p className="text-sm font-medium mb-2">Event Card</p>
-                      <div className="border border-border rounded-lg overflow-hidden">
-                        <div className="h-32 bg-gradient-to-r from-primary/10 to-primary/5 flex items-center justify-center relative overflow-hidden">
+                    <div className="p-4 border-b" style={{ borderBottomColor: DESIGN.colors.border }}>
+                      <p className="text-sm font-medium mb-2" style={{ color: DESIGN.colors.textPrimary }}>
+                        Event Card
+                      </p>
+                      <div className="overflow-hidden" style={{ borderRadius: DESIGN.borderRadius.button, border: `1px solid ${DESIGN.colors.border}` }}>
+                        <div className="h-32 flex items-center justify-center relative overflow-hidden"
+                             style={{ background: `linear-gradient(to right, ${eventData.themeColor}10, ${eventData.themeColor}5)` }}>
                           {imageFiles.length > 0 ? (
                             <img
                               src={eventData.images[0]}
@@ -1826,10 +2102,14 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                               }}
                             />
                           ) : (
-                            <Image className="w-12 h-12 text-muted-foreground" />
+                            <Image className="w-12 h-12" style={{ color: DESIGN.colors.textSecondary }} />
                           )}
                           {videoFile && (
-                            <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                            <div className="absolute top-2 right-2 text-xs px-2 py-1 rounded"
+                                 style={{ 
+                                   background: 'rgba(0, 0, 0, 0.6)',
+                                   color: DESIGN.colors.textPrimary
+                                 }}>
                               Video
                             </div>
                           )}
@@ -1837,8 +2117,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         <div className="p-3">
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1">
-                              <p className="font-medium truncate">{eventData.name}</p>
-                              <p className="text-sm text-muted-foreground truncate">
+                              <p className="font-medium truncate" style={{ color: DESIGN.colors.textPrimary }}>
+                                {eventData.name}
+                              </p>
+                              <p className="text-sm truncate" style={{ color: DESIGN.colors.textSecondary }}>
                                 {eventData.date} at {eventData.time}
                               </p>
                             </div>
@@ -1846,13 +2128,14 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                               className="px-2 py-1 text-xs rounded ml-2"
                               style={{ 
                                 backgroundColor: `${eventData.themeColor}20`,
-                                color: eventData.themeColor
+                                color: eventData.themeColor,
+                                borderRadius: DESIGN.borderRadius.smallPill
                               }}
                             >
                               {eventData.category}
                             </span>
                           </div>
-                          <div className="flex items-center text-sm text-muted-foreground">
+                          <div className="flex items-center text-sm" style={{ color: DESIGN.colors.textSecondary }}>
                             <MapPin className="w-3 h-3 mr-1" />
                             <span className="truncate">{eventData.location}</span>
                           </div>
@@ -1862,23 +2145,25 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     
                     {/* Event Details Preview */}
                     <div className="p-4">
-                      <p className="text-sm font-medium mb-2">Event Details</p>
+                      <p className="text-sm font-medium mb-2" style={{ color: DESIGN.colors.textPrimary }}>
+                        Event Details
+                      </p>
                       <div className="space-y-3 text-sm">
                         <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-muted-foreground" />
-                          <span>{eventData.date} at {eventData.time}</span>
+                          <Calendar className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
+                          <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.date} at {eventData.time}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-muted-foreground" />
-                          <span>{eventData.location}</span>
+                          <MapPin className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
+                          <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.location}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <DollarSign className="w-4 h-4 text-muted-foreground" />
-                          <span>{eventData.isFree ? 'Free' : `N$${eventData.price}`}</span>
+                          <DollarSign className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
+                          <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.isFree ? 'Free' : `N$${eventData.price}`}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Map className="w-4 h-4 text-muted-foreground" />
-                          <span>Check-in radius: {eventData.geofenceRadius}m</span>
+                          <Map className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
+                          <span style={{ color: DESIGN.colors.textPrimary }}>Check-in radius: {eventData.geofenceRadius}m</span>
                         </div>
                       </div>
                     </div>
@@ -1887,49 +2172,54 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
                 {/* Edit Sections */}
                 <div className="space-y-3">
-                  <label className="text-sm font-medium">Event Information</label>
-                  <div className="border border-border rounded-xl overflow-hidden">
+                  <label className="text-[13px] font-semibold uppercase tracking-wider" 
+                         style={{ color: DESIGN.colors.textSecondary }}>
+                    Event Information
+                  </label>
+                  <div className="overflow-hidden" style={{ borderRadius: DESIGN.borderRadius.card, border: `1px solid ${DESIGN.colors.border}` }}>
                     {/* Basic Info */}
-                    <div className="p-4 border-b border-border">
+                    <div className="p-4 border-b" style={{ borderBottomColor: DESIGN.colors.border }}>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">Basic Info</span>
+                          <Calendar className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
+                          <span className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>Basic Info</span>
                         </div>
                         <button 
                           onClick={() => setStep(1)}
-                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                          className="text-xs flex items-center gap-1"
+                          style={{ color: eventData.themeColor }}
                         >
                           <Edit2 className="w-3 h-3" />
                           Edit
                         </button>
                       </div>
                       <div className="space-y-1 text-sm">
-                        <p><span className="text-muted-foreground">Name:</span> {eventData.name}</p>
-                        <p><span className="text-muted-foreground">Category:</span> {eventData.category}</p>
-                        <p><span className="text-muted-foreground">Date:</span> {eventData.date} at {eventData.time}</p>
-                        <p><span className="text-muted-foreground">Price:</span> {eventData.isFree ? 'Free' : `N$${eventData.price}`}</p>
+                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Name:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.name}</span></p>
+                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Category:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.category}</span></p>
+                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Date:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.date} at {eventData.time}</span></p>
+                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Price:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.isFree ? 'Free' : `N$${eventData.price}`}</span></p>
                       </div>
                     </div>
                     
                     {/* Media */}
-                    <div className="p-4 border-b border-border">
+                    <div className="p-4 border-b" style={{ borderBottomColor: DESIGN.colors.border }}>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <Camera className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">Media</span>
+                          <Camera className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
+                          <span className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>Media</span>
                         </div>
                         <button 
                           onClick={() => setStep(2)}
-                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                          className="text-xs flex items-center gap-1"
+                          style={{ color: eventData.themeColor }}
                         >
                           <Edit2 className="w-3 h-3" />
                           Edit
                         </button>
                       </div>
                       <div className="space-y-1 text-sm">
-                        <p><span className="text-muted-foreground">Photos:</span> {imageFiles.length}</p>
-                        <p><span className="text-muted-foreground">Video:</span> {videoFile ? 'Yes' : 'No'}</p>
+                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Photos:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{imageFiles.length}</span></p>
+                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Video:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{videoFile ? 'Yes' : 'No'}</span></p>
                       </div>
                     </div>
                     
@@ -1937,20 +2227,21 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     <div className="p-4">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <MapIcon className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">Location</span>
+                          <MapIcon className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
+                          <span className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>Location</span>
                         </div>
                         <button 
                           onClick={() => setStep(3)}
-                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                          className="text-xs flex items-center gap-1"
+                          style={{ color: eventData.themeColor }}
                         >
                           <Edit2 className="w-3 h-3" />
                           Edit
                         </button>
                       </div>
                       <div className="space-y-1 text-sm">
-                        <p><span className="text-muted-foreground">Venue:</span> {eventData.location}</p>
-                        <p><span className="text-muted-foreground">Check-in radius:</span> {eventData.geofenceRadius}m</p>
+                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Venue:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.location}</span></p>
+                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Check-in radius:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.geofenceRadius}m</span></p>
                       </div>
                     </div>
                   </div>
@@ -1967,23 +2258,40 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 >
                   <Check className="w-12 h-12" style={{ color: eventData.themeColor }} />
                 </div>
-                <h3 className="text-2xl font-bold mb-2 text-center">Event Created Successfully!</h3>
-                <p className="text-muted-foreground text-center mb-8 max-w-md">
-                  Your event "<span className="font-semibold">{createdEvent.name}</span>" is now live! Share the code below so attendees can check in.
+                <h3 className="text-[28px] font-bold mb-2 text-center" style={{ color: DESIGN.colors.textPrimary }}>
+                  Event Created Successfully!
+                </h3>
+                <p className="text-center mb-8 max-w-md" style={{ color: DESIGN.colors.textSecondary }}>
+                  Your event "<span className="font-semibold" style={{ color: DESIGN.colors.textPrimary }}>{createdEvent.name}</span>" is now live! Share the code below so attendees can check in.
                 </p>
 
-                <div className="w-full max-w-sm bg-card rounded-2xl flex flex-col items-center justify-center mb-6 border-2 border-border p-6">
+                <div className="w-full max-w-sm flex flex-col items-center justify-center mb-6 border-2 p-6"
+                     style={{
+                       borderRadius: DESIGN.borderRadius.card,
+                       borderColor: DESIGN.colors.border,
+                       background: DESIGN.colors.card
+                     }}>
                   <div className="text-center mb-6">
                     <p className="text-sm font-medium mb-2" style={{ color: eventData.themeColor }}>
                       Event Check-in Code
                     </p>
-                    <p className="text-3xl font-mono font-bold tracking-widest bg-background p-4 rounded-lg">
+                    <p className="text-3xl font-mono font-bold tracking-widest p-4 rounded-lg"
+                       style={{
+                         background: DESIGN.colors.background,
+                         color: DESIGN.colors.textPrimary
+                       }}>
                       {createdEvent.qrCode}
                     </p>
                   </div>
-                  <div className="w-56 h-56 bg-white flex items-center justify-center p-4 border border-border rounded-xl">
-                    <div className="w-full h-full bg-gray-100 flex items-center justify-center rounded-lg">
-                      <QrCode className="w-44 h-44 text-gray-800" />
+                  <div className="w-56 h-56 p-4 border rounded-xl flex items-center justify-center"
+                       style={{
+                         borderRadius: DESIGN.borderRadius.card,
+                         borderColor: DESIGN.colors.border,
+                         background: DESIGN.colors.textPrimary
+                       }}>
+                    <div className="w-full h-full rounded-lg flex items-center justify-center"
+                         style={{ background: `${DESIGN.colors.textSecondary}10` }}>
+                      <QrCode className="w-44 h-44" style={{ color: DESIGN.colors.background }} />
                     </div>
                   </div>
                 </div>
@@ -1991,16 +2299,18 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 <div className="flex gap-3 w-full max-w-sm">
                   <Button 
                     variant="outline" 
-                    className="flex-1 rounded-lg h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                    className="flex-1 h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
                     onClick={copyCode}
+                    style={{ borderRadius: DESIGN.borderRadius.button }}
                   >
                     <Copy className="w-4 h-4 mr-2" />
                     Copy Code
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="flex-1 rounded-lg h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                    className="flex-1 h-12 hover:scale-[1.02] active:scale-[0.98] transition-transform"
                     onClick={handleDownloadQR}
+                    style={{ borderRadius: DESIGN.borderRadius.button }}
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Save QR
@@ -2013,14 +2323,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
         {/* Footer - Redesigned to be compact */}
         {step < 6 && (
-          <div className="border-t border-border bg-background p-4 shrink-0">
+          <div className="border-t p-4 flex-shrink-0" style={{ borderTopColor: DESIGN.colors.border, background: DESIGN.colors.background }}>
             <div className="flex gap-3">
               {step > 1 && (
                 <Button 
                   variant="outline" 
-                  className="flex-1 rounded-lg h-11"
+                  className="flex-1 h-11"
                   onClick={() => setStep(step - 1)}
                   disabled={isSubmitting}
+                  style={{ borderRadius: DESIGN.borderRadius.button }}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Previous
@@ -2028,7 +2339,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               )}
               {step < 5 ? (
                 <Button
-                  className="flex-1 rounded-lg h-11 font-medium"
+                  className="flex-1 h-11 font-medium"
                   onClick={() => setStep(step + 1)}
                   disabled={
                     isSubmitting ||
@@ -2039,6 +2350,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   style={{ 
                     backgroundColor: eventData.themeColor,
                     borderColor: eventData.themeColor,
+                    borderRadius: DESIGN.borderRadius.button,
+                    color: DESIGN.colors.background
                   }}
                 >
                   {step === 4 ? 'Review Event' : 'Next'}
@@ -2046,12 +2359,14 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                 </Button>
               ) : (
                 <Button
-                  className="flex-1 rounded-lg h-11 font-medium"
+                  className="flex-1 h-11 font-medium"
                   onClick={handlePublish}
                   disabled={isSubmitting}
                   style={{ 
                     backgroundColor: eventData.themeColor,
-                    borderColor: eventData.themeColor 
+                    borderColor: eventData.themeColor,
+                    borderRadius: DESIGN.borderRadius.button,
+                    color: DESIGN.colors.background
                   }}
                 >
                   {isSubmitting ? (
@@ -2072,13 +2387,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         )}
 
         {step === 6 && (
-          <div className="border-t border-border bg-background p-4 shrink-0">
+          <div className="border-t p-4 flex-shrink-0" style={{ borderTopColor: DESIGN.colors.border, background: DESIGN.colors.background }}>
             <Button 
-              className="w-full rounded-lg h-11 font-medium" 
+              className="w-full h-11 font-medium" 
               onClick={onClose}
               style={{ 
                 backgroundColor: eventData.themeColor,
-                borderColor: eventData.themeColor 
+                borderColor: eventData.themeColor,
+                borderRadius: DESIGN.borderRadius.button,
+                color: DESIGN.colors.background
               }}
             >
               <Check className="w-4 h-4 mr-2" />
