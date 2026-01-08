@@ -157,13 +157,10 @@ export default function EventDetail() {
       
       // Start new interval (rotate every 5 seconds)
       carouselIntervalRef.current = setInterval(() => {
-        setCurrentImageIndex((prev) => {
-          if (!event.images) return prev;
-          return (prev + 1) % event.images.length;
-        });
+        setCurrentImageIndex((prev) => (prev + 1) % event.images.length);
       }, 5000);
     }
-  }, [event?.mediaType, event?.images?.length]);
+  }, [event?.mediaType, event?.images?.length, event?.images]);
 
   // Stop carousel rotation
   const stopCarouselRotation = useCallback(() => {
@@ -174,7 +171,10 @@ export default function EventDetail() {
   }, []);
 
   // Handle carousel navigation with manual control pause
-  const nextImage = useCallback(() => {
+  const nextImage = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (event?.images && event.images.length > 0) {
       // Stop auto-rotation temporarily when user manually navigates
       stopCarouselRotation();
@@ -185,9 +185,12 @@ export default function EventDetail() {
         startCarouselRotation();
       }, 3000);
     }
-  }, [event?.images?.length, startCarouselRotation, stopCarouselRotation]);
+  }, [event?.images, stopCarouselRotation, startCarouselRotation]);
 
-  const prevImage = useCallback(() => {
+  const prevImage = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (event?.images && event.images.length > 0) {
       // Stop auto-rotation temporarily when user manually navigates
       stopCarouselRotation();
@@ -198,10 +201,13 @@ export default function EventDetail() {
         startCarouselRotation();
       }, 3000);
     }
-  }, [event?.images?.length, startCarouselRotation, stopCarouselRotation]);
+  }, [event?.images, stopCarouselRotation, startCarouselRotation]);
 
   // Handle video playback
-  const toggleVideoPlay = useCallback(() => {
+  const toggleVideoPlay = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (videoRef.current) {
       if (videoRef.current.paused) {
         videoRef.current.play();
@@ -216,7 +222,10 @@ export default function EventDetail() {
     }
   }, []);
 
-  const toggleVideoMute = useCallback(() => {
+  const toggleVideoMute = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (videoRef.current) {
       const newMutedState = !videoRef.current.muted;
       videoRef.current.muted = newMutedState;
@@ -226,7 +235,10 @@ export default function EventDetail() {
   }, []);
 
   // Handle fullscreen video controls
-  const toggleFullscreenVideoPlay = useCallback(() => {
+  const toggleFullscreenVideoPlay = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (fullscreenVideoRef.current) {
       if (fullscreenVideoRef.current.paused) {
         fullscreenVideoRef.current.play();
@@ -238,7 +250,10 @@ export default function EventDetail() {
     }
   }, []);
 
-  const toggleFullscreenVideoMute = useCallback(() => {
+  const toggleFullscreenVideoMute = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (fullscreenVideoRef.current) {
       const newMutedState = !fullscreenVideoRef.current.muted;
       fullscreenVideoRef.current.muted = newMutedState;
@@ -246,7 +261,10 @@ export default function EventDetail() {
     }
   }, []);
 
-  const openVideoModal = useCallback(() => {
+  const openVideoModal = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     // Save current video state before opening modal
     if (videoRef.current) {
       videoPlaybackStateRef.current.currentTime = videoRef.current.currentTime;
@@ -349,7 +367,7 @@ export default function EventDetail() {
         videoElement.removeEventListener('ended', handleEnded);
       };
     }
-  }, [event?.mediaType, event?.videos, handleVideoPlay, handleVideoPause, handleVideoEnded]);
+  }, [event?.mediaType, event?.videos?.length, handleVideoPlay, handleVideoPause, handleVideoEnded]);
 
   // Setup fullscreen video when modal opens
   const setupFullscreenVideo = useCallback(() => {
@@ -383,7 +401,7 @@ export default function EventDetail() {
         fullscreenVideoElement.removeEventListener('ended', handleEnded);
       };
     }
-  }, [isVideoModalOpen, event?.mediaType, event?.videos, isFullscreenVideoMuted, handleFullscreenVideoPlay, handleFullscreenVideoPause, handleFullscreenVideoEnded]);
+  }, [isVideoModalOpen, event?.mediaType, event?.videos?.length, isFullscreenVideoMuted, handleFullscreenVideoPlay, handleFullscreenVideoPause, handleFullscreenVideoEnded]);
 
   // Handle page visibility for persistent video playback
   useEffect(() => {
@@ -412,27 +430,27 @@ export default function EventDetail() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [event?.mediaType]);
+  }, [event?.mediaType, event?.id]);
 
   // Setup main video and carousel on mount and when event changes
   useEffect(() => {
     if (event?.mediaType === 'video') {
-      const cleanup = setupMainVideo();
-      return cleanup;
+      setupMainVideo();
     } else if (event?.mediaType === 'carousel') {
       startCarouselRotation();
-      return () => {
-        stopCarouselRotation();
-      };
     }
-  }, [event?.mediaType, event?.id, setupMainVideo, startCarouselRotation, stopCarouselRotation]);
+    
+    return () => {
+      stopCarouselRotation();
+    };
+  }, [event?.mediaType, event?.id, event?.videos?.length, event?.images?.length, setupMainVideo, startCarouselRotation, stopCarouselRotation]);
 
   // Setup fullscreen video when modal opens
   useEffect(() => {
     if (isVideoModalOpen && event?.mediaType === 'video') {
       setupFullscreenVideo();
     }
-  }, [isVideoModalOpen, event?.mediaType, setupFullscreenVideo]);
+  }, [isVideoModalOpen, event?.mediaType, event?.id, setupFullscreenVideo]);
 
   // Handle Escape key to close modal
   useEffect(() => {
@@ -695,17 +713,13 @@ export default function EventDetail() {
               }}
             />
             
-            {/* Video Controls Overlay - ALWAYS VISIBLE ON MOBILE */}
+            {/* Video Controls Overlay - Always visible on mobile, hover only on desktop */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
               <div className="absolute bottom-0 left-0 right-0 p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        toggleVideoPlay();
-                      }}
+                      onClick={toggleVideoPlay}
                       className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95"
                       style={{
                         background: 'rgba(255, 255, 255, 0.9)',
@@ -720,11 +734,7 @@ export default function EventDetail() {
                       )}
                     </button>
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        toggleVideoMute();
-                      }}
+                      onClick={toggleVideoMute}
                       className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95"
                       style={{
                         background: 'rgba(255, 255, 255, 0.9)',
@@ -740,11 +750,7 @@ export default function EventDetail() {
                     </button>
                   </div>
                   <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      openVideoModal();
-                    }}
+                    onClick={openVideoModal}
                     className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95"
                     style={{
                       background: 'rgba(255, 255, 255, 0.9)',
@@ -763,7 +769,7 @@ export default function EventDetail() {
               <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                 <button
                   onClick={toggleVideoPlay}
-                  className="w-16 h-16 rounded-full flex items-center justify-center"
+                  className="w-16 h-16 rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
                   style={{
                     background: 'rgba(255, 255, 255, 0.9)',
                     color: DESIGN.colors.background
@@ -806,11 +812,7 @@ export default function EventDetail() {
                 {event.images.length > 1 && (
                   <>
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        prevImage();
-                      }}
+                      onClick={prevImage}
                       className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 z-10"
                       style={{
                         background: 'rgba(0, 0, 0, 0.6)',
@@ -821,11 +823,7 @@ export default function EventDetail() {
                       <ChevronLeft className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        nextImage();
-                      }}
+                      onClick={nextImage}
                       className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 z-10"
                       style={{
                         background: 'rgba(0, 0, 0, 0.6)',
@@ -958,7 +956,7 @@ export default function EventDetail() {
               style={{ color: DESIGN.colors.textSecondary }}
             >
               <span className="font-medium" style={{ color: DESIGN.colors.primary }}>
-                {event.price === 0 ? 'FREE' : `N${event.price}`}
+                {event.price === 0 ? 'FREE' : `N$${event.price}`}
               </span>
               <span className="mx-1" aria-hidden="true">•</span>
               <span>{event.attendees} attending</span>
@@ -1335,7 +1333,7 @@ export default function EventDetail() {
                   color: DESIGN.colors.textPrimary 
                 }}
               >
-                {event.price === 0 ? 'FREE ENTRY' : `N${event.price}`}
+                {event.price === 0 ? 'FREE ENTRY' : `N$${event.price}`}
               </p>
               <p 
                 className="text-xs truncate"
@@ -1391,7 +1389,7 @@ export default function EventDetail() {
                 <div className="flex items-center gap-4">
                   <button
                     onClick={toggleFullscreenVideoPlay}
-                    className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all"
+                    className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all active:scale-95"
                     aria-label={isFullscreenVideoPlaying ? 'Pause video' : 'Play video'}
                   >
                     {isFullscreenVideoPlaying ? (
@@ -1402,7 +1400,7 @@ export default function EventDetail() {
                   </button>
                   <button
                     onClick={toggleFullscreenVideoMute}
-                    className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all"
+                    className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all active:scale-95"
                     aria-label={isFullscreenVideoMuted ? 'Unmute video' : 'Mute video'}
                   >
                     {isFullscreenVideoMuted ? (
@@ -1418,7 +1416,7 @@ export default function EventDetail() {
             {/* Close Button */}
             <button
               onClick={closeVideoModal}
-              className="absolute top-6 right-6 w-12 h-12 rounded-full flex items-center justify-center bg-black/60 backdrop-blur-sm hover:bg-black/80 transition-all"
+              className="absolute top-6 right-6 w-12 h-12 rounded-full flex items-center justify-center bg-black/60 backdrop-blur-sm hover:bg-black/80 transition-all active:scale-95"
               aria-label="Close video"
             >
               <X className="w-6 h-6 text-white" />
