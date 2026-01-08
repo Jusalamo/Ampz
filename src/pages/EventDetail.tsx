@@ -4,7 +4,7 @@ import {
   ArrowLeft, Calendar, MapPin, Users, Clock, Share2, Bookmark, 
   Ticket, ExternalLink, MessageCircle, Image, ChevronDown, ChevronUp,
   Play, Pause, Volume2, VolumeX, Maximize2, Grid3x3, ChevronLeft, ChevronRight,
-  X, Film
+  X, Film, RotateCcw
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
@@ -88,7 +88,10 @@ export default function EventDetail() {
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(true);
   const [isVideoPlaying, setIsVideoPlaying] = useState(true);
-  const [isVideoEnded, setIsVideoEnded] = useState(false);
+  const [isFullscreenVideoPlaying, setIsFullscreenVideoPlaying] = useState(true);
+  const [showVideoControls, setShowVideoControls] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fullscreenVideoRef = useRef<HTMLVideoElement>(null);
@@ -140,13 +143,12 @@ export default function EventDetail() {
     return event?.price === 0 ? 'Register Free' : 'Buy Ticket';
   }, [user, hasTicket, isLive, event]);
 
-  // Handle video playback
+  // Handle main video playback
   const toggleVideoPlay = useCallback(() => {
     if (videoRef.current) {
       if (videoRef.current.paused) {
         videoRef.current.play();
         setIsVideoPlaying(true);
-        setIsVideoEnded(false);
       } else {
         videoRef.current.pause();
         setIsVideoPlaying(false);
@@ -162,16 +164,15 @@ export default function EventDetail() {
     }
   }, []);
 
-  // Handle fullscreen video controls
+  // Handle fullscreen video playback
   const toggleFullscreenVideoPlay = useCallback(() => {
     if (fullscreenVideoRef.current) {
       if (fullscreenVideoRef.current.paused) {
         fullscreenVideoRef.current.play();
-        setIsVideoPlaying(true);
-        setIsVideoEnded(false);
+        setIsFullscreenVideoPlaying(true);
       } else {
         fullscreenVideoRef.current.pause();
-        setIsVideoPlaying(false);
+        setIsFullscreenVideoPlaying(false);
       }
     }
   }, []);
@@ -185,28 +186,49 @@ export default function EventDetail() {
   }, []);
 
   const openVideoModal = useCallback(() => {
-    // Pause the main video before opening modal
+    // Save current video time before opening modal
     if (videoRef.current) {
-      videoRef.current.pause();
-      setIsVideoPlaying(false);
+      const currentTime = videoRef.current.currentTime;
+      setIsVideoModalOpen(true);
+      
+      // Wait for modal to render and set video time
+      setTimeout(() => {
+        if (fullscreenVideoRef.current) {
+          fullscreenVideoRef.current.currentTime = currentTime;
+          fullscreenVideoRef.current.muted = isVideoMuted;
+          fullscreenVideoRef.current.play();
+          setIsFullscreenVideoPlaying(true);
+        }
+      }, 100);
+    } else {
+      setIsVideoModalOpen(true);
     }
-    setIsVideoModalOpen(true);
-  }, []);
+  }, [isVideoMuted]);
 
   const closeVideoModal = useCallback(() => {
-    setIsVideoModalOpen(false);
-    // Resume main video with muted autoplay after a short delay
-    setTimeout(() => {
-      if (videoRef.current) {
-        videoRef.current.muted = true;
-        videoRef.current.play().catch(e => {
-          console.log('Autoplay failed:', e);
-          setIsVideoPlaying(false);
-        });
-        setIsVideoPlaying(true);
-        setIsVideoMuted(true);
-      }
-    }, 100);
+    // Save fullscreen video time before closing
+    if (fullscreenVideoRef.current) {
+      const currentTime = fullscreenVideoRef.current.currentTime;
+      const currentMutedState = fullscreenVideoRef.current.muted;
+      
+      setIsVideoModalOpen(false);
+      
+      // Resume main video from where fullscreen left off
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.currentTime = currentTime;
+          videoRef.current.muted = currentMutedState;
+          videoRef.current.play().catch(e => {
+            console.log('Autoplay failed:', e);
+            setIsVideoPlaying(false);
+          });
+          setIsVideoPlaying(true);
+          setIsVideoMuted(currentMutedState);
+        }
+      }, 100);
+    } else {
+      setIsVideoModalOpen(false);
+    }
   }, []);
 
   // Handle carousel navigation
@@ -222,86 +244,156 @@ export default function EventDetail() {
     }
   }, [event]);
 
-  // Handle video events
-  const handleVideoPlay = useCallback(() => {
-    setIsVideoPlaying(true);
-    setIsVideoEnded(false);
+  // Handle video time update
+  const handleVideoTimeUpdate = useCallback(() => {
+    if (videoRef.current) {
+      const progress = (videoRef.current.currentTime / videoRef.current.duration) * 100;
+      setVideoProgress(isNaN(progress) ? 0 : progress);
+      setVideoDuration(videoRef.current.duration || 0);
+    }
   }, []);
 
-  const handleVideoPause = useCallback(() => {
-    setIsVideoPlaying(false);
+  const handleFullscreenVideoTimeUpdate = useCallback(() => {
+    if (fullscreenVideoRef.current) {
+      const progress = (fullscreenVideoRef.current.currentTime / fullscreenVideoRef.current.duration) * 100;
+      setVideoProgress(isNaN(progress) ? 0 : progress);
+      setVideoDuration(fullscreenVideoRef.current.duration || 0);
+    }
   }, []);
 
-  const handleVideoEnded = useCallback(() => {
-    setIsVideoPlaying(false);
-    setIsVideoEnded(true);
+  // Handle video loaded metadata
+  const handleVideoLoadedMetadata = useCallback(() => {
+    if (videoRef.current) {
+      setVideoDuration(videoRef.current.duration || 0);
+    }
   }, []);
 
-  // Setup main video event listeners
+  const handleFullscreenVideoLoadedMetadata = useCallback(() => {
+    if (fullscreenVideoRef.current) {
+      setVideoDuration(fullscreenVideoRef.current.duration || 0);
+    }
+  }, []);
+
+  // Format time (seconds to MM:SS)
+  const formatTime = useCallback((seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  }, []);
+
+  // Setup main video with persistent auto-loop
   useEffect(() => {
     const videoElement = videoRef.current;
     if (videoElement && event?.mediaType === 'video') {
-      const handlePlay = () => handleVideoPlay();
-      const handlePause = () => handleVideoPause();
-      const handleEnded = () => handleVideoEnded();
-
-      videoElement.addEventListener('play', handlePlay);
-      videoElement.addEventListener('pause', handlePause);
-      videoElement.addEventListener('ended', handleEnded);
-      
-      // Set initial state
-      videoElement.muted = true;
+      // Set video attributes for auto-loop
       videoElement.loop = true;
+      videoElement.muted = isVideoMuted;
       
-      // Try to autoplay muted
-      const playPromise = videoElement.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.log('Autoplay prevented:', error);
+      // Try to auto-play the video
+      const playVideo = async () => {
+        try {
+          await videoElement.play();
+          setIsVideoPlaying(true);
+        } catch (error) {
+          console.log('Video autoplay prevented:', error);
           setIsVideoPlaying(false);
-        });
-      }
+        }
+      };
+
+      playVideo();
+
+      // Add event listeners
+      videoElement.addEventListener('timeupdate', handleVideoTimeUpdate);
+      videoElement.addEventListener('loadedmetadata', handleVideoLoadedMetadata);
+      videoElement.addEventListener('play', () => setIsVideoPlaying(true));
+      videoElement.addEventListener('pause', () => setIsVideoPlaying(false));
+      videoElement.addEventListener('ended', () => {
+        // Video should auto-loop, but just in case
+        videoElement.currentTime = 0;
+        videoElement.play();
+      });
 
       return () => {
-        videoElement.removeEventListener('play', handlePlay);
-        videoElement.removeEventListener('pause', handlePause);
-        videoElement.removeEventListener('ended', handleEnded);
+        videoElement.removeEventListener('timeupdate', handleVideoTimeUpdate);
+        videoElement.removeEventListener('loadedmetadata', handleVideoLoadedMetadata);
       };
     }
-  }, [event?.mediaType, handleVideoPlay, handleVideoPause, handleVideoEnded]);
+  }, [event?.mediaType, isVideoMuted, handleVideoTimeUpdate, handleVideoLoadedMetadata]);
 
-  // Setup fullscreen video event listeners when modal opens
+  // Setup fullscreen video with controls
   useEffect(() => {
     const fullscreenVideoElement = fullscreenVideoRef.current;
     if (fullscreenVideoElement && isVideoModalOpen && event?.mediaType === 'video') {
-      const handlePlay = () => handleVideoPlay();
-      const handlePause = () => handleVideoPause();
-      const handleEnded = () => handleVideoEnded();
-
-      fullscreenVideoElement.addEventListener('play', handlePlay);
-      fullscreenVideoElement.addEventListener('pause', handlePause);
-      fullscreenVideoElement.addEventListener('ended', handleEnded);
-      
-      // Set initial state for modal video
+      // Set video attributes
       fullscreenVideoElement.loop = true;
       fullscreenVideoElement.muted = isVideoMuted;
       
-      // Try to play unmuted in modal
-      const playPromise = fullscreenVideoElement.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.log('Modal autoplay prevented:', error);
-          setIsVideoPlaying(false);
-        });
-      }
+      // Show controls initially
+      setShowVideoControls(true);
+      
+      // Hide controls after 3 seconds
+      const hideControlsTimeout = setTimeout(() => {
+        setShowVideoControls(false);
+      }, 3000);
+
+      // Add event listeners
+      fullscreenVideoElement.addEventListener('timeupdate', handleFullscreenVideoTimeUpdate);
+      fullscreenVideoElement.addEventListener('loadedmetadata', handleFullscreenVideoLoadedMetadata);
+      fullscreenVideoElement.addEventListener('play', () => setIsFullscreenVideoPlaying(true));
+      fullscreenVideoElement.addEventListener('pause', () => setIsFullscreenVideoPlaying(false));
+      fullscreenVideoElement.addEventListener('ended', () => {
+        fullscreenVideoElement.currentTime = 0;
+        fullscreenVideoElement.play();
+      });
+
+      // Try to play video in modal
+      const playVideo = async () => {
+        try {
+          await fullscreenVideoElement.play();
+          setIsFullscreenVideoPlaying(true);
+        } catch (error) {
+          console.log('Modal video autoplay prevented:', error);
+          setIsFullscreenVideoPlaying(false);
+        }
+      };
+
+      playVideo();
 
       return () => {
-        fullscreenVideoElement.removeEventListener('play', handlePlay);
-        fullscreenVideoElement.removeEventListener('pause', handlePause);
-        fullscreenVideoElement.removeEventListener('ended', handleEnded);
+        fullscreenVideoElement.removeEventListener('timeupdate', handleFullscreenVideoTimeUpdate);
+        fullscreenVideoElement.removeEventListener('loadedmetadata', handleFullscreenVideoLoadedMetadata);
+        clearTimeout(hideControlsTimeout);
       };
     }
-  }, [isVideoModalOpen, event?.mediaType, isVideoMuted, handleVideoPlay, handleVideoPause, handleVideoEnded]);
+  }, [isVideoModalOpen, event?.mediaType, isVideoMuted, handleFullscreenVideoTimeUpdate, handleFullscreenVideoLoadedMetadata]);
+
+  // Handle mouse movement to show/hide controls in modal
+  useEffect(() => {
+    if (!isVideoModalOpen) return;
+
+    const handleMouseMove = () => {
+      setShowVideoControls(true);
+      
+      // Clear existing timeout
+      if (videoControlsTimeoutRef.current) {
+        clearTimeout(videoControlsTimeoutRef.current);
+      }
+      
+      // Hide controls after 3 seconds of inactivity
+      videoControlsTimeoutRef.current = setTimeout(() => {
+        setShowVideoControls(false);
+      }, 3000);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      if (videoControlsTimeoutRef.current) {
+        clearTimeout(videoControlsTimeoutRef.current);
+      }
+    };
+  }, [isVideoModalOpen]);
 
   // Handle Escape key to close modal
   useEffect(() => {
@@ -553,10 +645,9 @@ export default function EventDetail() {
               ref={videoRef}
               src={event.videos[0]}
               className="w-full h-full object-cover"
-              muted={isVideoMuted}
               loop
               playsInline
-              preload="metadata"
+              preload="auto"
             />
             
             {/* Video Controls Overlay */}
@@ -610,22 +701,13 @@ export default function EventDetail() {
               </div>
             </div>
             
-            {/* Play overlay when video ended */}
-            {isVideoEnded && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                <button
-                  onClick={toggleVideoPlay}
-                  className="w-16 h-16 rounded-full flex items-center justify-center"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    color: DESIGN.colors.background
-                  }}
-                  aria-label="Replay video"
-                >
-                  <Play className="w-8 h-8 ml-1" />
-                </button>
-              </div>
-            )}
+            {/* Video Progress Bar */}
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/30">
+              <div 
+                className="h-full bg-white transition-all duration-100"
+                style={{ width: `${videoProgress}%` }}
+              />
+            </div>
             
             {/* Video Indicator */}
             <div className="absolute top-3 left-3 px-2 py-1 rounded-full backdrop-blur-sm"
@@ -1205,29 +1287,59 @@ export default function EventDetail() {
         </div>
       </footer>
 
-      {/* Video Modal */}
+      {/* Fullscreen Video Modal */}
       {isVideoModalOpen && event.mediaType === 'video' && event.videos && event.videos.length > 0 && (
-        <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
+        <div 
+          className="fixed inset-0 z-50 bg-black flex items-center justify-center"
+          onClick={(e) => {
+            // Only close if clicking on backdrop, not video or controls
+            if (e.target === e.currentTarget) {
+              closeVideoModal();
+            }
+          }}
+        >
           <div className="relative w-full h-full flex items-center justify-center">
             <video
               ref={fullscreenVideoRef}
               src={event.videos[0]}
               className="w-full h-full object-contain"
-              muted={isVideoMuted}
               loop
-              controls={false}
+              playsInline
+              preload="auto"
+              onClick={(e) => e.stopPropagation()}
             />
             
             {/* Custom Video Controls */}
-            <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent">
+            <div 
+              className={cn(
+                "absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300",
+                showVideoControls ? "opacity-100" : "opacity-0"
+              )}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Progress Bar */}
+              <div className="mb-4">
+                <div className="h-1 bg-white/30 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-white transition-all duration-100"
+                    style={{ width: `${videoProgress}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-white mt-1">
+                  <span>{formatTime(videoDuration * (videoProgress / 100))}</span>
+                  <span>{formatTime(videoDuration)}</span>
+                </div>
+              </div>
+              
+              {/* Control Buttons */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <button
                     onClick={toggleFullscreenVideoPlay}
                     className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all"
-                    aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
+                    aria-label={isFullscreenVideoPlaying ? 'Pause video' : 'Play video'}
                   >
-                    {isVideoPlaying ? (
+                    {isFullscreenVideoPlaying ? (
                       <Pause className="w-6 h-6 text-white" />
                     ) : (
                       <Play className="w-6 h-6 text-white ml-1" />
@@ -1244,11 +1356,31 @@ export default function EventDetail() {
                       <Volume2 className="w-6 h-6 text-white" />
                     )}
                   </button>
+                  <button
+                    onClick={() => {
+                      if (fullscreenVideoRef.current) {
+                        fullscreenVideoRef.current.currentTime = 0;
+                      }
+                    }}
+                    className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all"
+                    aria-label="Restart video"
+                  >
+                    <RotateCcw className="w-6 h-6 text-white" />
+                  </button>
                 </div>
+                
+                {/* Exit Fullscreen Button */}
+                <button
+                  onClick={closeVideoModal}
+                  className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all"
+                  aria-label="Exit fullscreen"
+                >
+                  <Maximize2 className="w-6 h-6 text-white transform rotate-45" />
+                </button>
               </div>
             </div>
             
-            {/* Close Button */}
+            {/* Close Button (Top Right) */}
             <button
               onClick={closeVideoModal}
               className="absolute top-6 right-6 w-12 h-12 rounded-full flex items-center justify-center bg-black/60 backdrop-blur-sm hover:bg-black/80 transition-all"
@@ -1256,6 +1388,29 @@ export default function EventDetail() {
             >
               <X className="w-6 h-6 text-white" />
             </button>
+            
+            {/* Play/Pause overlay when clicking on video */}
+            <div 
+              className="absolute inset-0 flex items-center justify-center"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFullscreenVideoPlay();
+              }}
+            >
+              <button
+                className={cn(
+                  "w-20 h-20 rounded-full flex items-center justify-center bg-black/40 backdrop-blur-sm transition-all",
+                  showVideoControls ? "opacity-100 scale-100" : "opacity-0 scale-95"
+                )}
+                aria-label={isFullscreenVideoPlaying ? 'Pause video' : 'Play video'}
+              >
+                {isFullscreenVideoPlaying ? (
+                  <Pause className="w-10 h-10 text-white" />
+                ) : (
+                  <Play className="w-10 h-10 text-white ml-2" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
