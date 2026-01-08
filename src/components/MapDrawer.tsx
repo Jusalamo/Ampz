@@ -763,7 +763,6 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                     key={event.id}
                     event={event}
                     onClick={() => handleEventCardClick(event)}
-                    design={DESIGN}
                   />
                 ))
               ) : (

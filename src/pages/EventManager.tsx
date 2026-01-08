@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ChevronLeft, 
@@ -16,7 +16,15 @@ import {
   CheckCircle,
   Clock,
   TrendingUp,
-  Send
+  Send,
+  X,
+  Copy,
+  Share2,
+  MapPin,
+  DollarSign,
+  Image as ImageIcon,
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
@@ -24,15 +32,410 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { Event } from '@/lib/types';
+import QRCode from 'qrcode';
 
 type Tab = 'events' | 'attendees' | 'analytics' | 'messages' | 'settings';
 
+// Modal Components
+interface EditEventModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  event: Event;
+  onSave: (updatedEvent: Partial<Event>) => void;
+}
+
+function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps) {
+  const [formData, setFormData] = useState({
+    name: event.name,
+    description: event.description,
+    date: event.date,
+    time: event.time,
+    location: event.location,
+    address: event.address,
+    price: event.price,
+    maxAttendees: event.maxAttendees,
+    geofenceRadius: event.geofenceRadius
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (event) {
+      setFormData({
+        name: event.name,
+        description: event.description,
+        date: event.date,
+        time: event.time,
+        location: event.location,
+        address: event.address,
+        price: event.price,
+        maxAttendees: event.maxAttendees,
+        geofenceRadius: event.geofenceRadius
+      });
+    }
+  }, [event]);
+
+  const handleSave = async () => {
+    if (!formData.name.trim()) {
+      toast({ title: 'Error', description: 'Event name is required', variant: 'destructive' });
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      await onSave(formData);
+      toast({ title: 'Success', description: 'Event updated successfully' });
+      onClose();
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to update event', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="bg-card rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-border">
+        <div className="sticky top-0 bg-card border-b border-border p-4 flex items-center justify-between">
+          <h2 className="text-lg font-bold">Edit Event</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        
+        <div className="p-4 space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Event Name</label>
+            <Input 
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Enter event name"
+            />
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium mb-1 block">Description</label>
+            <Textarea 
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Enter event description"
+              rows={3}
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Date</label>
+              <Input 
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Time</label>
+              <Input 
+                type="time"
+                value={formData.time}
+                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+              />
+            </div>
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium mb-1 block">Venue Name</label>
+            <Input 
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              placeholder="Enter venue name"
+            />
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium mb-1 block">Address</label>
+            <Input 
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              placeholder="Enter full address"
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Price (NAD)</label>
+              <Input 
+                type="number"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Max Attendees</label>
+              <Input 
+                type="number"
+                value={formData.maxAttendees}
+                onChange={(e) => setFormData({ ...formData, maxAttendees: parseInt(e.target.value) || 100 })}
+                placeholder="100"
+              />
+            </div>
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium mb-1 block">Check-in Radius (meters)</label>
+            <Input 
+              type="number"
+              value={formData.geofenceRadius}
+              onChange={(e) => setFormData({ ...formData, geofenceRadius: parseInt(e.target.value) || 50 })}
+              placeholder="50"
+            />
+            <p className="text-xs text-muted-foreground mt-1">Users must be within this radius to check in</p>
+          </div>
+        </div>
+        
+        <div className="sticky bottom-0 bg-card border-t border-border p-4 flex gap-3">
+          <Button variant="outline" onClick={onClose} className="flex-1">
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Save Changes
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface QRCodeModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  event: Event;
+}
+
+function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState(true);
+  const { toast } = useToast();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (isOpen && event) {
+      generateQRCode();
+    }
+  }, [isOpen, event]);
+
+  const generateQRCode = async () => {
+    setIsGenerating(true);
+    try {
+      // Create unique QR data for this event
+      const qrData = JSON.stringify({
+        eventId: event.id,
+        eventName: event.name,
+        type: 'event_checkin',
+        timestamp: new Date().toISOString(),
+        accessCode: event.qrCode
+      });
+
+      const dataUrl = await QRCode.toDataURL(qrData, {
+        width: 400,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        },
+        errorCorrectionLevel: 'H'
+      });
+      
+      setQrCodeDataUrl(dataUrl);
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      toast({ title: 'Error', description: 'Failed to generate QR code', variant: 'destructive' });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const downloadQRCode = () => {
+    if (!qrCodeDataUrl) return;
+    
+    const link = document.createElement('a');
+    link.download = `${event.name.replace(/\s+/g, '-')}-QR-Code.png`;
+    link.href = qrCodeDataUrl;
+    link.click();
+    
+    toast({ title: 'Downloaded!', description: 'QR code saved to your device' });
+  };
+
+  const copyAccessCode = () => {
+    navigator.clipboard.writeText(event.qrCode);
+    toast({ title: 'Copied!', description: 'Access code copied to clipboard' });
+  };
+
+  const shareQRCode = async () => {
+    if (navigator.share) {
+      try {
+        const blob = await (await fetch(qrCodeDataUrl)).blob();
+        const file = new File([blob], `${event.name}-QR.png`, { type: 'image/png' });
+        await navigator.share({
+          title: event.name,
+          text: `Scan this QR code to check in to ${event.name}`,
+          files: [file]
+        });
+      } catch (error) {
+        copyAccessCode();
+      }
+    } else {
+      copyAccessCode();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="bg-card rounded-2xl w-full max-w-sm overflow-hidden border border-border">
+        <div className="p-4 flex items-center justify-between border-b border-border">
+          <h2 className="text-lg font-bold">Event QR Code</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        
+        <div className="p-6">
+          <div className="bg-white rounded-xl p-4 mb-4 flex items-center justify-center">
+            {isGenerating ? (
+              <div className="w-48 h-48 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+              </div>
+            ) : (
+              <img src={qrCodeDataUrl} alt="Event QR Code" className="w-48 h-48" />
+            )}
+          </div>
+          
+          <div className="text-center mb-4">
+            <h3 className="font-bold">{event.name}</h3>
+            <p className="text-sm text-muted-foreground">{event.date} at {event.time}</p>
+          </div>
+          
+          <div className="bg-muted rounded-xl p-3 mb-4">
+            <p className="text-xs text-muted-foreground mb-1">Access Code</p>
+            <div className="flex items-center justify-between">
+              <code className="font-mono text-lg font-bold tracking-wider">{event.qrCode}</code>
+              <button onClick={copyAccessCode} className="p-2 hover:bg-background rounded-lg transition-colors">
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <Button variant="outline" onClick={shareQRCode} className="flex items-center gap-2">
+              <Share2 className="w-4 h-4" />
+              Share
+            </Button>
+            <Button onClick={downloadQRCode} disabled={!qrCodeDataUrl} className="flex items-center gap-2">
+              <Download className="w-4 h-4" />
+              Download
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface DeleteEventModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  event: Event;
+  onDelete: () => void;
+}
+
+function DeleteEventModal({ isOpen, onClose, event, onDelete }: DeleteEventModalProps) {
+  const [confirmText, setConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { toast } = useToast();
+
+  const handleDelete = async () => {
+    if (confirmText !== 'DELETE') {
+      toast({ title: 'Error', description: 'Please type DELETE to confirm', variant: 'destructive' });
+      return;
+    }
+    
+    setIsDeleting(true);
+    try {
+      await onDelete();
+      toast({ title: 'Deleted', description: 'Event has been permanently deleted' });
+      onClose();
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to delete event', variant: 'destructive' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="bg-card rounded-2xl w-full max-w-sm overflow-hidden border border-border">
+        <div className="p-6 text-center">
+          <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-8 h-8 text-destructive" />
+          </div>
+          
+          <h2 className="text-xl font-bold mb-2">Delete Event?</h2>
+          <p className="text-muted-foreground text-sm mb-4">
+            This will permanently delete <strong>"{event.name}"</strong> and all associated data including attendees and tickets.
+          </p>
+          
+          <div className="bg-destructive/10 rounded-xl p-3 mb-4 text-left">
+            <p className="text-xs text-destructive mb-2">This action cannot be undone. Type DELETE to confirm:</p>
+            <Input 
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
+              placeholder="Type DELETE"
+              className="border-destructive/50 focus:border-destructive"
+            />
+          </div>
+          
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={onClose} className="flex-1">
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDelete} 
+              disabled={confirmText !== 'DELETE' || isDeleting}
+              className="flex-1"
+            >
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Delete
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function EventManager() {
   const navigate = useNavigate();
-  const { user, events } = useApp();
+  const { user, events, updateEvent, deleteEvent } = useApp();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('events');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [announcementText, setAnnouncementText] = useState('');
+  
+  // Modal states
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [actionEvent, setActionEvent] = useState<Event | null>(null);
 
   const userEvents = events.filter(e => e.organizerId === user?.id);
   const selectedEvent = selectedEventId ? events.find(e => e.id === selectedEventId) : null;
@@ -64,6 +467,34 @@ export default function EventManager() {
     if (eventDate < now) return 'past';
     if (eventDate.toDateString() === now.toDateString()) return 'live';
     return 'upcoming';
+  };
+
+  const handleEditEvent = (event: Event) => {
+    setActionEvent(event);
+    setEditModalOpen(true);
+  };
+
+  const handleQRCode = (event: Event) => {
+    setActionEvent(event);
+    setQrModalOpen(true);
+  };
+
+  const handleDeleteEvent = (event: Event) => {
+    setActionEvent(event);
+    setDeleteModalOpen(true);
+  };
+
+  const handleSaveEvent = async (updatedData: Partial<Event>) => {
+    if (actionEvent && updateEvent) {
+      updateEvent(actionEvent.id, updatedData);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (actionEvent && deleteEvent) {
+      deleteEvent(actionEvent.id);
+      setSelectedEventId(null);
+    }
   };
 
   // Mock attendees data
@@ -160,7 +591,7 @@ export default function EventManager() {
                             size="sm" 
                             variant="outline" 
                             className="h-7 text-xs"
-                            onClick={() => setSelectedEventId(event.id)}
+                            onClick={() => navigate(`/event/${event.id}`)}
                           >
                             <Eye className="w-3 h-3 mr-1" />
                             View
@@ -169,6 +600,7 @@ export default function EventManager() {
                             size="sm" 
                             variant="outline" 
                             className="h-7 text-xs"
+                            onClick={() => handleEditEvent(event)}
                           >
                             <Edit className="w-3 h-3 mr-1" />
                             Edit
@@ -177,9 +609,18 @@ export default function EventManager() {
                             size="sm" 
                             variant="outline" 
                             className="h-7 text-xs"
+                            onClick={() => handleQRCode(event)}
                           >
                             <QrCode className="w-3 h-3 mr-1" />
                             QR
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-7 text-xs text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteEvent(event)}
+                          >
+                            <Trash2 className="w-3 h-3" />
                           </Button>
                         </div>
                       </div>
@@ -462,13 +903,44 @@ export default function EventManager() {
               </div>
             </div>
 
-            <Button variant="destructive" className="w-full">
+            <Button variant="destructive" className="w-full" onClick={() => {
+              toast({ 
+                title: 'Confirm deletion', 
+                description: 'Use the delete button on individual events instead',
+                variant: 'destructive'
+              });
+            }}>
               <Trash2 className="w-4 h-4 mr-2" />
               Delete All Events
             </Button>
           </div>
         )}
       </div>
+
+      {/* Modals */}
+      {actionEvent && (
+        <>
+          <EditEventModal
+            isOpen={editModalOpen}
+            onClose={() => { setEditModalOpen(false); setActionEvent(null); }}
+            event={actionEvent}
+            onSave={handleSaveEvent}
+          />
+          
+          <QRCodeModal
+            isOpen={qrModalOpen}
+            onClose={() => { setQrModalOpen(false); setActionEvent(null); }}
+            event={actionEvent}
+          />
+          
+          <DeleteEventModal
+            isOpen={deleteModalOpen}
+            onClose={() => { setDeleteModalOpen(false); setActionEvent(null); }}
+            event={actionEvent}
+            onDelete={handleConfirmDelete}
+          />
+        </>
+      )}
 
       <BottomNav />
     </div>

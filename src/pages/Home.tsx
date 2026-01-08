@@ -7,7 +7,6 @@ import { CheckInModal } from '@/components/modals/CheckInModal';
 import { TicketsModal } from '@/components/modals/TicketsModal';
 import { EventWizardModal } from '@/components/modals/EventWizardModal';
 import { SubscriptionModal } from '@/components/modals/SubscriptionModal';
-import { NotificationsDropdown } from '@/components/modals/NotificationsDropdown';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -48,7 +47,6 @@ export default function Home() {
   const [showTickets, setShowTickets] = useState(false);
   const [showEventWizard, setShowEventWizard] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
   const featuredRef = useRef<HTMLDivElement>(null);
   const myEventsCarouselRef = useRef<HTMLDivElement>(null);
 
@@ -244,33 +242,24 @@ export default function Home() {
                   {user?.subscription?.tier}
                 </span>
               )}
-              <div className="relative">
-                <button
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
-                  style={{ 
-                    background: DESIGN.colors.card,
-                    border: `1px solid ${DESIGN.colors.textSecondary}20`
-                  }}
-                >
-                  <Bell className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
-                  {unreadNotificationsCount > 0 && (
-                    <span 
-                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center"
-                      style={{ background: '#EF4444', color: '#FFFFFF' }}
-                    >
-                      {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
-                    </span>
-                  )}
-                </button>
-                {showNotifications && (
-                  <NotificationsDropdown 
-                    isOpen={showNotifications} 
-                    onClose={() => setShowNotifications(false)}
-                    swipeable={true}
-                  />
+              <button
+                onClick={() => navigate('/activity')}
+                className="relative w-10 h-10 rounded-full flex items-center justify-center transition-colors"
+                style={{ 
+                  background: DESIGN.colors.card,
+                  border: `1px solid ${DESIGN.colors.textSecondary}20`
+                }}
+              >
+                <Bell className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
+                {unreadNotificationsCount > 0 && (
+                  <span 
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center"
+                    style={{ background: '#EF4444', color: '#FFFFFF' }}
+                  >
+                    {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                  </span>
                 )}
-              </div>
+              </button>
             </div>
           </div>
         </div>
