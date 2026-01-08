@@ -88,10 +88,12 @@ export default function EventDetail() {
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(true);
   const [isVideoPlaying, setIsVideoPlaying] = useState(true);
+  const [isVideoEnded, setIsVideoEnded] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fullscreenVideoRef = useRef<HTMLVideoElement>(null);
   const lastScrollY = useRef(0);
+  const videoControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Memoize event find for better performance
   const event = useMemo(() => 
@@ -144,6 +146,7 @@ export default function EventDetail() {
       if (videoRef.current.paused) {
         videoRef.current.play();
         setIsVideoPlaying(true);
+        setIsVideoEnded(false);
       } else {
         videoRef.current.pause();
         setIsVideoPlaying(false);
@@ -153,31 +156,57 @@ export default function EventDetail() {
 
   const toggleVideoMute = useCallback(() => {
     if (videoRef.current) {
-      videoRef.current.muted = !videoRef.current.muted;
-      setIsVideoMuted(videoRef.current.muted);
+      const newMutedState = !videoRef.current.muted;
+      videoRef.current.muted = newMutedState;
+      setIsVideoMuted(newMutedState);
+    }
+  }, []);
+
+  // Handle fullscreen video controls
+  const toggleFullscreenVideoPlay = useCallback(() => {
+    if (fullscreenVideoRef.current) {
+      if (fullscreenVideoRef.current.paused) {
+        fullscreenVideoRef.current.play();
+        setIsVideoPlaying(true);
+        setIsVideoEnded(false);
+      } else {
+        fullscreenVideoRef.current.pause();
+        setIsVideoPlaying(false);
+      }
+    }
+  }, []);
+
+  const toggleFullscreenVideoMute = useCallback(() => {
+    if (fullscreenVideoRef.current) {
+      const newMutedState = !fullscreenVideoRef.current.muted;
+      fullscreenVideoRef.current.muted = newMutedState;
+      setIsVideoMuted(newMutedState);
     }
   }, []);
 
   const openVideoModal = useCallback(() => {
-    setIsVideoModalOpen(true);
-    if (fullscreenVideoRef.current) {
-      fullscreenVideoRef.current.muted = false;
-      fullscreenVideoRef.current.play();
-      setIsVideoPlaying(true);
-      setIsVideoMuted(false);
+    // Pause the main video before opening modal
+    if (videoRef.current) {
+      videoRef.current.pause();
+      setIsVideoPlaying(false);
     }
+    setIsVideoModalOpen(true);
   }, []);
 
   const closeVideoModal = useCallback(() => {
     setIsVideoModalOpen(false);
-    if (fullscreenVideoRef.current) {
-      fullscreenVideoRef.current.pause();
-    }
-    // Reset main video to muted autoplay
-    if (videoRef.current) {
-      videoRef.current.muted = true;
-      videoRef.current.play();
-    }
+    // Resume main video with muted autoplay after a short delay
+    setTimeout(() => {
+      if (videoRef.current) {
+        videoRef.current.muted = true;
+        videoRef.current.play().catch(e => {
+          console.log('Autoplay failed:', e);
+          setIsVideoPlaying(false);
+        });
+        setIsVideoPlaying(true);
+        setIsVideoMuted(true);
+      }
+    }, 100);
   }, []);
 
   // Handle carousel navigation
@@ -192,6 +221,106 @@ export default function EventDetail() {
       setCurrentImageIndex((prev) => (prev - 1 + event.images.length) % event.images.length);
     }
   }, [event]);
+
+  // Handle video events
+  const handleVideoPlay = useCallback(() => {
+    setIsVideoPlaying(true);
+    setIsVideoEnded(false);
+  }, []);
+
+  const handleVideoPause = useCallback(() => {
+    setIsVideoPlaying(false);
+  }, []);
+
+  const handleVideoEnded = useCallback(() => {
+    setIsVideoPlaying(false);
+    setIsVideoEnded(true);
+  }, []);
+
+  // Setup main video event listeners
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (videoElement && event?.mediaType === 'video') {
+      const handlePlay = () => handleVideoPlay();
+      const handlePause = () => handleVideoPause();
+      const handleEnded = () => handleVideoEnded();
+
+      videoElement.addEventListener('play', handlePlay);
+      videoElement.addEventListener('pause', handlePause);
+      videoElement.addEventListener('ended', handleEnded);
+      
+      // Set initial state
+      videoElement.muted = true;
+      videoElement.loop = true;
+      
+      // Try to autoplay muted
+      const playPromise = videoElement.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.log('Autoplay prevented:', error);
+          setIsVideoPlaying(false);
+        });
+      }
+
+      return () => {
+        videoElement.removeEventListener('play', handlePlay);
+        videoElement.removeEventListener('pause', handlePause);
+        videoElement.removeEventListener('ended', handleEnded);
+      };
+    }
+  }, [event?.mediaType, handleVideoPlay, handleVideoPause, handleVideoEnded]);
+
+  // Setup fullscreen video event listeners when modal opens
+  useEffect(() => {
+    const fullscreenVideoElement = fullscreenVideoRef.current;
+    if (fullscreenVideoElement && isVideoModalOpen && event?.mediaType === 'video') {
+      const handlePlay = () => handleVideoPlay();
+      const handlePause = () => handleVideoPause();
+      const handleEnded = () => handleVideoEnded();
+
+      fullscreenVideoElement.addEventListener('play', handlePlay);
+      fullscreenVideoElement.addEventListener('pause', handlePause);
+      fullscreenVideoElement.addEventListener('ended', handleEnded);
+      
+      // Set initial state for modal video
+      fullscreenVideoElement.loop = true;
+      fullscreenVideoElement.muted = isVideoMuted;
+      
+      // Try to play unmuted in modal
+      const playPromise = fullscreenVideoElement.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.log('Modal autoplay prevented:', error);
+          setIsVideoPlaying(false);
+        });
+      }
+
+      return () => {
+        fullscreenVideoElement.removeEventListener('play', handlePlay);
+        fullscreenVideoElement.removeEventListener('pause', handlePause);
+        fullscreenVideoElement.removeEventListener('ended', handleEnded);
+      };
+    }
+  }, [isVideoModalOpen, event?.mediaType, isVideoMuted, handleVideoPlay, handleVideoPause, handleVideoEnded]);
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isVideoModalOpen) {
+        closeVideoModal();
+      }
+    };
+
+    if (isVideoModalOpen) {
+      document.addEventListener('keydown', handleEscapeKey);
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKey);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isVideoModalOpen, closeVideoModal]);
 
   // Scroll effect - prevent automatic scrolling
   useEffect(() => {
@@ -419,31 +548,30 @@ export default function EventDetail() {
       <div className="relative h-64 overflow-hidden">
         {event.mediaType === 'video' && event.videos && event.videos.length > 0 ? (
           /* Video Player */
-          <div className="relative w-full h-full">
+          <div className="relative w-full h-full group">
             <video
               ref={videoRef}
               src={event.videos[0]}
               className="w-full h-full object-cover"
-              muted
-              autoPlay
+              muted={isVideoMuted}
               loop
               playsInline
-              onPlay={() => setIsVideoPlaying(true)}
-              onPause={() => setIsVideoPlaying(false)}
+              preload="metadata"
             />
             
             {/* Video Controls Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 hover:opacity-100 transition-opacity">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <div className="absolute bottom-0 left-0 right-0 p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <button
                       onClick={toggleVideoPlay}
-                      className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"
+                      className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105"
                       style={{
                         background: 'rgba(255, 255, 255, 0.9)',
                         color: DESIGN.colors.background
                       }}
+                      aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
                     >
                       {isVideoPlaying ? (
                         <Pause className="w-5 h-5" />
@@ -453,11 +581,12 @@ export default function EventDetail() {
                     </button>
                     <button
                       onClick={toggleVideoMute}
-                      className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"
+                      className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105"
                       style={{
                         background: 'rgba(255, 255, 255, 0.9)',
                         color: DESIGN.colors.background
                       }}
+                      aria-label={isVideoMuted ? 'Unmute video' : 'Mute video'}
                     >
                       {isVideoMuted ? (
                         <VolumeX className="w-5 h-5" />
@@ -468,17 +597,35 @@ export default function EventDetail() {
                   </div>
                   <button
                     onClick={openVideoModal}
-                    className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"
+                    className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105"
                     style={{
                       background: 'rgba(255, 255, 255, 0.9)',
                       color: DESIGN.colors.background
                     }}
+                    aria-label="Open video in fullscreen"
                   >
                     <Maximize2 className="w-5 h-5" />
                   </button>
                 </div>
               </div>
             </div>
+            
+            {/* Play overlay when video ended */}
+            {isVideoEnded && (
+              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                <button
+                  onClick={toggleVideoPlay}
+                  className="w-16 h-16 rounded-full flex items-center justify-center"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    color: DESIGN.colors.background
+                  }}
+                  aria-label="Replay video"
+                >
+                  <Play className="w-8 h-8 ml-1" />
+                </button>
+              </div>
+            )}
             
             {/* Video Indicator */}
             <div className="absolute top-3 left-3 px-2 py-1 rounded-full backdrop-blur-sm"
@@ -512,21 +659,23 @@ export default function EventDetail() {
                   <>
                     <button
                       onClick={prevImage}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105"
                       style={{
                         background: 'rgba(0, 0, 0, 0.6)',
                         color: DESIGN.colors.textPrimary
                       }}
+                      aria-label="Previous image"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
                     <button
                       onClick={nextImage}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105"
                       style={{
                         background: 'rgba(0, 0, 0, 0.6)',
                         color: DESIGN.colors.textPrimary
                       }}
+                      aria-label="Next image"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
@@ -538,11 +687,12 @@ export default function EventDetail() {
                           key={index}
                           onClick={() => setCurrentImageIndex(index)}
                           className={cn(
-                            'w-2 h-2 rounded-full transition-all',
+                            'w-2 h-2 rounded-full transition-all duration-300 hover:scale-125',
                             index === currentImageIndex 
                               ? 'bg-white w-4' 
                               : 'bg-white/50'
                           )}
+                          aria-label={`Go to image ${index + 1}`}
                         />
                       ))}
                     </div>
@@ -1063,20 +1213,48 @@ export default function EventDetail() {
               ref={fullscreenVideoRef}
               src={event.videos[0]}
               className="w-full h-full object-contain"
-              controls
-              autoPlay
+              muted={isVideoMuted}
+              loop
+              controls={false}
             />
+            
+            {/* Custom Video Controls */}
+            <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={toggleFullscreenVideoPlay}
+                    className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all"
+                    aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
+                  >
+                    {isVideoPlaying ? (
+                      <Pause className="w-6 h-6 text-white" />
+                    ) : (
+                      <Play className="w-6 h-6 text-white ml-1" />
+                    )}
+                  </button>
+                  <button
+                    onClick={toggleFullscreenVideoMute}
+                    className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all"
+                    aria-label={isVideoMuted ? 'Unmute video' : 'Mute video'}
+                  >
+                    {isVideoMuted ? (
+                      <VolumeX className="w-6 h-6 text-white" />
+                    ) : (
+                      <Volume2 className="w-6 h-6 text-white" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
             
             {/* Close Button */}
             <button
               onClick={closeVideoModal}
-              className="absolute top-4 right-4 w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-sm"
-              style={{
-                background: 'rgba(0, 0, 0, 0.6)',
-                color: DESIGN.colors.textPrimary
-              }}
+              className="absolute top-6 right-6 w-12 h-12 rounded-full flex items-center justify-center bg-black/60 backdrop-blur-sm hover:bg-black/80 transition-all"
+              aria-label="Close video"
             >
-              <X className="w-6 h-6" />
+              <X className="w-6 h-6 text-white" />
             </button>
           </div>
         </div>
