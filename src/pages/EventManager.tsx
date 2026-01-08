@@ -25,7 +25,8 @@ import {
   Image as ImageIcon,
   AlertTriangle,
   Loader2,
-  Video as VideoIcon
+  Film,
+  Grid3x3
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
@@ -58,7 +59,7 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
     price: event.price,
     maxAttendees: event.maxAttendees,
     geofenceRadius: event.geofenceRadius,
-    mediaType: event.mediaType || 'carousel'
+    mediaType: event.mediaType,
   });
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
@@ -75,7 +76,7 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
         price: event.price,
         maxAttendees: event.maxAttendees,
         geofenceRadius: event.geofenceRadius,
-        mediaType: event.mediaType || 'carousel'
+        mediaType: event.mediaType,
       });
     }
   }, [event]);
@@ -189,36 +190,6 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
           </div>
           
           <div>
-            <label className="text-sm font-medium mb-1 block">Media Type</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setFormData(prev => ({ ...prev, mediaType: 'carousel' }))}
-                className={cn(
-                  'flex-1 p-3 border rounded-lg text-center',
-                  formData.mediaType === 'carousel'
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border hover:border-primary'
-                )}
-              >
-                <ImageIcon className="w-5 h-5 mx-auto mb-1" />
-                <span className="text-sm">Carousel</span>
-              </button>
-              <button
-                onClick={() => setFormData(prev => ({ ...prev, mediaType: 'video' }))}
-                className={cn(
-                  'flex-1 p-3 border rounded-lg text-center',
-                  formData.mediaType === 'video'
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border hover:border-primary'
-                )}
-              >
-                <VideoIcon className="w-5 h-5 mx-auto mb-1" />
-                <span className="text-sm">Video</span>
-              </button>
-            </div>
-          </div>
-          
-          <div>
             <label className="text-sm font-medium mb-1 block">Check-in Radius (meters)</label>
             <Input 
               type="number"
@@ -227,6 +198,37 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
               placeholder="50"
             />
             <p className="text-xs text-muted-foreground mt-1">Users must be within this radius to check in</p>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-1 block">Media Type</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFormData({ ...formData, mediaType: 'carousel' })}
+                className={cn(
+                  'flex-1 p-3 border rounded-lg flex flex-col items-center gap-2',
+                  formData.mediaType === 'carousel' 
+                    ? 'border-primary bg-primary/10' 
+                    : 'border-border'
+                )}
+              >
+                <Grid3x3 className="w-5 h-5" />
+                <span className="text-sm">Carousel</span>
+              </button>
+              <button
+                onClick={() => setFormData({ ...formData, mediaType: 'video' })}
+                className={cn(
+                  'flex-1 p-3 border rounded-lg flex flex-col items-center gap-2',
+                  formData.mediaType === 'video' 
+                    ? 'border-primary bg-primary/10' 
+                    : 'border-border'
+                )}
+              >
+                <Film className="w-5 h-5" />
+                <span className="text-sm">Video</span>
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Display type on event details page</p>
           </div>
         </div>
         
@@ -353,6 +355,9 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
           <div className="text-center mb-4">
             <h3 className="font-bold">{event.name}</h3>
             <p className="text-sm text-muted-foreground">{event.date} at {event.time}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Media: {event.mediaType === 'video' ? 'Video' : 'Image Carousel'}
+            </p>
           </div>
           
           <div className="bg-muted rounded-xl p-3 mb-4">
@@ -619,19 +624,21 @@ export default function EventManager() {
                         <p className="text-xs text-muted-foreground mt-1">
                           {event.date} • {event.attendees} attendees
                         </p>
-                        <div className="flex items-center gap-1 mb-2">
+                        <div className="flex items-center gap-2 mt-1">
                           {event.mediaType === 'video' ? (
-                            <span className="inline-flex items-center gap-0.5 text-xs text-blue-500">
-                              <VideoIcon className="w-3 h-3" />
-                              Video
-                            </span>
+                            <div className="flex items-center gap-1">
+                              <Film className="w-3 h-3 text-primary" />
+                              <span className="text-xs text-muted-foreground">Video</span>
+                            </div>
                           ) : (
-                            <span className="inline-flex items-center gap-0.5 text-xs text-purple-500">
-                              <ImageIcon className="w-3 h-3" />
-                              Carousel
-                            </span>
+                            <div className="flex items-center gap-1">
+                              <Grid3x3 className="w-3 h-3 text-primary" />
+                              <span className="text-xs text-muted-foreground">
+                                {event.images?.length || 0} photos
+                              </span>
+                            </div>
                           )}
-                          <span className="text-xs text-muted-foreground mx-1">•</span>
+                          <span className="text-xs text-muted-foreground">•</span>
                           <span className="text-xs text-muted-foreground">
                             Radius: {event.geofenceRadius}m
                           </span>
@@ -837,9 +844,8 @@ export default function EventManager() {
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{event.name}</p>
-                      <p className="text-xs text-muted-foreground">{event.attendees} attendees</p>
                       <p className="text-xs text-muted-foreground">
-                        {event.mediaType === 'video' ? 'Video' : 'Carousel'} • {event.geofenceRadius}m radius
+                        {event.attendees} attendees • {event.mediaType === 'video' ? 'Video' : 'Carousel'}
                       </p>
                     </div>
                   </div>
@@ -924,19 +930,6 @@ export default function EventManager() {
                   <p className="text-xs text-muted-foreground mt-1">Default radius in meters</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Default Media Type</label>
-                  <div className="flex gap-2">
-                    <button className="flex-1 p-3 border border-primary rounded-lg text-center bg-primary/10">
-                      <ImageIcon className="w-5 h-5 mx-auto mb-1" />
-                      <span className="text-sm">Carousel</span>
-                    </button>
-                    <button className="flex-1 p-3 border border-border rounded-lg text-center hover:border-primary">
-                      <VideoIcon className="w-5 h-5 mx-auto mb-1" />
-                      <span className="text-sm">Video</span>
-                    </button>
-                  </div>
-                </div>
-                <div>
                   <label className="text-sm font-medium mb-2 block">Default Theme Color</label>
                   <div className="flex gap-2">
                     {['#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#3B82F6'].map(color => (
@@ -946,6 +939,19 @@ export default function EventManager() {
                         style={{ backgroundColor: color }}
                       />
                     ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Default Media Type</label>
+                  <div className="flex gap-2">
+                    <button className="flex-1 p-3 border border-border rounded-lg flex flex-col items-center gap-2">
+                      <Grid3x3 className="w-5 h-5" />
+                      <span className="text-sm">Carousel</span>
+                    </button>
+                    <button className="flex-1 p-3 border border-border rounded-lg flex flex-col items-center gap-2">
+                      <Film className="w-5 h-5" />
+                      <span className="text-sm">Video</span>
+                    </button>
                   </div>
                 </div>
               </div>
