@@ -1,5 +1,7 @@
 import { User, Event, ConnectionProfile, Match, Ticket, AppNotification, CommunityPhoto, CommunityComment } from './types';
 
+export const isDemoUser = true; // Flag to indicate demo mode
+
 export const demoUser: User = {
   id: 'demo-user',
   email: 'demo@amps.app',
@@ -41,6 +43,7 @@ export const demoUser: User = {
   createdEvents: [],
   likesRemaining: Infinity,
   lastLikeReset: new Date().toISOString(),
+  isDemo: true, // Added demo flag to user object
 };
 
 export const demoEvents: Event[] = [
@@ -65,6 +68,7 @@ export const demoEvents: Event[] = [
     coverImage: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=800',
     tags: ['Jazz', 'Live Music', 'Outdoor'],
     isFeatured: true,
+    isDemo: true, // Added demo flag
   },
   {
     id: 'event-2',
@@ -87,6 +91,7 @@ export const demoEvents: Event[] = [
     coverImage: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800',
     tags: ['Tech', 'Networking', 'Free'],
     isFeatured: true,
+    isDemo: true, // Added demo flag
   },
   {
     id: 'event-3',
@@ -109,6 +114,7 @@ export const demoEvents: Event[] = [
     coverImage: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=800',
     tags: ['Party', 'Beach', 'DJ'],
     isFeatured: true,
+    isDemo: true, // Added demo flag
   },
   {
     id: 'event-4',
@@ -131,6 +137,7 @@ export const demoEvents: Event[] = [
     coverImage: 'https://images.unsplash.com/photo-1531243269054-5ebf6f34081e?w=800',
     tags: ['Art', 'Gallery', 'Exhibition'],
     isFeatured: false,
+    isDemo: true, // Added demo flag
   },
   {
     id: 'event-5',
@@ -153,6 +160,7 @@ export const demoEvents: Event[] = [
     coverImage: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800',
     tags: ['Food', 'Festival', 'Local'],
     isFeatured: true,
+    isDemo: true, // Added demo flag
   },
   {
     id: 'event-6',
@@ -175,6 +183,7 @@ export const demoEvents: Event[] = [
     coverImage: 'https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?w=800',
     tags: ['Sports', 'Running', 'Fitness'],
     isFeatured: false,
+    isDemo: true, // Added demo flag
   },
 ];
 
@@ -191,6 +200,7 @@ export const demoConnectionProfiles: ConnectionProfile[] = [
     location: 'Windhoek',
     occupation: 'Photographer',
     isPublic: true,
+    isDemo: true, // Added demo flag
   },
   {
     id: 'conn-2',
@@ -204,6 +214,7 @@ export const demoConnectionProfiles: ConnectionProfile[] = [
     location: 'Windhoek',
     occupation: 'Music Producer',
     isPublic: true,
+    isDemo: true, // Added demo flag
   },
   {
     id: 'conn-3',
@@ -217,6 +228,7 @@ export const demoConnectionProfiles: ConnectionProfile[] = [
     location: 'Swakopmund',
     occupation: 'Event Planner',
     isPublic: true,
+    isDemo: true, // Added demo flag
   },
   {
     id: 'conn-4',
@@ -230,6 +242,7 @@ export const demoConnectionProfiles: ConnectionProfile[] = [
     location: 'Windhoek',
     occupation: 'CEO',
     isPublic: true,
+    isDemo: true, // Added demo flag
   },
   {
     id: 'conn-5',
@@ -243,6 +256,7 @@ export const demoConnectionProfiles: ConnectionProfile[] = [
     location: 'Swakopmund',
     occupation: 'Travel Blogger',
     isPublic: true,
+    isDemo: true, // Added demo flag
   },
 ];
 
@@ -257,6 +271,7 @@ export const demoMatches: Match[] = [
     lastMessageTime: '2h ago',
     unread: true,
     online: true,
+    isDemo: true, // Added demo flag
   },
   {
     id: 'match-2',
@@ -268,6 +283,7 @@ export const demoMatches: Match[] = [
     lastMessageTime: '1d ago',
     unread: false,
     online: false,
+    isDemo: true, // Added demo flag
   },
 ];
 
@@ -285,6 +301,7 @@ export const demoTickets: Ticket[] = [
     quantity: 2,
     qrCode: 'JAZZ-TKT-001',
     status: 'active',
+    isDemo: true, // Added demo flag
   },
 ];
 
@@ -297,6 +314,7 @@ export const demoNotifications: AppNotification[] = [
     timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     read: false,
     data: { matchId: 'match-1' },
+    isDemo: true, // Added demo flag
   },
   {
     id: 'notif-2',
@@ -306,6 +324,7 @@ export const demoNotifications: AppNotification[] = [
     timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     read: false,
     data: { matchId: 'match-1' },
+    isDemo: true, // Added demo flag
   },
   {
     id: 'notif-3',
@@ -315,6 +334,7 @@ export const demoNotifications: AppNotification[] = [
     timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
     read: true,
     data: { eventId: 'event-1' },
+    isDemo: true, // Added demo flag
   },
 ];
 
@@ -329,6 +349,7 @@ export const demoCommunityPhotos: CommunityPhoto[] = [
     timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
     likes: 24,
     likedBy: [],
+    isDemo: true, // Added demo flag
   },
   {
     id: 'photo-2',
@@ -340,6 +361,7 @@ export const demoCommunityPhotos: CommunityPhoto[] = [
     timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     likes: 18,
     likedBy: [],
+    isDemo: true, // Added demo flag
   },
 ];
 
@@ -354,6 +376,7 @@ export const demoCommunityComments: CommunityComment[] = [
     timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
     likes: 12,
     likedBy: [],
+    isDemo: true, // Added demo flag
   },
   {
     id: 'comment-2',
@@ -365,6 +388,7 @@ export const demoCommunityComments: CommunityComment[] = [
     timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
     likes: 5,
     likedBy: [],
+    isDemo: true, // Added demo flag
   },
   {
     id: 'reply-1',
@@ -377,5 +401,6 @@ export const demoCommunityComments: CommunityComment[] = [
     likes: 2,
     likedBy: [],
     replyTo: 'comment-2',
+    isDemo: true, // Added demo flag
   },
 ];
