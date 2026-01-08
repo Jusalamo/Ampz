@@ -5,6 +5,33 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
+
+// Design Constants
+const DESIGN = {
+  colors: {
+    primary: '#C4B5FD',
+    lavenderLight: '#E9D5FF',
+    accentPink: '#FFB8E6',
+    background: '#1A1A1A',
+    card: '#2D2D2D',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#B8B8B8',
+    brandGreen: '#10B981'
+  },
+  borderRadius: {
+    card: '24px',
+    inner: '20px',
+    button: '12px',
+    round: '50%',
+    small: '8px'
+  },
+  shadows: {
+    card: '0 8px 32px rgba(0, 0, 0, 0.4)',
+    button: '0 4px 16px rgba(0, 0, 0, 0.3)',
+    glowPurple: '0 4px 32px rgba(196, 181, 253, 0.4)'
+  }
+};
 
 interface CheckInModalProps {
   isOpen: boolean;
@@ -69,7 +96,6 @@ export function CheckInModal({ isOpen, onClose }: CheckInModalProps) {
   }, [step]);
 
   const handleSimulateScan = () => {
-    // Pick a random event
     const randomEvent = events[Math.floor(Math.random() * events.length)];
     setSelectedEvent(randomEvent.id);
     setStep('privacy');
@@ -137,10 +163,22 @@ export function CheckInModal({ isOpen, onClose }: CheckInModalProps) {
   const event = selectedEvent ? events.find(e => e.id === selectedEvent) : null;
 
   return (
-    <div className="fixed inset-0 bg-background z-50 flex flex-col">
+    <div 
+      className="fixed inset-0 z-50 flex flex-col"
+      style={{ background: DESIGN.colors.background }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
-        <h2 className="text-lg font-bold">
+      <div 
+        className="flex items-center justify-between p-4 flex-shrink-0"
+        style={{ 
+          borderBottom: `1px solid ${DESIGN.colors.card}`,
+          height: '72px'
+        }}
+      >
+        <h2 
+          className="text-[20px] font-bold"
+          style={{ color: DESIGN.colors.textPrimary }}
+        >
           {step === 'scan' && 'Scan QR Code'}
           {step === 'code' && 'Enter Code'}
           {step === 'privacy' && 'Privacy Choice'}
@@ -148,9 +186,18 @@ export function CheckInModal({ isOpen, onClose }: CheckInModalProps) {
           {step === 'preview' && 'Preview Card'}
           {step === 'success' && 'Checked In!'}
         </h2>
-        <button onClick={handleClose} className="w-10 h-10 rounded-full bg-card flex items-center justify-center">
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={handleClose}
+          className="w-10 h-10 flex items-center justify-center"
+          style={{
+            background: DESIGN.colors.card,
+            borderRadius: DESIGN.borderRadius.round,
+            color: DESIGN.colors.textPrimary
+          }}
+        >
           <X className="w-5 h-5" />
-        </button>
+        </motion.button>
       </div>
 
       {/* Content */}
@@ -158,40 +205,87 @@ export function CheckInModal({ isOpen, onClose }: CheckInModalProps) {
         {/* QR Scanner */}
         {step === 'scan' && (
           <div className="flex-1 flex flex-col items-center justify-center p-5">
-            <div className="relative w-64 h-64 rounded-2xl overflow-hidden mb-6">
+            <div className="relative w-64 h-64 mb-6">
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 className="w-full h-full object-cover"
+                style={{ borderRadius: DESIGN.borderRadius.card }}
               />
               {/* QR Frame Overlay */}
-              <div className="absolute inset-0 border-2 border-primary rounded-2xl">
-                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-xl" />
-                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-xl" />
-                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-xl" />
-                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-xl" />
+              <div 
+                className="absolute inset-0 border-2"
+                style={{ 
+                  borderColor: DESIGN.colors.primary,
+                  borderRadius: DESIGN.borderRadius.card
+                }}
+              >
+                <div 
+                  className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4"
+                  style={{ 
+                    borderColor: DESIGN.colors.primary,
+                    borderTopLeftRadius: '16px'
+                  }}
+                />
+                <div 
+                  className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4"
+                  style={{ 
+                    borderColor: DESIGN.colors.primary,
+                    borderTopRightRadius: '16px'
+                  }}
+                />
+                <div 
+                  className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4"
+                  style={{ 
+                    borderColor: DESIGN.colors.primary,
+                    borderBottomLeftRadius: '16px'
+                  }}
+                />
+                <div 
+                  className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4"
+                  style={{ 
+                    borderColor: DESIGN.colors.primary,
+                    borderBottomRightRadius: '16px'
+                  }}
+                />
               </div>
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full">
+              <div 
+                className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 text-xs font-bold"
+                style={{
+                  background: DESIGN.colors.primary,
+                  color: DESIGN.colors.background,
+                  borderRadius: '12px'
+                }}
+              >
                 SCAN QR
               </div>
             </div>
             
-            <p className="text-muted-foreground text-center mb-6">
+            <p 
+              className="text-center mb-6"
+              style={{ color: DESIGN.colors.textSecondary }}
+            >
               Point your camera at the event's QR code
             </p>
 
             <div className="flex gap-3 w-full max-w-xs">
               <Button
                 variant="outline"
-                className="flex-1"
+                className="flex-1 h-12"
+                style={{ borderRadius: DESIGN.borderRadius.button }}
                 onClick={() => setStep('code')}
               >
                 <Keyboard className="w-4 h-4 mr-2" />
                 Enter Code
               </Button>
               <Button
-                className="flex-1 gradient-pro"
+                className="flex-1 h-12"
+                style={{ 
+                  background: DESIGN.colors.primary,
+                  color: DESIGN.colors.background,
+                  borderRadius: DESIGN.borderRadius.button
+                }}
                 onClick={handleSimulateScan}
               >
                 <QrCode className="w-4 h-4 mr-2" />
@@ -204,9 +298,20 @@ export function CheckInModal({ isOpen, onClose }: CheckInModalProps) {
         {/* Manual Code Entry */}
         {step === 'code' && (
           <div className="flex-1 flex flex-col items-center justify-center p-5">
-            <QrCode className="w-16 h-16 text-primary mb-6" />
-            <h3 className="text-xl font-bold mb-2">Enter Event Code</h3>
-            <p className="text-muted-foreground text-center mb-6">
+            <QrCode 
+              className="w-16 h-16 mb-6" 
+              style={{ color: DESIGN.colors.primary }}
+            />
+            <h3 
+              className="text-[22px] font-bold mb-2"
+              style={{ color: DESIGN.colors.textPrimary }}
+            >
+              Enter Event Code
+            </h3>
+            <p 
+              className="text-center mb-6"
+              style={{ color: DESIGN.colors.textSecondary }}
+            >
               Ask the event organizer for the check-in code
             </p>
             
@@ -215,18 +320,25 @@ export function CheckInModal({ isOpen, onClose }: CheckInModalProps) {
               onChange={(e) => setEventCode(e.target.value.toUpperCase())}
               placeholder="Enter code..."
               className="text-center text-2xl font-bold tracking-widest h-14 max-w-xs mb-6"
+              style={{ borderRadius: DESIGN.borderRadius.button }}
             />
 
             <div className="flex gap-3 w-full max-w-xs">
               <Button
                 variant="outline"
-                className="flex-1"
+                className="flex-1 h-12"
+                style={{ borderRadius: DESIGN.borderRadius.button }}
                 onClick={() => setStep('scan')}
               >
                 Back
               </Button>
               <Button
-                className="flex-1 gradient-pro"
+                className="flex-1 h-12"
+                style={{ 
+                  background: DESIGN.colors.primary,
+                  color: DESIGN.colors.background,
+                  borderRadius: DESIGN.borderRadius.button
+                }}
                 onClick={handleCodeSubmit}
                 disabled={!eventCode}
               >
@@ -240,51 +352,111 @@ export function CheckInModal({ isOpen, onClose }: CheckInModalProps) {
         {step === 'privacy' && event && (
           <div className="flex-1 flex flex-col p-5">
             <div className="text-center mb-8">
-              <h3 className="text-xl font-bold mb-2">Joining {event.name}</h3>
-              <p className="text-muted-foreground">
+              <h3 
+                className="text-[22px] font-bold mb-2"
+                style={{ color: DESIGN.colors.textPrimary }}
+              >
+                Joining {event.name}
+              </h3>
+              <p style={{ color: DESIGN.colors.textSecondary }}>
                 How do you want to appear at this event?
               </p>
             </div>
 
             <div className="space-y-4 flex-1">
-              <button
+              <motion.button
+                whileTap={{ scale: 0.98 }}
                 onClick={() => handlePrivacyChoice(true)}
-                className="w-full p-6 rounded-2xl border-2 border-border hover:border-primary transition-all text-left group"
+                className="w-full p-6 text-left group"
+                style={{
+                  background: DESIGN.colors.card,
+                  borderRadius: DESIGN.borderRadius.card,
+                  border: `2px solid ${DESIGN.colors.card}`
+                }}
               >
                 <div className="flex items-center gap-4 mb-3">
-                  <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
-                    <Users className="w-6 h-6 text-primary" />
+                  <div 
+                    className="w-12 h-12 flex items-center justify-center"
+                    style={{
+                      background: `${DESIGN.colors.primary}20`,
+                      borderRadius: DESIGN.borderRadius.small
+                    }}
+                  >
+                    <Users className="w-6 h-6" style={{ color: DESIGN.colors.primary }} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-lg">Public</h4>
-                    <p className="text-sm text-brand-green">Best for networking</p>
+                    <h4 
+                      className="font-bold text-lg"
+                      style={{ color: DESIGN.colors.textPrimary }}
+                    >
+                      Public
+                    </h4>
+                    <p 
+                      className="text-sm"
+                      style={{ color: DESIGN.colors.brandGreen }}
+                    >
+                      Best for networking
+                    </p>
                   </div>
                 </div>
-                <p className="text-muted-foreground text-sm">
+                <p 
+                  className="text-sm"
+                  style={{ color: DESIGN.colors.textSecondary }}
+                >
                   Others can see your profile and photo. Connect with people at the event!
                 </p>
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button
+                whileTap={{ scale: 0.98 }}
                 onClick={() => handlePrivacyChoice(false)}
-                className="w-full p-6 rounded-2xl border-2 border-border hover:border-primary transition-all text-left group"
+                className="w-full p-6 text-left group"
+                style={{
+                  background: DESIGN.colors.card,
+                  borderRadius: DESIGN.borderRadius.card,
+                  border: `2px solid ${DESIGN.colors.card}`
+                }}
               >
                 <div className="flex items-center gap-4 mb-3">
-                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center group-hover:bg-muted/80 transition-colors">
-                    <UserX className="w-6 h-6 text-muted-foreground" />
+                  <div 
+                    className="w-12 h-12 flex items-center justify-center"
+                    style={{
+                      background: `${DESIGN.colors.textSecondary}20`,
+                      borderRadius: DESIGN.borderRadius.small
+                    }}
+                  >
+                    <UserX className="w-6 h-6" style={{ color: DESIGN.colors.textSecondary }} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-lg">Private</h4>
-                    <p className="text-sm text-muted-foreground">Browse anonymously</p>
+                    <h4 
+                      className="font-bold text-lg"
+                      style={{ color: DESIGN.colors.textPrimary }}
+                    >
+                      Private
+                    </h4>
+                    <p 
+                      className="text-sm"
+                      style={{ color: DESIGN.colors.textSecondary }}
+                    >
+                      Browse anonymously
+                    </p>
                   </div>
                 </div>
-                <p className="text-muted-foreground text-sm">
+                <p 
+                  className="text-sm"
+                  style={{ color: DESIGN.colors.textSecondary }}
+                >
                   You can see others but they won't see you. Perfect for shy attendees.
                 </p>
-              </button>
+              </motion.button>
             </div>
 
-            <Button variant="outline" onClick={onClose} className="mt-4">
+            <Button 
+              variant="outline" 
+              onClick={onClose} 
+              className="mt-4 h-12"
+              style={{ borderRadius: DESIGN.borderRadius.button }}
+            >
               Cancel
             </Button>
           </div>
@@ -293,39 +465,70 @@ export function CheckInModal({ isOpen, onClose }: CheckInModalProps) {
         {/* Photo Capture */}
         {step === 'photo' && (
           <div className="flex-1 flex flex-col items-center justify-center p-5">
-            <div className="relative w-64 h-80 rounded-2xl overflow-hidden mb-6">
+            <div className="relative w-64 h-80 mb-6">
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 className="w-full h-full object-cover"
-                style={{ transform: 'scaleX(-1)' }}
+                style={{ 
+                  borderRadius: DESIGN.borderRadius.card,
+                  transform: 'scaleX(-1)' 
+                }}
               />
-              <div className="absolute inset-0 border-4 border-primary/50 rounded-2xl" />
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-brand-green text-foreground text-xs font-bold rounded-full animate-pulse">
+              <div 
+                className="absolute inset-0 border-4"
+                style={{ 
+                  borderColor: `${DESIGN.colors.primary}80`,
+                  borderRadius: DESIGN.borderRadius.card
+                }}
+              />
+              <div 
+                className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 text-xs font-bold"
+                style={{
+                  background: DESIGN.colors.brandGreen,
+                  color: DESIGN.colors.background,
+                  borderRadius: '12px'
+                }}
+              >
                 LIVE PHOTO
               </div>
             </div>
             <canvas ref={canvasRef} className="hidden" />
             
-            <p className="text-muted-foreground text-center mb-6">
+            <p 
+              className="text-center mb-6"
+              style={{ color: DESIGN.colors.textSecondary }}
+            >
               This photo will be shown to other attendees
             </p>
 
             <div className="flex gap-4">
-              <Button
-                variant="outline"
+              <motion.button
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setStep('privacy')}
-                className="w-14 h-14 rounded-full p-0"
+                className="w-14 h-14 flex items-center justify-center"
+                style={{
+                  background: DESIGN.colors.card,
+                  color: DESIGN.colors.textPrimary,
+                  borderRadius: DESIGN.borderRadius.round
+                }}
               >
                 <X className="w-6 h-6" />
-              </Button>
-              <Button
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
                 onClick={capturePhoto}
-                className="w-20 h-20 rounded-full p-0 gradient-pro glow-purple"
+                className="w-20 h-20 flex items-center justify-center"
+                style={{
+                  background: DESIGN.colors.primary,
+                  color: DESIGN.colors.background,
+                  borderRadius: DESIGN.borderRadius.round,
+                  boxShadow: DESIGN.shadows.glowPurple
+                }}
               >
                 <Camera className="w-8 h-8" />
-              </Button>
+              </motion.button>
             </div>
           </div>
         )}
@@ -333,26 +536,66 @@ export function CheckInModal({ isOpen, onClose }: CheckInModalProps) {
         {/* Preview Card */}
         {step === 'preview' && user && (
           <div className="flex-1 flex flex-col items-center justify-center p-5">
-            <h3 className="text-lg font-medium text-muted-foreground mb-4">
+            <h3 
+              className="text-[15px] font-medium mb-4"
+              style={{ color: DESIGN.colors.textSecondary }}
+            >
               This is how others will see you
             </h3>
 
             {/* Preview Card */}
-            <div className="w-64 aspect-[3/4] rounded-2xl overflow-hidden bg-card border border-border shadow-card mb-6 relative">
+            <div 
+              className="w-64 aspect-[3/4] mb-6 relative"
+              style={{
+                background: DESIGN.colors.card,
+                borderRadius: DESIGN.borderRadius.card,
+                border: `1px solid ${DESIGN.colors.textSecondary}20`,
+                boxShadow: DESIGN.shadows.card
+              }}
+            >
               {capturedPhoto && (
                 <img
                   src={capturedPhoto}
                   alt="Your photo"
                   className="w-full h-3/4 object-cover"
-                  style={{ transform: 'scaleX(-1)' }}
+                  style={{ 
+                    borderTopLeftRadius: DESIGN.borderRadius.card,
+                    borderTopRightRadius: DESIGN.borderRadius.card,
+                    transform: 'scaleX(-1)' 
+                  }}
                 />
               )}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/80 to-transparent p-4">
-                <h4 className="font-bold text-lg">{user.profile.name}, {user.profile.age}</h4>
-                <p className="text-sm text-muted-foreground truncate">{user.profile.bio || 'No bio yet'}</p>
-                <div className="flex flex-wrap gap-1 mt-2">
+              <div 
+                className="absolute bottom-0 left-0 right-0 p-4"
+                style={{
+                  background: 'linear-gradient(to top, #1A1A1A, #1A1A1A80, transparent)',
+                  borderBottomLeftRadius: DESIGN.borderRadius.card,
+                  borderBottomRightRadius: DESIGN.borderRadius.card
+                }}
+              >
+                <h4 
+                  className="font-bold text-lg mb-1"
+                  style={{ color: DESIGN.colors.textPrimary }}
+                >
+                  {user.profile.name}, {user.profile.age}
+                </h4>
+                <p 
+                  className="text-sm truncate mb-2"
+                  style={{ color: DESIGN.colors.textSecondary }}
+                >
+                  {user.profile.bio || 'No bio yet'}
+                </p>
+                <div className="flex flex-wrap gap-1">
                   {user.profile.interests.slice(0, 3).map((interest) => (
-                    <span key={interest} className="px-2 py-0.5 bg-primary/20 text-primary text-xs rounded-full">
+                    <span 
+                      key={interest} 
+                      className="px-2 py-0.5 text-xs"
+                      style={{
+                        background: `${DESIGN.colors.primary}20`,
+                        color: DESIGN.colors.primary,
+                        borderRadius: '8px'
+                      }}
+                    >
                       {interest}
                     </span>
                   ))}
@@ -363,14 +606,21 @@ export function CheckInModal({ isOpen, onClose }: CheckInModalProps) {
             <div className="flex gap-3 w-full max-w-xs">
               <Button
                 variant="outline"
-                className="flex-1"
+                className="flex-1 h-12"
+                style={{ borderRadius: DESIGN.borderRadius.button }}
                 onClick={() => setStep('photo')}
               >
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Retake
               </Button>
               <Button
-                className="flex-1 gradient-pro glow-purple"
+                className="flex-1 h-12"
+                style={{ 
+                  background: DESIGN.colors.primary,
+                  color: DESIGN.colors.background,
+                  borderRadius: DESIGN.borderRadius.button,
+                  boxShadow: DESIGN.shadows.glowPurple
+                }}
                 onClick={completeCheckIn}
               >
                 <Check className="w-4 h-4 mr-2" />
@@ -383,15 +633,45 @@ export function CheckInModal({ isOpen, onClose }: CheckInModalProps) {
         {/* Success */}
         {step === 'success' && event && (
           <div className="flex-1 flex flex-col items-center justify-center p-5 text-center">
-            <div className="w-24 h-24 rounded-full bg-brand-green/20 flex items-center justify-center mb-6 animate-scale-in">
-              <Check className="w-12 h-12 text-brand-green" />
-            </div>
-            <h3 className="text-2xl font-bold mb-2">Welcome!</h3>
-            <p className="text-muted-foreground mb-2">You're checked in to</p>
-            <h4 className="text-xl font-bold text-primary mb-8">{event.name}</h4>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+              className="w-24 h-24 flex items-center justify-center mb-6"
+              style={{
+                background: `${DESIGN.colors.brandGreen}20`,
+                borderRadius: DESIGN.borderRadius.round
+              }}
+            >
+              <Check className="w-12 h-12" style={{ color: DESIGN.colors.brandGreen }} />
+            </motion.div>
+            <h3 
+              className="text-[28px] font-bold mb-2"
+              style={{ color: DESIGN.colors.textPrimary }}
+            >
+              Welcome!
+            </h3>
+            <p 
+              className="mb-2"
+              style={{ color: DESIGN.colors.textSecondary }}
+            >
+              You're checked in to
+            </p>
+            <h4 
+              className="text-[22px] font-bold mb-8"
+              style={{ color: DESIGN.colors.primary }}
+            >
+              {event.name}
+            </h4>
             
             <Button
-              className="w-full max-w-xs gradient-pro glow-purple"
+              className="w-full max-w-xs h-12"
+              style={{ 
+                background: DESIGN.colors.primary,
+                color: DESIGN.colors.background,
+                borderRadius: DESIGN.borderRadius.button,
+                boxShadow: DESIGN.shadows.glowPurple
+              }}
               onClick={handleClose}
             >
               Start Connecting
