@@ -83,6 +83,7 @@ export interface ConnectionProfile {
   id: string;
   userId: string;
   eventId: string;
+  eventName?: string;
   name: string;
   age: number;
   bio: string;
@@ -91,6 +92,7 @@ export interface ConnectionProfile {
   location: string;
   isPublic: boolean;
   occupation?: string;
+  gender?: string;
 }
 
 export interface Match {

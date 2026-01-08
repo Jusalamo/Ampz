@@ -882,15 +882,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         images: eventData.images,
         videos: eventData.videos,
         tags: [eventData.category],
-        isFeatured: user?.subscription?.tier === 'max',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        status: 'upcoming',
-        organizer: {
-          id: user.id,
-          name: user.name || 'Event Organizer',
-          avatar: user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`
-        }
+        isFeatured: user?.subscription?.tier === 'max'
       };
 
       await addEvent(newEvent);

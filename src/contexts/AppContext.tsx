@@ -29,6 +29,7 @@ interface AppContextType {
   updateSubscription: (tier: 'free' | 'pro' | 'max') => void;
   addEvent: (event: Event) => void;
   updateEvent: (eventId: string, updates: Partial<Event>) => void;
+  deleteEvent: (eventId: string) => void;
   addTicket: (ticket: Ticket) => void;
   checkInToEvent: (eventId: string, isPublic: boolean, photo?: string) => void;
   addCommunityPhoto: (eventId: string, imageUrl: string) => void;
@@ -290,6 +291,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('amps_events', JSON.stringify(updatedEvents));
   };
 
+  const deleteEvent = (eventId: string) => {
+    const updatedEvents = events.filter(e => e.id !== eventId);
+    setEvents(updatedEvents);
+    localStorage.setItem('amps_events', JSON.stringify(updatedEvents));
+    
+    if (user) {
+      const updatedUser = { ...user, createdEvents: user.createdEvents.filter(id => id !== eventId) };
+      setUser(updatedUser);
+      localStorage.setItem('amps_user', JSON.stringify(updatedUser));
+    }
+  };
+
   const addTicket = (ticket: Ticket) => {
     const updatedTickets = [...tickets, ticket];
     setTickets(updatedTickets);
@@ -460,6 +473,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateSubscription,
         addEvent,
         updateEvent,
+        deleteEvent,
         addTicket,
         checkInToEvent,
         addCommunityPhoto,
