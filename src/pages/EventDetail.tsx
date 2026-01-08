@@ -1,19 +1,17 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { ArrowLeft, Calendar, MapPin, Users, Clock, Share2, Bookmark, Ticket, ExternalLink, MessageCircle, Image, ChevronDown, ChevronUp, Video as VideoIcon, Play, Pause, Volume2, VolumeX, Maximize2, ChevronRight, ChevronLeft, X } from 'lucide-react';
+import { 
+  ArrowLeft, Calendar, MapPin, Users, Clock, Share2, Bookmark, 
+  Ticket, ExternalLink, MessageCircle, Image, ChevronDown, ChevronUp,
+  Play, Pause, Volume2, VolumeX, Maximize2, Grid3x3, ChevronLeft, ChevronRight,
+  X, Film
+} from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { CommunityPhotos } from '@/components/CommunityPhotos';
 import { CommunityComments } from '@/components/CommunityComments';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
-import { Slider } from '@/components/ui/slider';
-
-// Initialize Mapbox with token
-const MAPBOX_TOKEN = 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg';
-mapboxgl.accessToken = MAPBOX_TOKEN;
 
 // Design Constants
 const DESIGN = {
@@ -74,174 +72,8 @@ interface EventType {
   images: string[];
   videos: string[];
   hasVideo: boolean;
-  mediaType?: 'video' | 'carousel';
-  coordinates: { lat: number; lng: number };
-  geofenceRadius: number;
-}
-
-// Video Modal Component
-function VideoModal({ isOpen, onClose, videoUrl, themeColor }: {
-  isOpen: boolean;
-  onClose: () => void;
-  videoUrl: string;
-  themeColor?: string;
-}) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [isMuted, setIsMuted] = useState(true);
-  const [progress, setProgress] = useState(0);
-  const [currentTime, setCurrentTime] = useState('0:00');
-  const [duration, setDuration] = useState('0:00');
-
-  useEffect(() => {
-    if (isOpen && videoRef.current) {
-      videoRef.current.play();
-      setIsPlaying(true);
-    }
-  }, [isOpen]);
-
-  const togglePlay = () => {
-    if (videoRef.current) {
-      if (videoRef.current.paused) {
-        videoRef.current.play();
-        setIsPlaying(true);
-      } else {
-        videoRef.current.pause();
-        setIsPlaying(false);
-      }
-    }
-  };
-
-  const toggleMute = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = !videoRef.current.muted;
-      setIsMuted(videoRef.current.muted);
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      const progress = (videoRef.current.currentTime / videoRef.current.duration) * 100;
-      setProgress(progress);
-      
-      // Format current time
-      const minutes = Math.floor(videoRef.current.currentTime / 60);
-      const seconds = Math.floor(videoRef.current.currentTime % 60);
-      setCurrentTime(`${minutes}:${seconds.toString().padStart(2, '0')}`);
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    if (videoRef.current) {
-      const minutes = Math.floor(videoRef.current.duration / 60);
-      const seconds = Math.floor(videoRef.current.duration % 60);
-      setDuration(`${minutes}:${seconds.toString().padStart(2, '0')}`);
-    }
-  };
-
-  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (videoRef.current) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const width = rect.width;
-      const percentage = clickX / width;
-      videoRef.current.currentTime = percentage * videoRef.current.duration;
-    }
-  };
-
-  const handleFullscreen = () => {
-    if (videoRef.current) {
-      if (videoRef.current.requestFullscreen) {
-        videoRef.current.requestFullscreen();
-      }
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="relative w-full max-w-4xl h-auto max-h-[90vh] rounded-2xl overflow-hidden bg-black">
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-50 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center hover:bg-black/70 transition-colors"
-          style={{ color: DESIGN.colors.textPrimary }}
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        {/* Video */}
-        <div className="relative">
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            className="w-full h-auto max-h-[80vh]"
-            autoPlay
-            loop
-            muted={isMuted}
-            onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={handleLoadedMetadata}
-            onEnded={() => setIsPlaying(false)}
-            onClick={togglePlay}
-          />
-
-          {/* Video controls overlay */}
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={togglePlay}
-                className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
-                style={{ color: DESIGN.colors.textPrimary }}
-              >
-                {isPlaying ? (
-                  <Pause className="w-6 h-6" />
-                ) : (
-                  <Play className="w-6 h-6 ml-1" />
-                )}
-              </button>
-
-              <button
-                onClick={toggleMute}
-                className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
-                style={{ color: DESIGN.colors.textPrimary }}
-              >
-                {isMuted ? (
-                  <VolumeX className="w-5 h-5" />
-                ) : (
-                  <Volume2 className="w-5 h-5" />
-                )}
-              </button>
-
-              <div className="flex-1">
-                <div 
-                  className="h-1.5 bg-white/30 rounded-full overflow-hidden cursor-pointer"
-                  onClick={handleProgressClick}
-                >
-                  <div 
-                    className="h-full bg-white transition-all duration-100"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-xs mt-1" style={{ color: DESIGN.colors.textPrimary }}>
-                  <span>{currentTime}</span>
-                  <span>{duration}</span>
-                </div>
-              </div>
-
-              <button
-                onClick={handleFullscreen}
-                className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
-                style={{ color: DESIGN.colors.textPrimary }}
-              >
-                <Maximize2 className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  mediaType: 'video' | 'carousel';
+  selectedVideoIndex: number;
 }
 
 export default function EventDetail() {
@@ -252,22 +84,18 @@ export default function EventDetail() {
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'comments'>('details');
-  const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(true);
-  const [geofenceRadius, setGeofenceRadius] = useState(50);
-  const [map, setMap] = useState<mapboxgl.Map | null>(null);
-  const [mapLoaded, setMapLoaded] = useState(false);
-  
+  const [isVideoPlaying, setIsVideoPlaying] = useState(true);
   const contentRef = useRef<HTMLDivElement>(null);
-  const mapContainerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const fullscreenVideoRef = useRef<HTMLVideoElement>(null);
   const lastScrollY = useRef(0);
 
   // Memoize event find for better performance
   const event = useMemo(() => 
-    events.find((e: any) => e.id === id), 
+    events.find((e: EventType) => e.id === id), 
     [events, id]
   ) as EventType | undefined;
 
@@ -302,11 +130,6 @@ export default function EventDetail() {
     [event]
   );
 
-  const themeColor = useMemo(() => 
-    event?.customTheme || DESIGN.colors.primary, 
-    [event]
-  );
-
   // Get CTA text with proper memoization
   const getCTAText = useCallback(() => {
     if (!user) return 'Buy Ticket';
@@ -314,6 +137,61 @@ export default function EventDetail() {
     if (hasTicket) return 'View Ticket';
     return event?.price === 0 ? 'Register Free' : 'Buy Ticket';
   }, [user, hasTicket, isLive, event]);
+
+  // Handle video playback
+  const toggleVideoPlay = useCallback(() => {
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play();
+        setIsVideoPlaying(true);
+      } else {
+        videoRef.current.pause();
+        setIsVideoPlaying(false);
+      }
+    }
+  }, []);
+
+  const toggleVideoMute = useCallback(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = !videoRef.current.muted;
+      setIsVideoMuted(videoRef.current.muted);
+    }
+  }, []);
+
+  const openVideoModal = useCallback(() => {
+    setIsVideoModalOpen(true);
+    if (fullscreenVideoRef.current) {
+      fullscreenVideoRef.current.muted = false;
+      fullscreenVideoRef.current.play();
+      setIsVideoPlaying(true);
+      setIsVideoMuted(false);
+    }
+  }, []);
+
+  const closeVideoModal = useCallback(() => {
+    setIsVideoModalOpen(false);
+    if (fullscreenVideoRef.current) {
+      fullscreenVideoRef.current.pause();
+    }
+    // Reset main video to muted autoplay
+    if (videoRef.current) {
+      videoRef.current.muted = true;
+      videoRef.current.play();
+    }
+  }, []);
+
+  // Handle carousel navigation
+  const nextImage = useCallback(() => {
+    if (event?.images && event.images.length > 0) {
+      setCurrentImageIndex((prev) => (prev + 1) % event.images.length);
+    }
+  }, [event]);
+
+  const prevImage = useCallback(() => {
+    if (event?.images && event.images.length > 0) {
+      setCurrentImageIndex((prev) => (prev - 1 + event.images.length) % event.images.length);
+    }
+  }, [event]);
 
   // Scroll effect - prevent automatic scrolling
   useEffect(() => {
@@ -341,120 +219,6 @@ export default function EventDetail() {
       }
     };
   }, []);
-
-  // Initialize map
-  useEffect(() => {
-    if (!event || !mapContainerRef.current || mapLoaded) return;
-
-    const mapInstance = new mapboxgl.Map({
-      container: mapContainerRef.current,
-      style: 'mapbox://styles/mapbox/streets-v11',
-      center: [event.coordinates.lng, event.coordinates.lat],
-      zoom: 14,
-      attributionControl: false
-    });
-
-    mapInstance.on('load', () => {
-      setMapLoaded(true);
-      
-      // Add marker
-      new mapboxgl.Marker({ color: themeColor })
-        .setLngLat([event.coordinates.lng, event.coordinates.lat])
-        .addTo(mapInstance);
-
-      // Add geofence circle
-      updateGeofenceCircle(mapInstance);
-    });
-
-    mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
-    
-    setMap(mapInstance);
-
-    return () => {
-      if (mapInstance) {
-        mapInstance.remove();
-      }
-    };
-  }, [event, themeColor, mapLoaded]);
-
-  // Update geofence circle when radius changes
-  useEffect(() => {
-    if (map && mapLoaded && event) {
-      updateGeofenceCircle(map);
-    }
-  }, [geofenceRadius, map, mapLoaded, event]);
-
-  const updateGeofenceCircle = (mapInstance: mapboxgl.Map) => {
-    if (!event) return;
-
-    const { lat, lng } = event.coordinates;
-    const radiusInKm = geofenceRadius / 1000;
-    
-    // Generate circle coordinates
-    const points = 64;
-    const coords: [number, number][] = [];
-    for (let i = 0; i < points; i++) {
-      const angle = (i / points) * 2 * Math.PI;
-      const dx = radiusInKm * Math.cos(angle) / 111.32;
-      const dy = radiusInKm * Math.sin(angle) / (111.32 * Math.cos(lat * Math.PI / 180));
-      coords.push([lng + dy, lat + dx]);
-    }
-    coords.push(coords[0]); // Close the circle
-
-    const sourceId = 'geofence-circle';
-    const fillLayerId = 'geofence-fill';
-    const lineLayerId = 'geofence-line';
-    
-    try {
-      if (mapInstance.getSource(sourceId)) {
-        (mapInstance.getSource(sourceId) as mapboxgl.GeoJSONSource).setData({
-          type: 'Feature',
-          properties: {},
-          geometry: { type: 'Polygon', coordinates: [coords] },
-        });
-      } else {
-        mapInstance.addSource(sourceId, {
-          type: 'geojson',
-          data: {
-            type: 'Feature',
-            properties: {},
-            geometry: { type: 'Polygon', coordinates: [coords] },
-          },
-        });
-
-        mapInstance.addLayer({
-          id: fillLayerId,
-          type: 'fill',
-          source: sourceId,
-          paint: {
-            'fill-color': themeColor,
-            'fill-opacity': 0.15,
-          },
-        });
-
-        mapInstance.addLayer({
-          id: lineLayerId,
-          type: 'line',
-          source: sourceId,
-          paint: {
-            'line-color': themeColor,
-            'line-width': 2,
-            'line-dasharray': [2, 2],
-          },
-        });
-      }
-
-      // Update layer colors if theme changes
-      if (mapInstance.getLayer(fillLayerId)) {
-        mapInstance.setPaintProperty(fillLayerId, 'fill-color', themeColor);
-      }
-      if (mapInstance.getLayer(lineLayerId)) {
-        mapInstance.setPaintProperty(lineLayerId, 'line-color', themeColor);
-      }
-    } catch (error) {
-      console.error('Error updating geofence circle:', error);
-    }
-  };
 
   const handleShare = useCallback(async () => {
     if (!event) return;
@@ -500,51 +264,6 @@ export default function EventDetail() {
   const toggleDescription = useCallback(() => {
     setShowFullDescription(prev => !prev);
   }, []);
-
-  const handleVideoPlay = useCallback(() => {
-    if (videoRef.current) {
-      if (videoRef.current.paused) {
-        videoRef.current.play();
-        setIsVideoPlaying(true);
-      } else {
-        videoRef.current.pause();
-        setIsVideoPlaying(false);
-      }
-    }
-  }, []);
-
-  const handleVideoMute = useCallback(() => {
-    if (videoRef.current) {
-      videoRef.current.muted = !videoRef.current.muted;
-      setIsVideoMuted(videoRef.current.muted);
-    }
-  }, []);
-
-  const openVideoModal = useCallback(() => {
-    setVideoModalOpen(true);
-  }, []);
-
-  const nextImage = useCallback(() => {
-    if (event?.images) {
-      setCurrentImageIndex(prev => (prev + 1) % event.images.length);
-    }
-  }, [event]);
-
-  const prevImage = useCallback(() => {
-    if (event?.images) {
-      setCurrentImageIndex(prev => (prev - 1 + event.images.length) % event.images.length);
-    }
-  }, [event]);
-
-  const handleGeofenceRadiusChange = useCallback((value: number[]) => {
-    setGeofenceRadius(value[0]);
-  }, []);
-
-  useEffect(() => {
-    if (event?.geofenceRadius) {
-      setGeofenceRadius(event.geofenceRadius);
-    }
-  }, [event]);
 
   if (!event) {
     return (
@@ -697,52 +416,63 @@ export default function EventDetail() {
       </header>
 
       {/* Hero Media Section */}
-      <div className="relative h-80 overflow-hidden">
-        {event.mediaType === 'video' && event.videos?.[0] ? (
+      <div className="relative h-64 overflow-hidden">
+        {event.mediaType === 'video' && event.videos && event.videos.length > 0 ? (
+          /* Video Player */
           <div className="relative w-full h-full">
             <video
               ref={videoRef}
               src={event.videos[0]}
               className="w-full h-full object-cover"
-              autoPlay
               muted
+              autoPlay
               loop
               playsInline
               onPlay={() => setIsVideoPlaying(true)}
               onPause={() => setIsVideoPlaying(false)}
-              onClick={openVideoModal}
             />
             
-            {/* Video controls overlay */}
+            {/* Video Controls Overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 hover:opacity-100 transition-opacity">
-              <div className="absolute bottom-4 left-0 right-0 p-4">
-                <div className="flex items-center justify-center gap-3">
-                  <button
-                    onClick={handleVideoPlay}
-                    className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
-                    style={{ color: DESIGN.colors.textPrimary }}
-                  >
-                    {isVideoPlaying ? (
-                      <Pause className="w-6 h-6" />
-                    ) : (
-                      <Play className="w-6 h-6 ml-1" />
-                    )}
-                  </button>
-                  <button
-                    onClick={handleVideoMute}
-                    className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
-                    style={{ color: DESIGN.colors.textPrimary }}
-                  >
-                    {isVideoMuted ? (
-                      <VolumeX className="w-5 h-5" />
-                    ) : (
-                      <Volume2 className="w-5 h-5" />
-                    )}
-                  </button>
+              <div className="absolute bottom-0 left-0 right-0 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={toggleVideoPlay}
+                      className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        color: DESIGN.colors.background
+                      }}
+                    >
+                      {isVideoPlaying ? (
+                        <Pause className="w-5 h-5" />
+                      ) : (
+                        <Play className="w-5 h-5 ml-0.5" />
+                      )}
+                    </button>
+                    <button
+                      onClick={toggleVideoMute}
+                      className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        color: DESIGN.colors.background
+                      }}
+                    >
+                      {isVideoMuted ? (
+                        <VolumeX className="w-5 h-5" />
+                      ) : (
+                        <Volume2 className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
                   <button
                     onClick={openVideoModal}
-                    className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
-                    style={{ color: DESIGN.colors.textPrimary }}
+                    className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.9)',
+                      color: DESIGN.colors.background
+                    }}
                   >
                     <Maximize2 className="w-5 h-5" />
                   </button>
@@ -750,60 +480,95 @@ export default function EventDetail() {
               </div>
             </div>
             
-            <div className="absolute bottom-4 right-4 bg-black/60 text-white text-xs px-2 py-1 rounded">
-              Click to expand
+            {/* Video Indicator */}
+            <div className="absolute top-3 left-3 px-2 py-1 rounded-full backdrop-blur-sm"
+                 style={{
+                   background: 'rgba(0, 0, 0, 0.6)'
+                 }}>
+              <div className="flex items-center gap-1">
+                <Film className="w-3 h-3 text-white" />
+                <span className="text-xs text-white">Video</span>
+              </div>
             </div>
           </div>
-        ) : event.images?.[0] ? (
+        ) : (
+          /* Image Carousel */
           <div className="relative w-full h-full">
-            <img
-              src={event.images[currentImageIndex]}
-              alt={`Event image ${currentImageIndex + 1}`}
-              className="w-full h-full object-cover"
-            />
-            
-            {/* Image carousel controls */}
-            {event.images.length > 1 && (
+            {event.images && event.images.length > 0 ? (
               <>
-                <button
-                  onClick={prevImage}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center hover:bg-black/70 transition-colors"
-                  style={{ color: DESIGN.colors.textPrimary }}
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={nextImage}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center hover:bg-black/70 transition-colors"
-                  style={{ color: DESIGN.colors.textPrimary }}
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
+                <img
+                  src={event.images[currentImageIndex]}
+                  alt={`Event image ${currentImageIndex + 1}`}
+                  className="w-full h-full object-cover"
+                  loading="eager"
+                  decoding="async"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x256?text=Event+Image';
+                  }}
+                />
                 
-                {/* Dots indicator */}
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                  {event.images.map((_, index) => (
+                {/* Carousel Controls */}
+                {event.images.length > 1 && (
+                  <>
                     <button
-                      key={index}
-                      onClick={() => setCurrentImageIndex(index)}
-                      className={cn(
-                        'w-2 h-2 rounded-full transition-all',
-                        index === currentImageIndex 
-                          ? 'bg-white w-4' 
-                          : 'bg-white/50'
-                      )}
-                    />
-                  ))}
-                </div>
+                      onClick={prevImage}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"
+                      style={{
+                        background: 'rgba(0, 0, 0, 0.6)',
+                        color: DESIGN.colors.textPrimary
+                      }}
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={nextImage}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm"
+                      style={{
+                        background: 'rgba(0, 0, 0, 0.6)',
+                        color: DESIGN.colors.textPrimary
+                      }}
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                    
+                    {/* Carousel Dots */}
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
+                      {event.images.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentImageIndex(index)}
+                          className={cn(
+                            'w-2 h-2 rounded-full transition-all',
+                            index === currentImageIndex 
+                              ? 'bg-white w-4' 
+                              : 'bg-white/50'
+                          )}
+                        />
+                      ))}
+                    </div>
+                    
+                    {/* Image Counter */}
+                    <div className="absolute top-3 left-3 px-2 py-1 rounded-full backdrop-blur-sm"
+                         style={{
+                           background: 'rgba(0, 0, 0, 0.6)'
+                         }}>
+                      <div className="flex items-center gap-1">
+                        <Grid3x3 className="w-3 h-3 text-white" />
+                        <span className="text-xs text-white">
+                          {currentImageIndex + 1}/{event.images.length}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </>
+            ) : (
+              /* Fallback if no images */
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-purple-900/20 to-pink-900/20">
+                <Image className="w-16 h-16" style={{ color: DESIGN.colors.textSecondary }} />
+              </div>
             )}
           </div>
-        ) : (
-          <img
-            src={event.coverImage}
-            alt={`Cover image for ${event.name}`}
-            className="w-full h-full object-cover"
-          />
         )}
         
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
@@ -880,7 +645,7 @@ export default function EventDetail() {
               className="text-sm"
               style={{ color: DESIGN.colors.textSecondary }}
             >
-              <span className="font-medium" style={{ color: themeColor }}>
+              <span className="font-medium" style={{ color: DESIGN.colors.primary }}>
                 {event.price === 0 ? 'FREE' : `N$${event.price}`}
               </span>
               <span className="mx-1" aria-hidden="true">•</span>
@@ -906,8 +671,8 @@ export default function EventDetail() {
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
             style={{
-              borderBottomColor: activeTab === 'details' ? themeColor : 'transparent',
-              color: activeTab === 'details' ? themeColor : DESIGN.colors.textSecondary,
+              borderBottomColor: activeTab === 'details' ? DESIGN.colors.primary : 'transparent',
+              color: activeTab === 'details' ? DESIGN.colors.primary : DESIGN.colors.textSecondary,
               fontSize: DESIGN.typography.small
             }}
             aria-current={activeTab === 'details' ? 'page' : undefined}
@@ -923,8 +688,8 @@ export default function EventDetail() {
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
             style={{
-              borderBottomColor: activeTab === 'photos' ? themeColor : 'transparent',
-              color: activeTab === 'photos' ? themeColor : DESIGN.colors.textSecondary,
+              borderBottomColor: activeTab === 'photos' ? DESIGN.colors.primary : 'transparent',
+              color: activeTab === 'photos' ? DESIGN.colors.primary : DESIGN.colors.textSecondary,
               fontSize: DESIGN.typography.small
             }}
             aria-current={activeTab === 'photos' ? 'page' : undefined}
@@ -941,8 +706,8 @@ export default function EventDetail() {
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
             style={{
-              borderBottomColor: activeTab === 'comments' ? themeColor : 'transparent',
-              color: activeTab === 'comments' ? themeColor : DESIGN.colors.textSecondary,
+              borderBottomColor: activeTab === 'comments' ? DESIGN.colors.primary : 'transparent',
+              color: activeTab === 'comments' ? DESIGN.colors.primary : DESIGN.colors.textSecondary,
               fontSize: DESIGN.typography.small
             }}
             aria-current={activeTab === 'comments' ? 'page' : undefined}
@@ -972,11 +737,11 @@ export default function EventDetail() {
                       className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" 
                       aria-hidden="true"
                       style={{
-                        background: `${themeColor}1A`,
+                        background: `${DESIGN.colors.primary}1A`,
                         borderRadius: DESIGN.borderRadius.button
                       }}
                     >
-                      <Calendar className="w-4 h-4" style={{ color: themeColor }} />
+                      <Calendar className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p 
@@ -1008,11 +773,11 @@ export default function EventDetail() {
                       className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" 
                       aria-hidden="true"
                       style={{
-                        background: `${themeColor}1A`,
+                        background: `${DESIGN.colors.primary}1A`,
                         borderRadius: DESIGN.borderRadius.button
                       }}
                     >
-                      <Clock className="w-4 h-4" style={{ color: themeColor }} />
+                      <Clock className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p 
@@ -1044,11 +809,11 @@ export default function EventDetail() {
                       className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" 
                       aria-hidden="true"
                       style={{
-                        background: `${themeColor}1A`,
+                        background: `${DESIGN.colors.primary}1A`,
                         borderRadius: DESIGN.borderRadius.button
                       }}
                     >
-                      <MapPin className="w-4 h-4" style={{ color: themeColor }} />
+                      <MapPin className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
                     </div>
                     <div className="flex-1 min-w-0 mr-2">
                       <p 
@@ -1074,9 +839,9 @@ export default function EventDetail() {
                       onClick={handleNavigateToMap}
                       className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary/20 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
                       style={{
-                        background: `${themeColor}1A`,
+                        background: `${DESIGN.colors.primary}1A`,
                         borderRadius: DESIGN.borderRadius.button,
-                        color: themeColor
+                        color: DESIGN.colors.primary
                       }}
                       aria-label="Open location in maps"
                     >
@@ -1084,56 +849,6 @@ export default function EventDetail() {
                     </button>
                   </div>
                 </div>
-              </div>
-
-              {/* Geofence Radius Control - NEW */}
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-[13px] font-semibold uppercase tracking-wider" 
-                         style={{ color: DESIGN.colors.textSecondary }}>
-                    Check-in Radius
-                  </label>
-                  <span 
-                    className="text-lg font-bold"
-                    style={{ color: themeColor }}
-                  >
-                    {geofenceRadius}m
-                  </span>
-                </div>
-                <Slider
-                  value={[geofenceRadius]}
-                  onValueChange={handleGeofenceRadiusChange}
-                  min={10}
-                  max={300}
-                  step={10}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                  <span>10m</span>
-                  <span>150m</span>
-                  <span>300m</span>
-                </div>
-                <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                  Attendees must be within this radius to check in
-                </p>
-              </div>
-
-              {/* Map with Geofence */}
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <label className="text-[13px] font-semibold uppercase tracking-wider" 
-                         style={{ color: DESIGN.colors.textSecondary }}>
-                    Check-in Area
-                  </label>
-                </div>
-                <div 
-                  ref={mapContainerRef}
-                  className="w-full h-64 rounded-xl overflow-hidden border"
-                  style={{
-                    border: `1px solid ${DESIGN.colors.textSecondary}20`,
-                    background: `${themeColor}10`
-                  }}
-                />
               </div>
 
               {/* Description */}
@@ -1151,7 +866,7 @@ export default function EventDetail() {
                       onClick={toggleDescription}
                       className="text-primary text-xs font-medium hover:underline flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-offset-2 rounded"
                       style={{
-                        color: themeColor,
+                        color: DESIGN.colors.primary,
                         fontSize: DESIGN.typography.caption
                       }}
                       aria-expanded={showFullDescription}
@@ -1215,7 +930,7 @@ export default function EventDetail() {
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" style={{ color: themeColor }} aria-hidden="true" />
+                    <Users className="w-4 h-4" style={{ color: DESIGN.colors.primary }} aria-hidden="true" />
                     <span 
                       className="font-medium"
                       style={{ 
@@ -1229,7 +944,7 @@ export default function EventDetail() {
                   <button 
                     className="text-xs font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 rounded"
                     style={{
-                      color: themeColor,
+                      color: DESIGN.colors.primary,
                       fontSize: DESIGN.typography.caption
                     }}
                     onClick={() => {/* TODO: Implement see all attendees */}}
@@ -1260,7 +975,7 @@ export default function EventDetail() {
                     <div 
                       className="w-8 h-8 rounded-full flex items-center justify-center border-2 text-xs font-semibold text-white"
                       style={{
-                        background: themeColor,
+                        background: DESIGN.colors.primary,
                         borderColor: DESIGN.colors.background
                       }}
                       aria-label={`${event.attendees - 4} more attendees`}
@@ -1326,7 +1041,7 @@ export default function EventDetail() {
                 height: '48px',
                 background: hasTicket && isLive 
                   ? `linear-gradient(135deg, ${DESIGN.colors.success} 0%, #059669 100%)`
-                  : `linear-gradient(135deg, ${themeColor} 0%, ${DESIGN.colors.lavenderLight} 100%)`,
+                  : `linear-gradient(135deg, ${DESIGN.colors.primary} 0%, ${DESIGN.colors.lavenderLight} 100%)`,
                 color: DESIGN.colors.background,
                 boxShadow: '0 4px 20px rgba(196, 181, 253, 0.3)'
               }}
@@ -1341,13 +1056,30 @@ export default function EventDetail() {
       </footer>
 
       {/* Video Modal */}
-      {event.mediaType === 'video' && event.videos?.[0] && (
-        <VideoModal
-          isOpen={videoModalOpen}
-          onClose={() => setVideoModalOpen(false)}
-          videoUrl={event.videos[0]}
-          themeColor={themeColor}
-        />
+      {isVideoModalOpen && event.mediaType === 'video' && event.videos && event.videos.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
+          <div className="relative w-full h-full flex items-center justify-center">
+            <video
+              ref={fullscreenVideoRef}
+              src={event.videos[0]}
+              className="w-full h-full object-contain"
+              controls
+              autoPlay
+            />
+            
+            {/* Close Button */}
+            <button
+              onClick={closeVideoModal}
+              className="absolute top-4 right-4 w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-sm"
+              style={{
+                background: 'rgba(0, 0, 0, 0.6)',
+                color: DESIGN.colors.textPrimary
+              }}
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
