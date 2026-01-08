@@ -26,7 +26,8 @@ import {
   AlertTriangle,
   Loader2,
   Film,
-  Grid3x3
+  Grid3x3,
+  Heart
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
@@ -37,6 +38,42 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Event } from '@/lib/types';
 import QRCode from 'qrcode';
+
+// Design Constants matching Connect screen
+const DESIGN = {
+  colors: {
+    primary: '#C4B5FD',
+    lavenderLight: '#E9D5FF',
+    accentPink: '#FFB8E6',
+    background: '#1A1A1A',
+    card: '#2D2D2D',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#B8B8B8',
+    success: '#10B981',
+    warning: '#F59E0B',
+    danger: '#EF4444',
+    info: '#3B82F6'
+  },
+  spacing: {
+    default: '16px',
+    cardPadding: '16px',
+    buttonGap: '12px',
+    modalPadding: '20px'
+  },
+  borderRadius: {
+    card: '24px',
+    cardInner: '20px',
+    button: '12px',
+    roundButton: '50%',
+    modalTop: '20px',
+    smallPill: '8px'
+  },
+  shadows: {
+    card: '0 8px 32px rgba(0, 0, 0, 0.4)',
+    button: '0 4px 16px rgba(0, 0, 0, 0.3)',
+    likeButton: '0 4px 16px rgba(255, 184, 230, 0.4)'
+  }
+};
 
 type Tab = 'events' | 'attendees' | 'analytics' | 'messages' | 'settings';
 
@@ -102,144 +139,331 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-card rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-border">
-        <div className="sticky top-0 bg-card border-b border-border p-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold">Edit Event</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-            <X className="w-4 h-4" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ 
+      background: 'rgba(0, 0, 0, 0.7)', 
+      backdropFilter: 'blur(4px)',
+      padding: DESIGN.spacing.default 
+    }}>
+      <div style={{
+        background: DESIGN.colors.card,
+        borderRadius: DESIGN.borderRadius.card,
+        width: '100%',
+        maxWidth: '512px',
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        border: '1px solid rgba(255, 255, 255, 0.1)'
+      }}>
+        <div style={{
+          position: 'sticky',
+          top: 0,
+          background: DESIGN.colors.card,
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          padding: DESIGN.spacing.default,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: DESIGN.colors.textPrimary }}>Edit Event</h2>
+          <button 
+            onClick={onClose} 
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: DESIGN.borderRadius.roundButton,
+              background: 'rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <X className="w-4 h-4" style={{ color: DESIGN.colors.textPrimary }} />
           </button>
         </div>
         
-        <div className="p-4 space-y-4">
+        <div style={{ padding: DESIGN.spacing.default, display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <label className="text-sm font-medium mb-1 block">Event Name</label>
-            <Input 
+            <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
+              Event Name
+            </label>
+            <input 
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="Enter event name"
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: DESIGN.colors.background,
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: DESIGN.borderRadius.button,
+                color: DESIGN.colors.textPrimary,
+                fontSize: '15px'
+              }}
             />
           </div>
           
           <div>
-            <label className="text-sm font-medium mb-1 block">Description</label>
-            <Textarea 
+            <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
+              Description
+            </label>
+            <textarea 
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Enter event description"
               rows={3}
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: DESIGN.colors.background,
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: DESIGN.borderRadius.button,
+                color: DESIGN.colors.textPrimary,
+                fontSize: '15px',
+                resize: 'vertical',
+                fontFamily: 'inherit'
+              }}
             />
           </div>
           
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
-              <label className="text-sm font-medium mb-1 block">Date</label>
-              <Input 
+              <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                Date
+              </label>
+              <input 
                 type="date"
                 value={formData.date}
                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: DESIGN.colors.background,
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: DESIGN.borderRadius.button,
+                  color: DESIGN.colors.textPrimary,
+                  fontSize: '15px'
+                }}
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Time</label>
-              <Input 
+              <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                Time
+              </label>
+              <input 
                 type="time"
                 value={formData.time}
                 onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: DESIGN.colors.background,
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: DESIGN.borderRadius.button,
+                  color: DESIGN.colors.textPrimary,
+                  fontSize: '15px'
+                }}
               />
             </div>
           </div>
           
           <div>
-            <label className="text-sm font-medium mb-1 block">Venue Name</label>
-            <Input 
+            <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
+              Venue Name
+            </label>
+            <input 
               value={formData.location}
               onChange={(e) => setFormData({ ...formData, location: e.target.value })}
               placeholder="Enter venue name"
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: DESIGN.colors.background,
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: DESIGN.borderRadius.button,
+                color: DESIGN.colors.textPrimary,
+                fontSize: '15px'
+              }}
             />
           </div>
           
           <div>
-            <label className="text-sm font-medium mb-1 block">Address</label>
-            <Input 
+            <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
+              Address
+            </label>
+            <input 
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               placeholder="Enter full address"
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: DESIGN.colors.background,
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: DESIGN.borderRadius.button,
+                color: DESIGN.colors.textPrimary,
+                fontSize: '15px'
+              }}
             />
           </div>
           
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
-              <label className="text-sm font-medium mb-1 block">Price (NAD)</label>
-              <Input 
+              <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                Price (NAD)
+              </label>
+              <input 
                 type="number"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
                 placeholder="0"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: DESIGN.colors.background,
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: DESIGN.borderRadius.button,
+                  color: DESIGN.colors.textPrimary,
+                  fontSize: '15px'
+                }}
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Max Attendees</label>
-              <Input 
+              <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                Max Attendees
+              </label>
+              <input 
                 type="number"
                 value={formData.maxAttendees}
                 onChange={(e) => setFormData({ ...formData, maxAttendees: parseInt(e.target.value) || 100 })}
                 placeholder="100"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: DESIGN.colors.background,
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: DESIGN.borderRadius.button,
+                  color: DESIGN.colors.textPrimary,
+                  fontSize: '15px'
+                }}
               />
             </div>
           </div>
           
           <div>
-            <label className="text-sm font-medium mb-1 block">Check-in Radius (meters)</label>
-            <Input 
+            <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
+              Check-in Radius (meters)
+            </label>
+            <input 
               type="number"
               value={formData.geofenceRadius}
               onChange={(e) => setFormData({ ...formData, geofenceRadius: parseInt(e.target.value) || 50 })}
               placeholder="50"
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: DESIGN.colors.background,
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: DESIGN.borderRadius.button,
+                color: DESIGN.colors.textPrimary,
+                fontSize: '15px'
+              }}
             />
-            <p className="text-xs text-muted-foreground mt-1">Users must be within this radius to check in</p>
+            <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>
+              Users must be within this radius to check in
+            </p>
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-1 block">Media Type</label>
-            <div className="flex gap-2">
+            <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
+              Media Type
+            </label>
+            <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 onClick={() => setFormData({ ...formData, mediaType: 'carousel' })}
-                className={cn(
-                  'flex-1 p-3 border rounded-lg flex flex-col items-center gap-2',
-                  formData.mediaType === 'carousel' 
-                    ? 'border-primary bg-primary/10' 
-                    : 'border-border'
-                )}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  border: `1px solid ${formData.mediaType === 'carousel' ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)'}`,
+                  borderRadius: DESIGN.borderRadius.button,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: formData.mediaType === 'carousel' ? `${DESIGN.colors.primary}20` : 'transparent'
+                }}
               >
-                <Grid3x3 className="w-5 h-5" />
-                <span className="text-sm">Carousel</span>
+                <Grid3x3 className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
+                <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>Carousel</span>
               </button>
               <button
                 onClick={() => setFormData({ ...formData, mediaType: 'video' })}
-                className={cn(
-                  'flex-1 p-3 border rounded-lg flex flex-col items-center gap-2',
-                  formData.mediaType === 'video' 
-                    ? 'border-primary bg-primary/10' 
-                    : 'border-border'
-                )}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  border: `1px solid ${formData.mediaType === 'video' ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)'}`,
+                  borderRadius: DESIGN.borderRadius.button,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: formData.mediaType === 'video' ? `${DESIGN.colors.primary}20` : 'transparent'
+                }}
               >
-                <Film className="w-5 h-5" />
-                <span className="text-sm">Video</span>
+                <Film className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
+                <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>Video</span>
               </button>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Display type on event details page</p>
+            <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>
+              Display type on event details page
+            </p>
           </div>
         </div>
         
-        <div className="sticky bottom-0 bg-card border-t border-border p-4 flex gap-3">
-          <Button variant="outline" onClick={onClose} className="flex-1">
+        <div style={{
+          position: 'sticky',
+          bottom: 0,
+          background: DESIGN.colors.card,
+          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+          padding: DESIGN.spacing.default,
+          display: 'flex',
+          gap: '12px'
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1,
+              padding: '12px',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: DESIGN.borderRadius.button,
+              background: 'transparent',
+              color: DESIGN.colors.textPrimary,
+              fontSize: '15px',
+              fontWeight: '500'
+            }}
+          >
             Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving} className="flex-1">
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            style={{
+              flex: 1,
+              padding: '12px',
+              border: 'none',
+              borderRadius: DESIGN.borderRadius.button,
+              background: DESIGN.colors.primary,
+              color: DESIGN.colors.background,
+              fontSize: '15px',
+              fontWeight: '500',
+              opacity: isSaving ? 0.7 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
             Save Changes
-          </Button>
+          </button>
         </div>
       </div>
     </div>
@@ -267,7 +491,6 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
   const generateQRCode = async () => {
     setIsGenerating(true);
     try {
-      // Create unique QR data for this event
       const qrData = JSON.stringify({
         eventId: event.id,
         eventName: event.name,
@@ -332,53 +555,143 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-card rounded-2xl w-full max-w-sm overflow-hidden border border-border">
-        <div className="p-4 flex items-center justify-between border-b border-border">
-          <h2 className="text-lg font-bold">Event QR Code</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-            <X className="w-4 h-4" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ 
+      background: 'rgba(0, 0, 0, 0.7)', 
+      backdropFilter: 'blur(4px)',
+      padding: DESIGN.spacing.default 
+    }}>
+      <div style={{
+        background: DESIGN.colors.card,
+        borderRadius: DESIGN.borderRadius.card,
+        width: '100%',
+        maxWidth: '384px',
+        overflow: 'hidden',
+        border: '1px solid rgba(255, 255, 255, 0.1)'
+      }}>
+        <div style={{
+          padding: DESIGN.spacing.default,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: DESIGN.colors.textPrimary }}>Event QR Code</h2>
+          <button 
+            onClick={onClose} 
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: DESIGN.borderRadius.roundButton,
+              background: 'rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <X className="w-4 h-4" style={{ color: DESIGN.colors.textPrimary }} />
           </button>
         </div>
         
-        <div className="p-6">
-          <div className="bg-white rounded-xl p-4 mb-4 flex items-center justify-center">
+        <div style={{ padding: '24px' }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: DESIGN.borderRadius.cardInner,
+            padding: '16px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
             {isGenerating ? (
-              <div className="w-48 h-48 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+              <div style={{ width: '192px', height: '192px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#9CA3AF' }} />
               </div>
             ) : (
-              <img src={qrCodeDataUrl} alt="Event QR Code" className="w-48 h-48" />
+              <img src={qrCodeDataUrl} alt="Event QR Code" style={{ width: '192px', height: '192px' }} />
             )}
           </div>
           
-          <div className="text-center mb-4">
-            <h3 className="font-bold">{event.name}</h3>
-            <p className="text-sm text-muted-foreground">{event.date} at {event.time}</p>
-            <p className="text-xs text-muted-foreground mt-1">
+          <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: DESIGN.colors.textPrimary }}>{event.name}</h3>
+            <p style={{ fontSize: '14px', color: DESIGN.colors.textSecondary }}>
+              {event.date} at {event.time}
+            </p>
+            <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>
               Media: {event.mediaType === 'video' ? 'Video' : 'Image Carousel'}
             </p>
           </div>
           
-          <div className="bg-muted rounded-xl p-3 mb-4">
-            <p className="text-xs text-muted-foreground mb-1">Access Code</p>
-            <div className="flex items-center justify-between">
-              <code className="font-mono text-lg font-bold tracking-wider">{event.qrCode}</code>
-              <button onClick={copyAccessCode} className="p-2 hover:bg-background rounded-lg transition-colors">
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: DESIGN.borderRadius.cardInner,
+            padding: '12px',
+            marginBottom: '16px'
+          }}>
+            <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginBottom: '4px' }}>Access Code</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <code style={{
+                fontFamily: 'monospace',
+                fontSize: '18px',
+                fontWeight: 'bold',
+                letterSpacing: '0.05em',
+                color: DESIGN.colors.textPrimary
+              }}>
+                {event.qrCode}
+              </code>
+              <button 
+                onClick={copyAccessCode} 
+                style={{
+                  padding: '8px',
+                  borderRadius: DESIGN.borderRadius.button,
+                  background: 'transparent',
+                  color: DESIGN.colors.textPrimary,
+                  transition: 'background 0.2s'
+                }}
+              >
                 <Copy className="w-4 h-4" />
               </button>
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" onClick={shareQRCode} className="flex items-center gap-2">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <button
+              onClick={shareQRCode}
+              style={{
+                padding: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: DESIGN.borderRadius.button,
+                background: 'transparent',
+                color: DESIGN.colors.textPrimary,
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
               <Share2 className="w-4 h-4" />
               Share
-            </Button>
-            <Button onClick={downloadQRCode} disabled={!qrCodeDataUrl} className="flex items-center gap-2">
+            </button>
+            <button
+              onClick={downloadQRCode}
+              disabled={!qrCodeDataUrl}
+              style={{
+                padding: '12px',
+                border: 'none',
+                borderRadius: DESIGN.borderRadius.button,
+                background: DESIGN.colors.primary,
+                color: DESIGN.colors.background,
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                opacity: !qrCodeDataUrl ? 0.5 : 1
+              }}
+            >
               <Download className="w-4 h-4" />
               Download
-            </Button>
+            </button>
           </div>
         </div>
       </div>
@@ -419,41 +732,104 @@ function DeleteEventModal({ isOpen, onClose, event, onDelete }: DeleteEventModal
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-card rounded-2xl w-full max-w-sm overflow-hidden border border-border">
-        <div className="p-6 text-center">
-          <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-4">
-            <AlertTriangle className="w-8 h-8 text-destructive" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ 
+      background: 'rgba(0, 0, 0, 0.7)', 
+      backdropFilter: 'blur(4px)',
+      padding: DESIGN.spacing.default 
+    }}>
+      <div style={{
+        background: DESIGN.colors.card,
+        borderRadius: DESIGN.borderRadius.card,
+        width: '100%',
+        maxWidth: '384px',
+        overflow: 'hidden',
+        border: '1px solid rgba(255, 255, 255, 0.1)'
+      }}>
+        <div style={{ padding: '24px', textAlign: 'center' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: DESIGN.borderRadius.roundButton,
+            background: `${DESIGN.colors.danger}20`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 16px'
+          }}>
+            <AlertTriangle className="w-8 h-8" style={{ color: DESIGN.colors.danger }} />
           </div>
           
-          <h2 className="text-xl font-bold mb-2">Delete Event?</h2>
-          <p className="text-muted-foreground text-sm mb-4">
+          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px', color: DESIGN.colors.textPrimary }}>
+            Delete Event?
+          </h2>
+          <p style={{ fontSize: '14px', color: DESIGN.colors.textSecondary, marginBottom: '16px' }}>
             This will permanently delete <strong>"{event.name}"</strong> and all associated data including attendees and tickets.
           </p>
           
-          <div className="bg-destructive/10 rounded-xl p-3 mb-4 text-left">
-            <p className="text-xs text-destructive mb-2">This action cannot be undone. Type DELETE to confirm:</p>
-            <Input 
+          <div style={{
+            background: `${DESIGN.colors.danger}10`,
+            borderRadius: DESIGN.borderRadius.cardInner,
+            padding: '12px',
+            marginBottom: '16px',
+            textAlign: 'left'
+          }}>
+            <p style={{ fontSize: '12px', color: DESIGN.colors.danger, marginBottom: '8px' }}>
+              This action cannot be undone. Type DELETE to confirm:
+            </p>
+            <input
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
               placeholder="Type DELETE"
-              className="border-destructive/50 focus:border-destructive"
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: DESIGN.colors.background,
+                border: `1px solid ${DESIGN.colors.danger}50`,
+                borderRadius: DESIGN.borderRadius.button,
+                color: DESIGN.colors.textPrimary,
+                fontSize: '15px'
+              }}
             />
           </div>
           
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={onClose} className="flex-1">
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={onClose}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: DESIGN.borderRadius.button,
+                background: 'transparent',
+                color: DESIGN.colors.textPrimary,
+                fontSize: '15px',
+                fontWeight: '500'
+              }}
+            >
               Cancel
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleDelete} 
+            </button>
+            <button
+              onClick={handleDelete}
               disabled={confirmText !== 'DELETE' || isDeleting}
-              className="flex-1"
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: 'none',
+                borderRadius: DESIGN.borderRadius.button,
+                background: DESIGN.colors.danger,
+                color: DESIGN.colors.textPrimary,
+                fontSize: '15px',
+                fontWeight: '500',
+                opacity: (confirmText !== 'DELETE' || isDeleting) ? 0.5 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
             >
               {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
               Delete
-            </Button>
+            </button>
           </div>
         </div>
       </div>
@@ -482,18 +858,50 @@ export default function EventManager() {
 
   if (!isPro) {
     return (
-      <div className="app-container min-h-screen bg-background flex flex-col items-center justify-center p-6">
-        <div className="text-center max-w-sm">
-          <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-6">
-            <Calendar className="w-10 h-10 text-primary" />
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        background: DESIGN.colors.background,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: DESIGN.spacing.default
+      }}>
+        <div style={{ textAlign: 'center', maxWidth: '384px' }}>
+          <div style={{
+            width: '80px',
+            height: '80px',
+            borderRadius: DESIGN.borderRadius.roundButton,
+            background: `${DESIGN.colors.primary}20`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 24px'
+          }}>
+            <Calendar className="w-10 h-10" style={{ color: DESIGN.colors.primary }} />
           </div>
-          <h1 className="text-2xl font-bold mb-2">Event Manager</h1>
-          <p className="text-muted-foreground mb-6">
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px', color: DESIGN.colors.textPrimary }}>
+            Event Manager
+          </h1>
+          <p style={{ fontSize: '15px', color: DESIGN.colors.textSecondary, marginBottom: '24px' }}>
             Upgrade to Pro or Max to create and manage events
           </p>
-          <Button onClick={() => navigate('/settings')} className="w-full">
+          <button
+            onClick={() => navigate('/settings')}
+            style={{
+              width: '100%',
+              padding: '15px',
+              border: 'none',
+              borderRadius: DESIGN.borderRadius.button,
+              background: DESIGN.colors.primary,
+              color: DESIGN.colors.background,
+              fontSize: '16px',
+              fontWeight: '500'
+            }}
+          >
             Upgrade Now
-          </Button>
+          </button>
         </div>
       </div>
     );
@@ -544,25 +952,75 @@ export default function EventManager() {
   ];
 
   return (
-    <div className="app-container min-h-screen bg-background pb-nav">
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      background: DESIGN.colors.background,
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-background border-b border-border">
-        <div className="flex items-center gap-3 p-4">
-          <button onClick={() => navigate(-1)} className="w-10 h-10 rounded-full bg-card flex items-center justify-center">
-            <ChevronLeft className="w-5 h-5" />
+      <div style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 30,
+        background: DESIGN.colors.background,
+        borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: DESIGN.spacing.default
+        }}>
+          <button 
+            onClick={() => navigate(-1)} 
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: DESIGN.borderRadius.roundButton,
+              background: DESIGN.colors.card,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none'
+            }}
+          >
+            <ChevronLeft className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
           </button>
-          <div className="flex-1">
-            <h1 className="text-lg font-bold">Event Manager</h1>
-            <p className="text-xs text-muted-foreground">{userEvents.length} events</p>
+          <div style={{ flex: 1 }}>
+            <h1 style={{ fontSize: '18px', fontWeight: 'bold', color: DESIGN.colors.textPrimary }}>Event Manager</h1>
+            <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>{userEvents.length} events</p>
           </div>
-          <Button size="sm" onClick={() => navigate('/events')}>
-            <Plus className="w-4 h-4 mr-1" />
+          <button
+            onClick={() => navigate('/events')}
+            style={{
+              padding: '8px 16px',
+              border: 'none',
+              borderRadius: DESIGN.borderRadius.button,
+              background: DESIGN.colors.primary,
+              color: DESIGN.colors.background,
+              fontSize: '14px',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            <Plus className="w-4 h-4" />
             New
-          </Button>
+          </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex px-4 gap-1 pb-3 overflow-x-auto no-scrollbar">
+        <div style={{
+          display: 'flex',
+          paddingLeft: DESIGN.spacing.default,
+          paddingRight: DESIGN.spacing.default,
+          gap: '4px',
+          paddingBottom: '12px',
+          overflowX: 'auto'
+        }}>
           {[
             { key: 'events', label: 'My Events', icon: Calendar },
             { key: 'attendees', label: 'Attendees', icon: Users },
@@ -573,12 +1031,20 @@ export default function EventManager() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key as Tab)}
-              className={cn(
-                'px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5',
-                activeTab === tab.key
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-card text-muted-foreground'
-              )}
+              style={{
+                padding: '8px 12px',
+                borderRadius: DESIGN.borderRadius.button,
+                fontSize: '14px',
+                fontWeight: '500',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: activeTab === tab.key ? DESIGN.colors.primary : DESIGN.colors.card,
+                color: activeTab === tab.key ? DESIGN.colors.background : DESIGN.colors.textSecondary,
+                border: 'none'
+              }}
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
@@ -588,97 +1054,142 @@ export default function EventManager() {
       </div>
 
       {/* Content */}
-      <div className="p-4">
+      <div style={{ padding: DESIGN.spacing.default, flex: 1, overflowY: 'auto' }}>
         {/* My Events Tab */}
         {activeTab === 'events' && (
-          <div className="space-y-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {userEvents.length > 0 ? (
               userEvents.map(event => {
                 const status = getEventStatus(event);
                 return (
                   <div 
                     key={event.id} 
-                    className={cn(
-                      "bg-card rounded-xl border overflow-hidden",
-                      selectedEventId === event.id ? "border-primary" : "border-border"
-                    )}
+                    style={{
+                      background: DESIGN.colors.card,
+                      borderRadius: DESIGN.borderRadius.card,
+                      border: `1px solid ${selectedEventId === event.id ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)'}`,
+                      overflow: 'hidden'
+                    }}
                   >
-                    <div className="flex">
+                    <div style={{ display: 'flex' }}>
                       <img 
                         src={event.coverImage} 
                         alt={event.name}
-                        className="w-24 h-24 object-cover"
+                        style={{ width: '96px', height: '96px', objectFit: 'cover' }}
                       />
-                      <div className="flex-1 p-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <h3 className="font-bold text-sm line-clamp-1">{event.name}</h3>
-                          <span className={cn(
-                            'px-2 py-0.5 text-xs rounded-full font-medium',
-                            status === 'live' && 'bg-green-500/20 text-green-500',
-                            status === 'upcoming' && 'bg-primary/20 text-primary',
-                            status === 'past' && 'bg-muted text-muted-foreground'
-                          )}>
+                      <div style={{ flex: 1, padding: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                          <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: DESIGN.colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {event.name}
+                          </h3>
+                          <span style={{
+                            padding: '2px 8px',
+                            fontSize: '12px',
+                            borderRadius: DESIGN.borderRadius.roundButton,
+                            fontWeight: '500',
+                            background: status === 'live' ? `${DESIGN.colors.success}20` : 
+                                      status === 'upcoming' ? `${DESIGN.colors.primary}20` : 
+                                      `${DESIGN.colors.textSecondary}20`,
+                            color: status === 'live' ? DESIGN.colors.success : 
+                                  status === 'upcoming' ? DESIGN.colors.primary : 
+                                  DESIGN.colors.textSecondary
+                          }}>
                             {status === 'live' ? '🔴 Live' : status === 'upcoming' ? 'Upcoming' : 'Past'}
                           </span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>
                           {event.date} • {event.attendees} attendees
                         </p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
                           {event.mediaType === 'video' ? (
-                            <div className="flex items-center gap-1">
-                              <Film className="w-3 h-3 text-primary" />
-                              <span className="text-xs text-muted-foreground">Video</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Film className="w-3 h-3" style={{ color: DESIGN.colors.primary }} />
+                              <span style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>Video</span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1">
-                              <Grid3x3 className="w-3 h-3 text-primary" />
-                              <span className="text-xs text-muted-foreground">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Grid3x3 className="w-3 h-3" style={{ color: DESIGN.colors.primary }} />
+                              <span style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
                                 {event.images?.length || 0} photos
                               </span>
                             </div>
                           )}
-                          <span className="text-xs text-muted-foreground">•</span>
-                          <span className="text-xs text-muted-foreground">
+                          <span style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>•</span>
+                          <span style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
                             Radius: {event.geofenceRadius}m
                           </span>
                         </div>
-                        <div className="flex gap-2 mt-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="h-7 text-xs"
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                          <button
                             onClick={() => navigate(`/event/${event.id}`)}
+                            style={{
+                              height: '28px',
+                              padding: '0 12px',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              borderRadius: DESIGN.borderRadius.button,
+                              background: 'transparent',
+                              color: DESIGN.colors.textPrimary,
+                              fontSize: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
                           >
-                            <Eye className="w-3 h-3 mr-1" />
+                            <Eye className="w-3 h-3" />
                             View
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="h-7 text-xs"
+                          </button>
+                          <button
                             onClick={() => handleEditEvent(event)}
+                            style={{
+                              height: '28px',
+                              padding: '0 12px',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              borderRadius: DESIGN.borderRadius.button,
+                              background: 'transparent',
+                              color: DESIGN.colors.textPrimary,
+                              fontSize: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
                           >
-                            <Edit className="w-3 h-3 mr-1" />
+                            <Edit className="w-3 h-3" />
                             Edit
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="h-7 text-xs"
+                          </button>
+                          <button
                             onClick={() => handleQRCode(event)}
+                            style={{
+                              height: '28px',
+                              padding: '0 12px',
+                              border: '1px solid rgba(255, 255, 255, 0.2)',
+                              borderRadius: DESIGN.borderRadius.button,
+                              background: 'transparent',
+                              color: DESIGN.colors.textPrimary,
+                              fontSize: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
                           >
-                            <QrCode className="w-3 h-3 mr-1" />
+                            <QrCode className="w-3 h-3" />
                             QR
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="h-7 text-xs text-destructive hover:text-destructive"
+                          </button>
+                          <button
                             onClick={() => handleDeleteEvent(event)}
+                            style={{
+                              height: '28px',
+                              width: '28px',
+                              borderRadius: DESIGN.borderRadius.button,
+                              background: 'transparent',
+                              color: DESIGN.colors.danger,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: 'none'
+                            }}
                           >
                             <Trash2 className="w-3 h-3" />
-                          </Button>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -686,16 +1197,33 @@ export default function EventManager() {
                 );
               })
             ) : (
-              <div className="text-center py-16">
-                <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="font-bold mb-2">No Events Yet</h3>
-                <p className="text-muted-foreground text-sm mb-4">
+              <div style={{ textAlign: 'center', padding: '64px 0' }}>
+                <Calendar className="w-12 h-12" style={{ color: DESIGN.colors.textSecondary, margin: '0 auto 16px' }} />
+                <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px', color: DESIGN.colors.textPrimary }}>
+                  No Events Yet
+                </h3>
+                <p style={{ fontSize: '14px', color: DESIGN.colors.textSecondary, marginBottom: '16px' }}>
                   Create your first event to get started
                 </p>
-                <Button onClick={() => navigate('/events')}>
-                  <Plus className="w-4 h-4 mr-2" />
+                <button
+                  onClick={() => navigate('/events')}
+                  style={{
+                    padding: '12px 24px',
+                    border: 'none',
+                    borderRadius: DESIGN.borderRadius.button,
+                    background: DESIGN.colors.primary,
+                    color: DESIGN.colors.background,
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    margin: '0 auto'
+                  }}
+                >
+                  <Plus className="w-4 h-4" />
                   Create Event
-                </Button>
+                </button>
               </div>
             )}
           </div>
@@ -703,20 +1231,26 @@ export default function EventManager() {
 
         {/* Attendees Tab */}
         {activeTab === 'attendees' && (
-          <div className="space-y-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Event Selector */}
             {userEvents.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
                 {userEvents.map(event => (
                   <button
                     key={event.id}
                     onClick={() => setSelectedEventId(event.id)}
-                    className={cn(
-                      'px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all border',
-                      selectedEventId === event.id
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-card text-muted-foreground border-border'
-                    )}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: DESIGN.borderRadius.button,
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.2s',
+                      border: '1px solid',
+                      background: selectedEventId === event.id ? DESIGN.colors.primary : DESIGN.colors.card,
+                      color: selectedEventId === event.id ? DESIGN.colors.background : DESIGN.colors.textSecondary,
+                      borderColor: selectedEventId === event.id ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)'
+                    }}
                   >
                     {event.name}
                   </button>
@@ -725,50 +1259,94 @@ export default function EventManager() {
             )}
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-card p-3 rounded-xl border border-border text-center">
-                <p className="text-2xl font-bold text-primary">{mockAttendees.length}</p>
-                <p className="text-xs text-muted-foreground">Total</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+              <div style={{
+                background: DESIGN.colors.card,
+                padding: '12px',
+                borderRadius: DESIGN.borderRadius.card,
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                textAlign: 'center'
+              }}>
+                <p style={{ fontSize: '24px', fontWeight: 'bold', color: DESIGN.colors.primary }}>{mockAttendees.length}</p>
+                <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>Total</p>
               </div>
-              <div className="bg-card p-3 rounded-xl border border-border text-center">
-                <p className="text-2xl font-bold text-green-500">
+              <div style={{
+                background: DESIGN.colors.card,
+                padding: '12px',
+                borderRadius: DESIGN.borderRadius.card,
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                textAlign: 'center'
+              }}>
+                <p style={{ fontSize: '24px', fontWeight: 'bold', color: DESIGN.colors.success }}>
                   {mockAttendees.filter(a => a.checkedIn).length}
                 </p>
-                <p className="text-xs text-muted-foreground">Checked In</p>
+                <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>Checked In</p>
               </div>
-              <div className="bg-card p-3 rounded-xl border border-border text-center">
-                <p className="text-2xl font-bold text-yellow-500">
+              <div style={{
+                background: DESIGN.colors.card,
+                padding: '12px',
+                borderRadius: DESIGN.borderRadius.card,
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                textAlign: 'center'
+              }}>
+                <p style={{ fontSize: '24px', fontWeight: 'bold', color: DESIGN.colors.warning }}>
                   {mockAttendees.filter(a => !a.checkedIn).length}
                 </p>
-                <p className="text-xs text-muted-foreground">Pending</p>
+                <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>Pending</p>
               </div>
             </div>
 
             {/* Export Button */}
-            <Button variant="outline" className="w-full">
-              <Download className="w-4 h-4 mr-2" />
+            <button
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: DESIGN.borderRadius.button,
+                background: 'transparent',
+                color: DESIGN.colors.textPrimary,
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              <Download className="w-4 h-4" />
               Export Attendee List (CSV)
-            </Button>
+            </button>
 
             {/* Attendees List */}
-            <div className="space-y-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {mockAttendees.map(attendee => (
-                <div key={attendee.id} className="bg-card rounded-xl p-3 border border-border flex items-center gap-3">
+                <div key={attendee.id} style={{
+                  background: DESIGN.colors.card,
+                  borderRadius: DESIGN.borderRadius.card,
+                  padding: '12px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
                   <img 
                     src={attendee.photo} 
                     alt={attendee.name}
-                    className="w-10 h-10 rounded-full object-cover"
+                    style={{ width: '40px', height: '40px', borderRadius: DESIGN.borderRadius.roundButton, objectFit: 'cover' }}
                   />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{attendee.name}</p>
-                    <p className="text-xs text-muted-foreground">{attendee.ticketType}</p>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: '14px', fontWeight: '500', color: DESIGN.colors.textPrimary }}>{attendee.name}</p>
+                    <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>{attendee.ticketType}</p>
                   </div>
-                  <span className={cn(
-                    'px-2 py-1 rounded-full text-xs flex items-center gap-1',
-                    attendee.checkedIn 
-                      ? 'bg-green-500/20 text-green-500'
-                      : 'bg-yellow-500/20 text-yellow-500'
-                  )}>
+                  <span style={{
+                    padding: '4px 8px',
+                    borderRadius: DESIGN.borderRadius.roundButton,
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    background: attendee.checkedIn ? `${DESIGN.colors.success}20` : `${DESIGN.colors.warning}20`,
+                    color: attendee.checkedIn ? DESIGN.colors.success : DESIGN.colors.warning
+                  }}>
                     {attendee.checkedIn ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                     {attendee.checkedIn ? 'Checked In' : 'Pending'}
                   </span>
@@ -780,50 +1358,79 @@ export default function EventManager() {
 
         {/* Analytics Tab */}
         {activeTab === 'analytics' && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-card p-4 rounded-xl border border-border">
-                <div className="flex items-center gap-2 mb-2">
-                  <Users className="w-5 h-5 text-primary" />
-                  <span className="text-sm text-muted-foreground">Total Attendees</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{
+                background: DESIGN.colors.card,
+                padding: '16px',
+                borderRadius: DESIGN.borderRadius.card,
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <Users className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+                  <span style={{ fontSize: '14px', color: DESIGN.colors.textSecondary }}>Total Attendees</span>
                 </div>
-                <p className="text-3xl font-bold">
+                <p style={{ fontSize: '32px', fontWeight: 'bold', color: DESIGN.colors.textPrimary }}>
                   {userEvents.reduce((sum, e) => sum + e.attendees, 0)}
                 </p>
-                <p className="text-xs text-green-500 flex items-center gap-1 mt-1">
+                <p style={{ fontSize: '12px', color: DESIGN.colors.success, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
                   <TrendingUp className="w-3 h-3" />
                   +12% from last month
                 </p>
               </div>
-              <div className="bg-card p-4 rounded-xl border border-border">
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  <span className="text-sm text-muted-foreground">Events Created</span>
+              <div style={{
+                background: DESIGN.colors.card,
+                padding: '16px',
+                borderRadius: DESIGN.borderRadius.card,
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <Calendar className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+                  <span style={{ fontSize: '14px', color: DESIGN.colors.textSecondary }}>Events Created</span>
                 </div>
-                <p className="text-3xl font-bold">{userEvents.length}</p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p style={{ fontSize: '32px', fontWeight: 'bold', color: DESIGN.colors.textPrimary }}>{userEvents.length}</p>
+                <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>
                   All time
                 </p>
               </div>
             </div>
 
-            <div className="bg-card p-4 rounded-xl border border-border">
-              <h3 className="font-semibold mb-4">Check-in Rate</h3>
-              <div className="h-40 flex items-end justify-center gap-2">
+            <div style={{
+              background: DESIGN.colors.card,
+              padding: '16px',
+              borderRadius: DESIGN.borderRadius.card,
+              border: '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: DESIGN.colors.textPrimary }}>Check-in Rate</h3>
+              <div style={{ height: '160px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '8px' }}>
                 {[65, 78, 45, 90, 82, 55, 70].map((val, i) => (
                   <div 
                     key={i}
-                    className="w-8 rounded-t-lg bg-primary/20"
-                    style={{ height: `${val}%` }}
+                    style={{
+                      width: '32px',
+                      borderTopLeftRadius: DESIGN.borderRadius.button,
+                      borderTopRightRadius: DESIGN.borderRadius.button,
+                      background: `${DESIGN.colors.primary}20`,
+                      height: '100%',
+                      position: 'relative'
+                    }}
                   >
                     <div 
-                      className="w-full bg-primary rounded-t-lg transition-all duration-500"
-                      style={{ height: `${val}%` }}
+                      style={{
+                        width: '100%',
+                        background: DESIGN.colors.primary,
+                        borderTopLeftRadius: DESIGN.borderRadius.button,
+                        borderTopRightRadius: DESIGN.borderRadius.button,
+                        transition: 'height 0.5s',
+                        position: 'absolute',
+                        bottom: 0,
+                        height: `${val}%`
+                      }}
                     />
                   </div>
                 ))}
               </div>
-              <div className="flex justify-between text-xs text-muted-foreground mt-2">
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '8px' }}>
                 <span>Mon</span>
                 <span>Tue</span>
                 <span>Wed</span>
@@ -834,17 +1441,35 @@ export default function EventManager() {
               </div>
             </div>
 
-            <div className="bg-card p-4 rounded-xl border border-border">
-              <h3 className="font-semibold mb-3">Top Performing Events</h3>
-              <div className="space-y-3">
+            <div style={{
+              background: DESIGN.colors.card,
+              padding: '16px',
+              borderRadius: DESIGN.borderRadius.card,
+              border: '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: DESIGN.colors.textPrimary }}>Top Performing Events</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {userEvents.slice(0, 3).map((event, i) => (
-                  <div key={event.id} className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                  <div key={event.id} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: DESIGN.borderRadius.roundButton,
+                      background: `${DESIGN.colors.primary}20`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      color: DESIGN.colors.primary
+                    }}>
                       {i + 1}
                     </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{event.name}</p>
-                      <p className="text-xs text-muted-foreground">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: '14px', fontWeight: '500', color: DESIGN.colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {event.name}
+                      </p>
+                      <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
                         {event.attendees} attendees • {event.mediaType === 'video' ? 'Video' : 'Carousel'}
                       </p>
                     </div>
@@ -857,24 +1482,47 @@ export default function EventManager() {
 
         {/* Messages Tab */}
         {activeTab === 'messages' && (
-          <div className="space-y-4">
-            <div className="bg-card p-4 rounded-xl border border-border">
-              <h3 className="font-semibold mb-3">Send Announcement</h3>
-              <p className="text-sm text-muted-foreground mb-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{
+              background: DESIGN.colors.card,
+              padding: '16px',
+              borderRadius: DESIGN.borderRadius.card,
+              border: '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: DESIGN.colors.textPrimary }}>Send Announcement</h3>
+              <p style={{ fontSize: '14px', color: DESIGN.colors.textSecondary, marginBottom: '16px' }}>
                 Send a message to all attendees of your events
               </p>
               
               {/* Event Selector */}
-              <div className="mb-4">
-                <label className="text-sm font-medium mb-2 block">Select Event</label>
-                <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                  <button className="px-3 py-2 rounded-lg text-xs font-medium bg-primary text-primary-foreground">
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>Select Event</label>
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto' }}>
+                  <button style={{
+                    padding: '8px 12px',
+                    borderRadius: DESIGN.borderRadius.button,
+                    fontSize: '12px',
+                    fontWeight: '500',
+                    whiteSpace: 'nowrap',
+                    background: DESIGN.colors.primary,
+                    color: DESIGN.colors.background,
+                    border: 'none'
+                  }}>
                     All Events
                   </button>
                   {userEvents.map(event => (
                     <button
                       key={event.id}
-                      className="px-3 py-2 rounded-lg text-xs font-medium bg-card text-muted-foreground border border-border whitespace-nowrap"
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: DESIGN.borderRadius.button,
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        whiteSpace: 'nowrap',
+                        background: DESIGN.colors.card,
+                        color: DESIGN.colors.textSecondary,
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                      }}
                     >
                       {event.name}
                     </button>
@@ -882,23 +1530,55 @@ export default function EventManager() {
                 </div>
               </div>
 
-              <Textarea
+              <textarea
                 value={announcementText}
                 onChange={(e) => setAnnouncementText(e.target.value)}
                 placeholder="Type your announcement..."
                 rows={4}
-                className="mb-3"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: DESIGN.colors.background,
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: DESIGN.borderRadius.button,
+                  color: DESIGN.colors.textPrimary,
+                  fontSize: '15px',
+                  marginBottom: '12px',
+                  resize: 'vertical',
+                  fontFamily: 'inherit'
+                }}
               />
 
-              <Button className="w-full" disabled={!announcementText.trim()}>
-                <Send className="w-4 h-4 mr-2" />
+              <button
+                disabled={!announcementText.trim()}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: 'none',
+                  borderRadius: DESIGN.borderRadius.button,
+                  background: DESIGN.colors.primary,
+                  color: DESIGN.colors.background,
+                  fontSize: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  opacity: !announcementText.trim() ? 0.5 : 1
+                }}
+              >
+                <Send className="w-4 h-4" />
                 Send Announcement
-              </Button>
+              </button>
             </div>
 
-            <div className="bg-card p-4 rounded-xl border border-border">
-              <h3 className="font-semibold mb-3">Quick Templates</h3>
-              <div className="space-y-2">
+            <div style={{
+              background: DESIGN.colors.card,
+              padding: '16px',
+              borderRadius: DESIGN.borderRadius.card,
+              border: '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: DESIGN.colors.textPrimary }}>Quick Templates</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {[
                   'Event starting soon! Get ready 🎉',
                   'Reminder: Check in when you arrive',
@@ -908,7 +1588,17 @@ export default function EventManager() {
                   <button
                     key={i}
                     onClick={() => setAnnouncementText(template)}
-                    className="w-full text-left p-3 rounded-lg bg-background border border-border text-sm hover:border-primary transition-colors"
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '12px',
+                      borderRadius: DESIGN.borderRadius.button,
+                      background: DESIGN.colors.background,
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      fontSize: '14px',
+                      color: DESIGN.colors.textPrimary,
+                      transition: 'border-color 0.2s'
+                    }}
                   >
                     {template}
                   </button>
@@ -920,71 +1610,150 @@ export default function EventManager() {
 
         {/* Settings Tab */}
         {activeTab === 'settings' && (
-          <div className="space-y-4">
-            <div className="bg-card p-4 rounded-xl border border-border">
-              <h3 className="font-semibold mb-4">Event Defaults</h3>
-              <div className="space-y-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{
+              background: DESIGN.colors.card,
+              padding: '16px',
+              borderRadius: DESIGN.borderRadius.card,
+              border: '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: DESIGN.colors.textPrimary }}>Event Defaults</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Default Check-in Radius</label>
-                  <Input type="number" defaultValue={100} className="h-12" />
-                  <p className="text-xs text-muted-foreground mt-1">Default radius in meters</p>
+                  <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                    Default Check-in Radius
+                  </label>
+                  <input type="number" defaultValue={100} style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: DESIGN.colors.background,
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: DESIGN.borderRadius.button,
+                    color: DESIGN.colors.textPrimary,
+                    fontSize: '15px'
+                  }} />
+                  <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>Default radius in meters</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Default Theme Color</label>
-                  <div className="flex gap-2">
+                  <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                    Default Theme Color
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
                     {['#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#3B82F6'].map(color => (
                       <button
                         key={color}
-                        className="w-10 h-10 rounded-full border-2 border-border"
-                        style={{ backgroundColor: color }}
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: DESIGN.borderRadius.roundButton,
+                          border: '2px solid rgba(255, 255, 255, 0.1)',
+                          background: color
+                        }}
                       />
                     ))}
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Default Media Type</label>
-                  <div className="flex gap-2">
-                    <button className="flex-1 p-3 border border-border rounded-lg flex flex-col items-center gap-2">
-                      <Grid3x3 className="w-5 h-5" />
-                      <span className="text-sm">Carousel</span>
+                  <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                    Default Media Type
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button style={{
+                      flex: 1,
+                      padding: '12px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: DESIGN.borderRadius.button,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'transparent'
+                    }}>
+                      <Grid3x3 className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
+                      <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>Carousel</span>
                     </button>
-                    <button className="flex-1 p-3 border border-border rounded-lg flex flex-col items-center gap-2">
-                      <Film className="w-5 h-5" />
-                      <span className="text-sm">Video</span>
+                    <button style={{
+                      flex: 1,
+                      padding: '12px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: DESIGN.borderRadius.button,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'transparent'
+                    }}>
+                      <Film className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
+                      <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>Video</span>
                     </button>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-card p-4 rounded-xl border border-border">
-              <h3 className="font-semibold mb-4">Notifications</h3>
-              <div className="space-y-3">
+            <div style={{
+              background: DESIGN.colors.card,
+              padding: '16px',
+              borderRadius: DESIGN.borderRadius.card,
+              border: '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: DESIGN.colors.textPrimary }}>Notifications</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {[
                   'Email me when someone checks in',
                   'Push notifications for new attendees',
                   'Weekly analytics summary',
                 ].map((setting, i) => (
-                  <div key={i} className="flex items-center justify-between py-2">
-                    <span className="text-sm">{setting}</span>
-                    <div className="w-12 h-6 bg-primary/20 rounded-full relative cursor-pointer">
-                      <div className="absolute right-1 top-1 w-4 h-4 bg-primary rounded-full" />
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
+                    <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>{setting}</span>
+                    <div style={{
+                      width: '48px',
+                      height: '24px',
+                      background: `${DESIGN.colors.primary}20`,
+                      borderRadius: DESIGN.borderRadius.roundButton,
+                      position: 'relative',
+                      cursor: 'pointer'
+                    }}>
+                      <div style={{
+                        position: 'absolute',
+                        right: '4px',
+                        top: '4px',
+                        width: '16px',
+                        height: '16px',
+                        background: DESIGN.colors.primary,
+                        borderRadius: DESIGN.borderRadius.roundButton
+                      }} />
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <Button variant="destructive" className="w-full" onClick={() => {
-              toast({ 
-                title: 'Confirm deletion', 
-                description: 'Use the delete button on individual events instead',
-                variant: 'destructive'
-              });
-            }}>
-              <Trash2 className="w-4 h-4 mr-2" />
+            <button
+              onClick={() => {
+                toast({ 
+                  title: 'Confirm deletion', 
+                  description: 'Use the delete button on individual events instead',
+                  variant: 'destructive'
+                });
+              }}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: 'none',
+                borderRadius: DESIGN.borderRadius.button,
+                background: DESIGN.colors.danger,
+                color: DESIGN.colors.textPrimary,
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              <Trash2 className="w-4 h-4" />
               Delete All Events
-            </Button>
+            </button>
           </div>
         )}
       </div>
