@@ -89,11 +89,18 @@ export default function EventDetail() {
   const [isVideoMuted, setIsVideoMuted] = useState(true);
   const [isVideoPlaying, setIsVideoPlaying] = useState(true);
   const [isVideoEnded, setIsVideoEnded] = useState(false);
+  const [isFullscreenVideoPlaying, setIsFullscreenVideoPlaying] = useState(true);
+  const [isFullscreenVideoMuted, setIsFullscreenVideoMuted] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fullscreenVideoRef = useRef<HTMLVideoElement>(null);
   const lastScrollY = useRef(0);
-  const videoControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const carouselIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const videoPlaybackStateRef = useRef({
+    currentTime: 0,
+    isPlaying: true,
+    isMuted: true
+  });
 
   // Memoize event find for better performance
   const event = useMemo(() => 
@@ -140,6 +147,56 @@ export default function EventDetail() {
     return event?.price === 0 ? 'Register Free' : 'Buy Ticket';
   }, [user, hasTicket, isLive, event]);
 
+  // Auto-rotate carousel
+  const startCarouselRotation = useCallback(() => {
+    if (event?.mediaType === 'carousel' && event.images && event.images.length > 1) {
+      // Clear existing interval
+      if (carouselIntervalRef.current) {
+        clearInterval(carouselIntervalRef.current);
+      }
+      
+      // Start new interval (rotate every 5 seconds)
+      carouselIntervalRef.current = setInterval(() => {
+        setCurrentImageIndex((prev) => (prev + 1) % event.images.length);
+      }, 5000);
+    }
+  }, [event?.mediaType, event?.images]);
+
+  // Stop carousel rotation
+  const stopCarouselRotation = useCallback(() => {
+    if (carouselIntervalRef.current) {
+      clearInterval(carouselIntervalRef.current);
+      carouselIntervalRef.current = null;
+    }
+  }, []);
+
+  // Handle carousel navigation with manual control pause
+  const nextImage = useCallback(() => {
+    if (event?.images && event.images.length > 0) {
+      // Stop auto-rotation temporarily when user manually navigates
+      stopCarouselRotation();
+      setCurrentImageIndex((prev) => (prev + 1) % event.images.length);
+      
+      // Restart auto-rotation after 3 seconds
+      setTimeout(() => {
+        startCarouselRotation();
+      }, 3000);
+    }
+  }, [event, startCarouselRotation, stopCarouselRotation]);
+
+  const prevImage = useCallback(() => {
+    if (event?.images && event.images.length > 0) {
+      // Stop auto-rotation temporarily when user manually navigates
+      stopCarouselRotation();
+      setCurrentImageIndex((prev) => (prev - 1 + event.images.length) % event.images.length);
+      
+      // Restart auto-rotation after 3 seconds
+      setTimeout(() => {
+        startCarouselRotation();
+      }, 3000);
+    }
+  }, [event, startCarouselRotation, stopCarouselRotation]);
+
   // Handle video playback
   const toggleVideoPlay = useCallback(() => {
     if (videoRef.current) {
@@ -147,9 +204,11 @@ export default function EventDetail() {
         videoRef.current.play();
         setIsVideoPlaying(true);
         setIsVideoEnded(false);
+        videoPlaybackStateRef.current.isPlaying = true;
       } else {
         videoRef.current.pause();
         setIsVideoPlaying(false);
+        videoPlaybackStateRef.current.isPlaying = false;
       }
     }
   }, []);
@@ -159,6 +218,7 @@ export default function EventDetail() {
       const newMutedState = !videoRef.current.muted;
       videoRef.current.muted = newMutedState;
       setIsVideoMuted(newMutedState);
+      videoPlaybackStateRef.current.isMuted = newMutedState;
     }
   }, []);
 
@@ -167,11 +227,10 @@ export default function EventDetail() {
     if (fullscreenVideoRef.current) {
       if (fullscreenVideoRef.current.paused) {
         fullscreenVideoRef.current.play();
-        setIsVideoPlaying(true);
-        setIsVideoEnded(false);
+        setIsFullscreenVideoPlaying(true);
       } else {
         fullscreenVideoRef.current.pause();
-        setIsVideoPlaying(false);
+        setIsFullscreenVideoPlaying(false);
       }
     }
   }, []);
@@ -180,13 +239,14 @@ export default function EventDetail() {
     if (fullscreenVideoRef.current) {
       const newMutedState = !fullscreenVideoRef.current.muted;
       fullscreenVideoRef.current.muted = newMutedState;
-      setIsVideoMuted(newMutedState);
+      setIsFullscreenVideoMuted(newMutedState);
     }
   }, []);
 
   const openVideoModal = useCallback(() => {
-    // Pause the main video before opening modal
+    // Save current video state before opening modal
     if (videoRef.current) {
+      videoPlaybackStateRef.current.currentTime = videoRef.current.currentTime;
       videoRef.current.pause();
       setIsVideoPlaying(false);
     }
@@ -195,71 +255,89 @@ export default function EventDetail() {
 
   const closeVideoModal = useCallback(() => {
     setIsVideoModalOpen(false);
-    // Resume main video with muted autoplay after a short delay
+    
+    // Resume main video with saved state after a short delay
     setTimeout(() => {
       if (videoRef.current) {
-        videoRef.current.muted = true;
-        videoRef.current.play().catch(e => {
-          console.log('Autoplay failed:', e);
-          setIsVideoPlaying(false);
-        });
-        setIsVideoPlaying(true);
-        setIsVideoMuted(true);
+        videoRef.current.muted = videoPlaybackStateRef.current.isMuted;
+        videoRef.current.currentTime = videoPlaybackStateRef.current.currentTime;
+        
+        if (videoPlaybackStateRef.current.isPlaying) {
+          videoRef.current.play().catch(e => {
+            console.log('Autoplay failed:', e);
+            setIsVideoPlaying(false);
+          });
+          setIsVideoPlaying(true);
+        }
+        
+        setIsVideoMuted(videoPlaybackStateRef.current.isMuted);
       }
     }, 100);
   }, []);
-
-  // Handle carousel navigation
-  const nextImage = useCallback(() => {
-    if (event?.images && event.images.length > 0) {
-      setCurrentImageIndex((prev) => (prev + 1) % event.images.length);
-    }
-  }, [event]);
-
-  const prevImage = useCallback(() => {
-    if (event?.images && event.images.length > 0) {
-      setCurrentImageIndex((prev) => (prev - 1 + event.images.length) % event.images.length);
-    }
-  }, [event]);
 
   // Handle video events
   const handleVideoPlay = useCallback(() => {
     setIsVideoPlaying(true);
     setIsVideoEnded(false);
+    videoPlaybackStateRef.current.isPlaying = true;
   }, []);
 
   const handleVideoPause = useCallback(() => {
     setIsVideoPlaying(false);
+    videoPlaybackStateRef.current.isPlaying = false;
   }, []);
 
   const handleVideoEnded = useCallback(() => {
     setIsVideoPlaying(false);
     setIsVideoEnded(true);
+    videoPlaybackStateRef.current.isPlaying = false;
   }, []);
 
-  // Setup main video event listeners
-  useEffect(() => {
+  // Handle fullscreen video events
+  const handleFullscreenVideoPlay = useCallback(() => {
+    setIsFullscreenVideoPlaying(true);
+  }, []);
+
+  const handleFullscreenVideoPause = useCallback(() => {
+    setIsFullscreenVideoPlaying(false);
+  }, []);
+
+  const handleFullscreenVideoEnded = useCallback(() => {
+    setIsFullscreenVideoPlaying(false);
+  }, []);
+
+  // Setup main video for persistent auto-playback
+  const setupMainVideo = useCallback(() => {
     const videoElement = videoRef.current;
-    if (videoElement && event?.mediaType === 'video') {
+    if (videoElement && event?.mediaType === 'video' && event.videos?.length > 0) {
       const handlePlay = () => handleVideoPlay();
       const handlePause = () => handleVideoPause();
       const handleEnded = () => handleVideoEnded();
 
       videoElement.addEventListener('play', handlePlay);
-      videoElement.addEventListener('pause', handlePause);
-      videoElement.addEventListener('ended', handleEnded);
+      videoElement.addEventListener('pause', handleVideoPause);
+      videoElement.addEventListener('ended', handleVideoEnded);
       
-      // Set initial state
-      videoElement.muted = true;
+      // Set initial state for persistent playback
+      videoElement.muted = videoPlaybackStateRef.current.isMuted;
       videoElement.loop = true;
+      videoElement.preload = "auto";
       
-      // Try to autoplay muted
-      const playPromise = videoElement.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.log('Autoplay prevented:', error);
-          setIsVideoPlaying(false);
-        });
+      // Restore saved playback time if exists
+      if (videoPlaybackStateRef.current.currentTime > 0) {
+        videoElement.currentTime = videoPlaybackStateRef.current.currentTime;
+      }
+      
+      // Try to autoplay with saved state
+      if (videoPlaybackStateRef.current.isPlaying) {
+        const playPromise = videoElement.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.log('Autoplay prevented, will retry:', error);
+            // Store that we need to try again when page becomes visible
+            videoPlaybackStateRef.current.isPlaying = true;
+          });
+        }
       }
 
       return () => {
@@ -268,15 +346,15 @@ export default function EventDetail() {
         videoElement.removeEventListener('ended', handleEnded);
       };
     }
-  }, [event?.mediaType, handleVideoPlay, handleVideoPause, handleVideoEnded]);
+  }, [event?.mediaType, event?.videos, handleVideoPlay, handleVideoPause, handleVideoEnded]);
 
-  // Setup fullscreen video event listeners when modal opens
-  useEffect(() => {
+  // Setup fullscreen video when modal opens
+  const setupFullscreenVideo = useCallback(() => {
     const fullscreenVideoElement = fullscreenVideoRef.current;
-    if (fullscreenVideoElement && isVideoModalOpen && event?.mediaType === 'video') {
-      const handlePlay = () => handleVideoPlay();
-      const handlePause = () => handleVideoPause();
-      const handleEnded = () => handleVideoEnded();
+    if (fullscreenVideoElement && isVideoModalOpen && event?.mediaType === 'video' && event.videos?.length > 0) {
+      const handlePlay = () => handleFullscreenVideoPlay();
+      const handlePause = () => handleFullscreenVideoPause();
+      const handleEnded = () => handleFullscreenVideoEnded();
 
       fullscreenVideoElement.addEventListener('play', handlePlay);
       fullscreenVideoElement.addEventListener('pause', handlePause);
@@ -284,14 +362,15 @@ export default function EventDetail() {
       
       // Set initial state for modal video
       fullscreenVideoElement.loop = true;
-      fullscreenVideoElement.muted = isVideoMuted;
+      fullscreenVideoElement.muted = isFullscreenVideoMuted;
+      fullscreenVideoElement.currentTime = videoPlaybackStateRef.current.currentTime;
       
-      // Try to play unmuted in modal
+      // Try to play in modal
       const playPromise = fullscreenVideoElement.play();
       if (playPromise !== undefined) {
         playPromise.catch(error => {
           console.log('Modal autoplay prevented:', error);
-          setIsVideoPlaying(false);
+          setIsFullscreenVideoPlaying(false);
         });
       }
 
@@ -301,7 +380,56 @@ export default function EventDetail() {
         fullscreenVideoElement.removeEventListener('ended', handleEnded);
       };
     }
-  }, [isVideoModalOpen, event?.mediaType, isVideoMuted, handleVideoPlay, handleVideoPause, handleVideoEnded]);
+  }, [isVideoModalOpen, event?.mediaType, event?.videos, isFullscreenVideoMuted, handleFullscreenVideoPlay, handleFullscreenVideoPause, handleFullscreenVideoEnded]);
+
+  // Handle page visibility for persistent video playback
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (videoRef.current && event?.mediaType === 'video') {
+        if (document.hidden) {
+          // Page is hidden, save current time
+          videoPlaybackStateRef.current.currentTime = videoRef.current.currentTime;
+          videoPlaybackStateRef.current.isPlaying = !videoRef.current.paused;
+        } else {
+          // Page is visible again, restore playback
+          if (videoPlaybackStateRef.current.isPlaying) {
+            videoRef.current.currentTime = videoPlaybackStateRef.current.currentTime;
+            videoRef.current.muted = videoPlaybackStateRef.current.isMuted;
+            videoRef.current.play().catch(e => {
+              console.log('Resume playback failed:', e);
+            });
+            setIsVideoPlaying(true);
+          }
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [event?.mediaType]);
+
+  // Setup main video and carousel on mount and when event changes
+  useEffect(() => {
+    if (event?.mediaType === 'video') {
+      setupMainVideo();
+    } else if (event?.mediaType === 'carousel') {
+      startCarouselRotation();
+    }
+    
+    return () => {
+      stopCarouselRotation();
+    };
+  }, [event?.mediaType, event?.videos, event?.images, setupMainVideo, startCarouselRotation, stopCarouselRotation]);
+
+  // Setup fullscreen video when modal opens
+  useEffect(() => {
+    if (isVideoModalOpen && event?.mediaType === 'video') {
+      setupFullscreenVideo();
+    }
+  }, [isVideoModalOpen, event?.mediaType, setupFullscreenVideo]);
 
   // Handle Escape key to close modal
   useEffect(() => {
@@ -556,7 +684,12 @@ export default function EventDetail() {
               muted={isVideoMuted}
               loop
               playsInline
-              preload="metadata"
+              preload="auto"
+              onTimeUpdate={() => {
+                if (videoRef.current) {
+                  videoPlaybackStateRef.current.currentTime = videoRef.current.currentTime;
+                }
+              }}
             />
             
             {/* Video Controls Overlay */}
@@ -639,7 +772,7 @@ export default function EventDetail() {
             </div>
           </div>
         ) : (
-          /* Image Carousel */
+          /* Image Carousel with Auto-rotation */
           <div className="relative w-full h-full">
             {event.images && event.images.length > 0 ? (
               <>
@@ -685,7 +818,11 @@ export default function EventDetail() {
                       {event.images.map((_, index) => (
                         <button
                           key={index}
-                          onClick={() => setCurrentImageIndex(index)}
+                          onClick={() => {
+                            stopCarouselRotation();
+                            setCurrentImageIndex(index);
+                            setTimeout(() => startCarouselRotation(), 3000);
+                          }}
                           className={cn(
                             'w-2 h-2 rounded-full transition-all duration-300 hover:scale-125',
                             index === currentImageIndex 
@@ -1213,9 +1350,14 @@ export default function EventDetail() {
               ref={fullscreenVideoRef}
               src={event.videos[0]}
               className="w-full h-full object-contain"
-              muted={isVideoMuted}
+              muted={isFullscreenVideoMuted}
               loop
               controls={false}
+              onTimeUpdate={() => {
+                if (fullscreenVideoRef.current) {
+                  videoPlaybackStateRef.current.currentTime = fullscreenVideoRef.current.currentTime;
+                }
+              }}
             />
             
             {/* Custom Video Controls */}
@@ -1225,9 +1367,9 @@ export default function EventDetail() {
                   <button
                     onClick={toggleFullscreenVideoPlay}
                     className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all"
-                    aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
+                    aria-label={isFullscreenVideoPlaying ? 'Pause video' : 'Play video'}
                   >
-                    {isVideoPlaying ? (
+                    {isFullscreenVideoPlaying ? (
                       <Pause className="w-6 h-6 text-white" />
                     ) : (
                       <Play className="w-6 h-6 text-white ml-1" />
@@ -1236,9 +1378,9 @@ export default function EventDetail() {
                   <button
                     onClick={toggleFullscreenVideoMute}
                     className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all"
-                    aria-label={isVideoMuted ? 'Unmute video' : 'Mute video'}
+                    aria-label={isFullscreenVideoMuted ? 'Unmute video' : 'Mute video'}
                   >
-                    {isVideoMuted ? (
+                    {isFullscreenVideoMuted ? (
                       <VolumeX className="w-6 h-6 text-white" />
                     ) : (
                       <Volume2 className="w-6 h-6 text-white" />
