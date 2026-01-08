@@ -7,44 +7,51 @@ import { useScrollDirection } from '@/hooks/useScrollDirection';
 import { cn } from '@/lib/utils';
 import { useState, useEffect, useRef } from 'react';
 
-// Design System Structure (matching Connect screen's layout system)
+// Design Constants from JSON
 const DESIGN = {
-  spacing: {
-    screenPadding: '20px',
-    sectionGap: '80px',
-    elementGap: '16px',
-    buttonGap: '12px',
-    containerMaxWidth: '1200px'
-  },
-  heights: {
-    header: '64px',
-    button: '56px',
-    buttonSmall: '44px',
-    card: '400px',
-    carousel: '500px',
-    featureIcon: '56px'
+  colors: {
+    primary: '#C4B5FD',
+    lavenderLight: '#E9D5FF',
+    accentPink: '#FFB8E6',
+    background: '#1A1A1A',
+    card: '#2D2D2D',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#B8B8B8'
   },
   borderRadius: {
-    large: '24px',
-    medium: '16px',
-    small: '12px',
-    round: '50%',
-    pill: '9999px'
+    card: '24px',
+    button: '12px',
+    roundButton: '50%',
+    modalTop: '20px',
+    smallPill: '8px'
   },
   typography: {
-    h1: { size: '56px', weight: 'bold', lineHeight: '1.2' },
-    h2: { size: '40px', weight: 'bold', lineHeight: '1.3' },
-    h3: { size: '32px', weight: 'bold', lineHeight: '1.3' },
-    bodyLarge: { size: '18px', weight: 'normal', lineHeight: '1.5' },
-    body: { size: '16px', weight: 'normal', lineHeight: '1.4' },
-    small: { size: '14px', weight: 'normal', lineHeight: '1.3' },
-    caption: { size: '12px', weight: 'medium', lineHeight: '1.2' }
+    h1: {
+      size: '28px',
+      weight: 'bold'
+    },
+    h2: {
+      size: '24px',
+      weight: 'semibold'
+    },
+    body: {
+      size: '14px',
+      weight: 'normal'
+    },
+    small: {
+      size: '13px',
+      weight: 'medium'
+    },
+    caption: {
+      size: '13px',
+      weight: 'semibold',
+      transform: 'uppercase',
+      tracking: '0.05em'
+    }
   },
-  layout: {
-    headerZIndex: 50,
-    backgroundZIndex: 0,
-    overlayZIndex: 1,
-    contentZIndex: 10
+  spacing: {
+    default: '16px',
+    buttonGap: '12px'
   }
 };
 
@@ -57,9 +64,11 @@ export default function Landing() {
   const carouselRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<NodeJS.Timeout>();
 
+  // Get only 4 featured events
   const featuredEvents = events.filter(e => e.isFeatured).slice(0, 4);
   const isHeaderSolid = scrollY > 50;
 
+  // Features in grid format
   const features = [
     { icon: Calendar, label: 'Discover', description: 'Find events happening near you' },
     { icon: Users, label: 'Match', description: 'Connect with people at events' },
@@ -83,6 +92,7 @@ export default function Landing() {
     };
   }, [isAutoPlaying, featuredEvents.length]);
 
+  // Handle manual slide change
   const goToSlide = (index: number) => {
     setCurrentSlide(index);
     if (isAutoPlaying) {
@@ -110,10 +120,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-black relative overflow-x-hidden">
       {/* Animated ColorBends Background */}
-      <div 
-        className="fixed inset-0"
-        style={{ zIndex: DESIGN.layout.backgroundZIndex }}
-      >
+      <div className="fixed inset-0 z-0">
         <ColorBends
           colors={['#8B5CF6', '#A78BFA', '#7C3AED']}
           rotation={30}
@@ -129,67 +136,51 @@ export default function Landing() {
       </div>
 
       {/* Dark overlay for readability */}
-      <div 
-        className="fixed inset-0 bg-black/50 pointer-events-none"
-        style={{ zIndex: DESIGN.layout.overlayZIndex }}
-      />
+      <div className="fixed inset-0 bg-black/50 pointer-events-none z-[1]" />
 
       {/* Persistent Header */}
       <header
         className={cn(
-          'fixed top-0 left-0 right-0 transition-all duration-300 flex items-center',
+          'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
           isHeaderSolid ? 'bg-black/90 backdrop-blur-xl border-b border-white/10' : 'bg-transparent'
         )}
-        style={{ 
-          height: DESIGN.heights.header,
-          zIndex: DESIGN.layout.headerZIndex
-        }}
       >
-        <div 
-          className="w-full mx-auto flex items-center justify-between"
-          style={{ 
-            maxWidth: DESIGN.spacing.containerMaxWidth,
-            padding: `0 ${DESIGN.spacing.screenPadding}`
-          }}
-        >
-          <div className="flex items-center gap-3">
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-4 h-16 pt-safe">
+          <div className="flex items-center gap-2">
             <div 
-              className="rounded-[12px] flex items-center justify-center gradient-pro"
-              style={{ 
-                width: '36px',
-                height: '36px'
-              }}
+              className="w-8 h-8 rounded-xl gradient-pro flex items-center justify-center"
+              style={{ borderRadius: DESIGN.borderRadius.card }}
             >
-              <Zap className="w-5 h-5 text-white" />
+              <Zap className="w-4 h-4 text-white" />
             </div>
             <span 
-              className="font-bold text-white"
-              style={{ fontSize: '20px' }}
+              className="text-xl font-extrabold"
+              style={{ color: DESIGN.colors.textPrimary }}
             >
               Amps
             </span>
           </div>
-          <div 
-            className="flex items-center"
-            style={{ gap: DESIGN.spacing.buttonGap }}
-          >
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               onClick={() => navigate('/auth?mode=login')}
               className="text-white/80 hover:text-white hover:bg-white/10"
-              style={{ 
-                height: '40px',
-                borderRadius: DESIGN.borderRadius.small
+              size="sm"
+              style={{
+                fontSize: DESIGN.typography.body.size,
+                color: DESIGN.colors.textSecondary
               }}
             >
               Log In
             </Button>
             <Button
               onClick={() => navigate('/auth')}
+              size="sm"
               className="gradient-pro text-white font-semibold"
-              style={{ 
-                height: '40px',
-                borderRadius: DESIGN.borderRadius.small
+              style={{
+                fontSize: DESIGN.typography.body.size,
+                background: DESIGN.colors.primary,
+                borderRadius: DESIGN.borderRadius.button
               }}
             >
               Sign Up
@@ -199,52 +190,33 @@ export default function Landing() {
       </header>
 
       {/* Main Content */}
-      <div style={{ zIndex: DESIGN.layout.contentZIndex }}>
+      <div className="relative z-10">
         {/* Hero Section */}
-        <section 
-          className="flex flex-col items-center justify-center"
-          style={{ 
-            minHeight: `calc(100vh - ${DESIGN.heights.header})`,
-            padding: `80px ${DESIGN.spacing.screenPadding}`
-          }}
-        >
-          <div 
-            className="w-full mx-auto text-center"
-            style={{ maxWidth: '800px' }}
-          >
+        <section className="min-h-[85vh] flex flex-col items-center justify-center px-4 pt-12 pb-8">
+          <div className="text-center max-w-2xl mx-auto px-4">
             <h1 
-              className="font-extrabold leading-tight mb-6 tracking-tight text-white"
-              style={{ 
-                fontSize: DESIGN.typography.h1.size,
-                lineHeight: DESIGN.typography.h1.lineHeight
-              }}
+              className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-tight mb-4 tracking-tight"
+              style={{ color: DESIGN.colors.textPrimary }}
             >
               Real events.
               <br />
               <span className="gradient-text">Real connections.</span>
             </h1>
             <p 
-              className="text-white/70 mb-10 leading-relaxed"
-              style={{ 
-                fontSize: DESIGN.typography.bodyLarge.size,
-                lineHeight: DESIGN.typography.bodyLarge.lineHeight
-              }}
+              className="text-white/70 text-base sm:text-lg md:text-xl mb-8 leading-relaxed max-w-xl mx-auto"
+              style={{ color: DESIGN.colors.textSecondary }}
             >
               Discover events near you. Meet people. Connect instantly.
             </p>
 
             {/* CTA Buttons */}
-            <div 
-              className="flex flex-col max-w-[400px] mx-auto mb-12"
-              style={{ gap: DESIGN.spacing.elementGap }}
-            >
+            <div className="space-y-3 mb-8 max-w-sm mx-auto">
               <Button
                 onClick={() => navigate('/auth')}
-                className="font-semibold gradient-pro glow-purple hover:opacity-90 transition-all"
-                style={{ 
-                  height: DESIGN.heights.button,
-                  borderRadius: DESIGN.borderRadius.small,
-                  fontSize: DESIGN.typography.body.size
+                className="w-full h-12 text-base font-semibold gradient-pro glow-purple hover:opacity-90 transition-all"
+                style={{
+                  borderRadius: DESIGN.borderRadius.button,
+                  background: DESIGN.colors.primary
                 }}
               >
                 Get Started
@@ -252,11 +224,11 @@ export default function Landing() {
               <Button
                 onClick={() => navigate('/auth?mode=login')}
                 variant="outline"
-                className="font-semibold border-white/30 bg-white/5 backdrop-blur-sm text-white hover:bg-white/10 hover:border-primary transition-all"
-                style={{ 
-                  height: DESIGN.heights.button,
-                  borderRadius: DESIGN.borderRadius.small,
-                  fontSize: DESIGN.typography.body.size
+                className="w-full h-12 text-base font-semibold border-white/30 bg-white/5 backdrop-blur-sm text-white hover:bg-white/10 hover:border-primary transition-all"
+                style={{
+                  borderRadius: DESIGN.borderRadius.button,
+                  color: DESIGN.colors.textPrimary,
+                  borderColor: `${DESIGN.colors.textSecondary}30`
                 }}
               >
                 I already have an account
@@ -265,77 +237,58 @@ export default function Landing() {
           </div>
 
           {/* Scroll Indicator */}
-          <div className="absolute animate-bounce" style={{ bottom: '32px' }}>
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 animate-bounce">
             <div 
-              className="rounded-full border-2 border-white/30 flex items-start justify-center p-2"
-              style={{ 
-                width: '24px',
-                height: '40px'
-              }}
+              className="w-6 h-10 rounded-full border-2 flex items-start justify-center p-2"
+              style={{ borderColor: `${DESIGN.colors.textSecondary}30` }}
             >
-              <div className="w-1.5 h-3 rounded-full bg-white/50 animate-pulse" />
+              <div 
+                className="w-1.5 h-3 rounded-full"
+                style={{ background: `${DESIGN.colors.textSecondary}50` }}
+              />
             </div>
           </div>
         </section>
 
-        {/* How Amps Works */}
-        <section 
-          className="px-5"
-          style={{ 
-            paddingTop: DESIGN.spacing.sectionGap,
-            paddingBottom: DESIGN.spacing.sectionGap
-          }}
-        >
-          <div 
-            className="mx-auto"
-            style={{ maxWidth: DESIGN.spacing.containerMaxWidth }}
-          >
+        {/* How Amps Works - Grid format */}
+        <section className="py-10 px-4">
+          <div className="max-w-6xl mx-auto">
             <h2 
-              className="font-bold text-white text-center mb-12"
-              style={{ 
-                fontSize: DESIGN.typography.h2.size,
-                lineHeight: DESIGN.typography.h2.lineHeight
-              }}
+              className="text-2xl sm:text-3xl font-bold text-center mb-6"
+              style={{ color: DESIGN.colors.textPrimary }}
             >
               How Amps Works
             </h2>
             
-            {/* Features Grid */}
-            <div 
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5"
-              style={{ gap: DESIGN.spacing.elementGap }}
-            >
+            {/* Grid layout for features */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               {features.map(({ icon: Icon, label, description }, index) => (
                 <div
                   key={label}
                   className={cn(
-                    "glass-card p-5 flex flex-col items-center text-center hover:border-primary transition-all",
-                    "bg-white/5 backdrop-blur-xl border border-white/10",
+                    "glass-card p-4 flex flex-col items-center gap-3 hover:border-primary transition-all text-center bg-white/5 backdrop-blur-xl border border-white/10",
                     index === 4 ? "sm:col-span-2 lg:col-span-1 lg:col-start-3" : ""
                   )}
                   style={{ 
-                    borderRadius: DESIGN.borderRadius.medium,
-                    gap: '16px'
+                    borderRadius: DESIGN.borderRadius.card,
+                    borderColor: `${DESIGN.colors.textSecondary}10`
                   }}
                 >
                   <div 
-                    className="rounded-[16px] bg-primary/20 flex items-center justify-center"
-                    style={{ 
-                      width: DESIGN.heights.featureIcon,
-                      height: DESIGN.heights.featureIcon
-                    }}
+                    className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center"
+                    style={{ borderRadius: DESIGN.borderRadius.card }}
                   >
-                    <Icon className="w-7 h-7 text-primary" />
+                    <Icon className="w-6 h-6" style={{ color: DESIGN.colors.primary }} />
                   </div>
                   <span 
-                    className="font-bold text-white"
-                    style={{ fontSize: DESIGN.typography.small.size }}
+                    className="text-sm font-bold"
+                    style={{ color: DESIGN.colors.textPrimary }}
                   >
                     {label}
                   </span>
                   <span 
-                    className="text-white/60 leading-relaxed"
-                    style={{ fontSize: DESIGN.typography.caption.size }}
+                    className="text-xs text-white/60 leading-relaxed"
+                    style={{ color: DESIGN.colors.textSecondary }}
                   >
                     {description}
                   </span>
@@ -345,58 +298,48 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* Featured Events */}
+        {/* Featured Events - Carousel format */}
         {featuredEvents.length > 0 && (
-          <section 
-            className="px-5"
-            style={{ 
-              paddingTop: DESIGN.spacing.sectionGap,
-              paddingBottom: DESIGN.spacing.sectionGap
-            }}
-          >
-            <div 
-              className="mx-auto"
-              style={{ maxWidth: DESIGN.spacing.containerMaxWidth }}
-            >
-              {/* Section Header */}
-              <div 
-                className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-12"
-                style={{ gap: DESIGN.spacing.elementGap }}
-              >
-                <div>
+          <section className="py-12 px-4">
+            <div className="max-w-6xl mx-auto">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
+                <div className="mb-4 sm:mb-0">
                   <h2 
-                    className="font-bold text-white mb-2"
-                    style={{ fontSize: DESIGN.typography.h3.size }}
+                    className="text-2xl font-bold"
+                    style={{ color: DESIGN.colors.textPrimary }}
                   >
                     Featured Events
                   </h2>
                   <p 
-                    className="text-white/60"
-                    style={{ fontSize: DESIGN.typography.small.size }}
+                    className="text-white/60 mt-1"
+                    style={{ 
+                      color: DESIGN.colors.textSecondary,
+                      fontSize: DESIGN.typography.body.size
+                    }}
                   >
                     Discover what's happening
                   </p>
                 </div>
                 <button 
                   onClick={() => navigate('/events')}
-                  className="text-primary font-medium flex items-center gap-1 hover:underline"
-                  style={{ fontSize: DESIGN.typography.small.size }}
+                  className="text-primary text-sm font-medium flex items-center gap-1 hover:underline"
+                  style={{ 
+                    color: DESIGN.colors.primary,
+                    fontSize: DESIGN.typography.body.size
+                  }}
                 >
                   See All <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Carousel */}
+              {/* Carousel Container */}
               <div 
                 ref={carouselRef}
                 className="relative overflow-hidden"
-                style={{ borderRadius: DESIGN.borderRadius.large }}
+                style={{ borderRadius: DESIGN.borderRadius.card }}
               >
                 {/* Carousel Slides */}
-                <div 
-                  className="relative"
-                  style={{ height: DESIGN.heights.carousel }}
-                >
+                <div className="relative h-[400px]">
                   {featuredEvents.slice(0, 3).map((event, index) => (
                     <div
                       key={event.id}
@@ -421,50 +364,46 @@ export default function Landing() {
                         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent" />
                         
                         {/* Featured Badge */}
-                        <div className="absolute top-6 left-6">
+                        <div className="absolute top-4 left-4">
                           <span 
-                            className="px-3 py-1.5 bg-primary/90 text-white font-semibold rounded-full"
-                            style={{ fontSize: DESIGN.typography.small.size }}
+                            className="px-3 py-1.5 text-xs font-semibold rounded-full"
+                            style={{ 
+                              background: DESIGN.colors.primary,
+                              color: DESIGN.colors.background,
+                              borderRadius: DESIGN.borderRadius.roundButton,
+                              fontSize: DESIGN.typography.small.size
+                            }}
                           >
                             Featured
                           </span>
                         </div>
                         
                         {/* Event Info */}
-                        <div 
-                          className="absolute bottom-0 left-0 right-0 p-8"
-                          style={{ padding: '32px' }}
-                        >
+                        <div className="absolute bottom-0 left-0 right-0 p-4">
                           <h3 
-                            className="text-white font-bold mb-3 line-clamp-1"
-                            style={{ fontSize: DESIGN.typography.h3.size }}
+                            className="text-white font-bold text-xl mb-2 line-clamp-1"
+                            style={{ color: DESIGN.colors.textPrimary }}
                           >
                             {event.name}
                           </h3>
-                          <div 
-                            className="flex flex-col sm:flex-row sm:items-center"
-                            style={{ gap: '24px' }}
-                          >
-                            <span 
-                              className="flex items-center gap-2 text-white/80"
-                              style={{ fontSize: DESIGN.typography.small.size }}
-                            >
-                              <Calendar className="w-5 h-5" />
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-white/80 text-sm">
+                            <span className="flex items-center gap-2">
+                              <Calendar className="w-4 h-4" />
                               {new Date(event.date).toLocaleDateString('en-US', { 
                                 month: 'short', 
                                 day: 'numeric',
                                 year: 'numeric'
                               })}
                             </span>
-                            <span 
-                              className="flex items-center gap-2 text-white/80"
-                              style={{ fontSize: DESIGN.typography.small.size }}
-                            >
-                              <MapPin className="w-5 h-5" />
+                            <span className="flex items-center gap-2">
+                              <MapPin className="w-4 h-4" />
                               {event.location.split(',')[0]}
                             </span>
                             {event.price > 0 && (
-                              <span className="text-white font-semibold">
+                              <span 
+                                className="text-white font-semibold"
+                                style={{ color: DESIGN.colors.textPrimary }}
+                              >
                                 N${event.price}
                               </span>
                             )}
@@ -476,17 +415,17 @@ export default function Landing() {
                 </div>
 
                 {/* Carousel Controls */}
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2">
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
                   {/* Previous Button */}
                   <button
                     onClick={prevSlide}
-                    className="rounded-full bg-black/60 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-black/80 transition-all"
+                    className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-black/80 transition-all"
                     style={{ 
-                      width: '40px',
-                      height: '40px'
+                      borderRadius: DESIGN.borderRadius.roundButton,
+                      borderColor: `${DESIGN.colors.textSecondary}20`
                     }}
                   >
-                    <ChevronRight className="w-5 h-5 rotate-180" />
+                    <ChevronRight className="w-4 h-4 rotate-180" />
                   </button>
 
                   {/* Dots Navigation */}
@@ -496,16 +435,13 @@ export default function Landing() {
                         key={index}
                         onClick={() => goToSlide(index)}
                         className={cn(
-                          "rounded-full transition-all duration-300",
+                          "w-2 h-2 rounded-full transition-all duration-300",
                           index === currentSlide
-                            ? "bg-primary"
+                            ? "bg-primary w-4"
                             : "bg-white/40 hover:bg-white/60"
                         )}
-                        style={{
-                          width: index === currentSlide ? '24px' : '8px',
-                          height: '8px'
-                        }}
                         aria-label={`Go to slide ${index + 1}`}
+                        style={{ borderRadius: DESIGN.borderRadius.roundButton }}
                       />
                     ))}
                   </div>
@@ -513,13 +449,13 @@ export default function Landing() {
                   {/* Next Button */}
                   <button
                     onClick={nextSlide}
-                    className="rounded-full bg-black/60 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-black/80 transition-all"
+                    className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-black/80 transition-all"
                     style={{ 
-                      width: '40px',
-                      height: '40px'
+                      borderRadius: DESIGN.borderRadius.roundButton,
+                      borderColor: `${DESIGN.colors.textSecondary}20`
                     }}
                   >
-                    <ChevronRight className="w-5 h-5" />
+                    <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -528,38 +464,29 @@ export default function Landing() {
         )}
 
         {/* Footer CTA */}
-        <section 
-          className="text-center px-5"
-          style={{ 
-            paddingTop: DESIGN.spacing.sectionGap,
-            paddingBottom: DESIGN.spacing.sectionGap
-          }}
-        >
-          <div 
-            className="mx-auto"
-            style={{ maxWidth: '800px' }}
-          >
+        <section className="py-12 px-4 text-center">
+          <div className="max-w-4xl mx-auto">
             <h2 
-              className="font-bold text-white mb-4"
-              style={{ fontSize: DESIGN.typography.h2.size }}
+              className="text-2xl font-bold mb-4"
+              style={{ color: DESIGN.colors.textPrimary }}
             >
               Ready to connect?
             </h2>
             <p 
-              className="text-white/60 mb-8"
-              style={{ fontSize: DESIGN.typography.body.size }}
+              className="text-white/60 mb-6"
+              style={{ 
+                color: DESIGN.colors.textSecondary,
+                fontSize: DESIGN.typography.body.size
+              }}
             >
               Join 10,000+ people connecting at events
             </p>
             <Button
               onClick={() => navigate('/auth')}
-              className="font-semibold gradient-pro glow-purple"
-              style={{ 
-                height: DESIGN.heights.button,
-                borderRadius: DESIGN.borderRadius.small,
-                fontSize: DESIGN.typography.body.size,
-                paddingLeft: '40px',
-                paddingRight: '40px'
+              className="h-12 px-8 text-base font-semibold gradient-pro glow-purple"
+              style={{
+                borderRadius: DESIGN.borderRadius.button,
+                background: DESIGN.colors.primary
               }}
             >
               Get Started Free
@@ -568,41 +495,31 @@ export default function Landing() {
         </section>
 
         {/* Footer */}
-        <footer 
-          className="border-t border-white/10 px-5"
-          style={{ 
-            paddingTop: '40px',
-            paddingBottom: '40px'
-          }}
-        >
-          <div 
-            className="mx-auto"
-            style={{ maxWidth: DESIGN.spacing.containerMaxWidth }}
-          >
-            <div 
-              className="flex items-center justify-center gap-3 mb-6"
-              style={{ gap: '12px' }}
-            >
+        <footer className="py-8 px-4 border-t border-white/10">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-center justify-center gap-2 mb-4">
               <div 
-                className="rounded-[12px] gradient-pro flex items-center justify-center"
-                style={{ 
-                  width: '32px',
-                  height: '32px'
-                }}
+                className="w-8 h-8 rounded-lg gradient-pro flex items-center justify-center"
+                style={{ borderRadius: DESIGN.borderRadius.button }}
               >
                 <Zap className="w-4 h-4 text-white" />
               </div>
-              <span className="text-lg font-bold text-white">Amps</span>
+              <span 
+                className="text-lg font-bold"
+                style={{ color: DESIGN.colors.textPrimary }}
+              >
+                Amps
+              </span>
             </div>
             <p 
-              className="text-center mb-4 text-white/40"
-              style={{ fontSize: DESIGN.typography.caption.size }}
+              className="text-center text-xs mb-4"
+              style={{ color: `${DESIGN.colors.textSecondary}40` }}
             >
               By continuing, you agree to our Terms of Service and Privacy Policy
             </p>
             <p 
-              className="text-center text-white/30"
-              style={{ fontSize: DESIGN.typography.caption.size }}
+              className="text-center text-xs"
+              style={{ color: `${DESIGN.colors.textSecondary}30` }}
             >
               © 2025 Amps. All rights reserved. Made with ❤️ in Namibia
             </p>
