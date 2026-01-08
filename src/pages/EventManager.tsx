@@ -27,14 +27,14 @@ import {
   Loader2,
   Film,
   Grid3x3,
-  Heart
+  Upload,
+  Link,
+  ToggleLeft,
+  ToggleRight
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Event } from '@/lib/types';
 import QRCode from 'qrcode';
@@ -58,7 +58,8 @@ const DESIGN = {
     default: '16px',
     cardPadding: '16px',
     buttonGap: '12px',
-    modalPadding: '20px'
+    modalPadding: '20px',
+    modalFooterHeight: '72px' // Height for sticky footer buttons
   },
   borderRadius: {
     card: '24px',
@@ -77,12 +78,52 @@ const DESIGN = {
 
 type Tab = 'events' | 'attendees' | 'analytics' | 'messages' | 'settings';
 
+// Toggle Switch Component
+interface ToggleSwitchProps {
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+  label?: string;
+}
+
+function ToggleSwitch({ enabled, onChange, label }: ToggleSwitchProps) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      {label && <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>{label}</span>}
+      <button
+        type="button"
+        onClick={() => onChange(!enabled)}
+        style={{
+          width: '44px',
+          height: '24px',
+          borderRadius: '12px',
+          background: enabled ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)',
+          position: 'relative',
+          border: 'none',
+          cursor: 'pointer',
+          transition: 'background 0.2s'
+        }}
+      >
+        <div style={{
+          position: 'absolute',
+          top: '2px',
+          left: enabled ? '22px' : '2px',
+          width: '20px',
+          height: '20px',
+          background: DESIGN.colors.textPrimary,
+          borderRadius: '50%',
+          transition: 'left 0.2s'
+        }} />
+      </button>
+    </div>
+  );
+}
+
 // Modal Components
 interface EditEventModalProps {
   isOpen: boolean;
   onClose: () => void;
   event: Event;
-  onSave: (updatedEvent: Partial<Event>) => void;
+  onSave: (updatedEvent: Partial<Event>) => Promise<void>;
 }
 
 function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps) {
@@ -98,8 +139,12 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
     geofenceRadius: event.geofenceRadius,
     mediaType: event.mediaType,
   });
+  
+  const [uploadedFiles, setUploadedFiles] = useState<string[]>(event.images || []);
+  const [activeTab, setActiveTab] = useState<'details' | 'media'>('details');
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (event) {
@@ -115,8 +160,33 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
         geofenceRadius: event.geofenceRadius,
         mediaType: event.mediaType,
       });
+      setUploadedFiles(event.images || []);
     }
   }, [event]);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newFiles: string[] = [];
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          newFiles.push(e.target.result as string);
+          if (newFiles.length === files.length) {
+            setUploadedFiles(prev => [...prev, ...newFiles]);
+            toast({ title: 'Success', description: `${files.length} files uploaded` });
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleSave = async () => {
     if (!formData.name.trim()) {
@@ -126,7 +196,11 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
     
     setIsSaving(true);
     try {
-      await onSave(formData);
+      await onSave({
+        ...formData,
+        images: uploadedFiles,
+        coverImage: uploadedFiles[0] || event.coverImage
+      });
       toast({ title: 'Success', description: 'Event updated successfully' });
       onClose();
     } catch (error) {
@@ -150,18 +224,20 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
         width: '100%',
         maxWidth: '512px',
         maxHeight: '90vh',
-        overflowY: 'auto',
-        border: '1px solid rgba(255, 255, 255, 0.1)'
+        overflow: 'hidden',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        display: 'flex',
+        flexDirection: 'column'
       }}>
+        {/* Header */}
         <div style={{
-          position: 'sticky',
-          top: 0,
           background: DESIGN.colors.card,
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
           padding: DESIGN.spacing.default,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          flexShrink: 0
         }}>
           <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: DESIGN.colors.textPrimary }}>Edit Event</h2>
           <button 
@@ -173,251 +249,416 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
               background: 'rgba(255, 255, 255, 0.1)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              border: 'none',
+              cursor: 'pointer'
             }}
           >
             <X className="w-4 h-4" style={{ color: DESIGN.colors.textPrimary }} />
           </button>
         </div>
-        
-        <div style={{ padding: DESIGN.spacing.default, display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div>
-            <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
-              Event Name
-            </label>
-            <input 
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Enter event name"
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: DESIGN.colors.background,
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: DESIGN.borderRadius.button,
-                color: DESIGN.colors.textPrimary,
-                fontSize: '15px'
-              }}
-            />
-          </div>
-          
-          <div>
-            <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
-              Description
-            </label>
-            <textarea 
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Enter event description"
-              rows={3}
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: DESIGN.colors.background,
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: DESIGN.borderRadius.button,
-                color: DESIGN.colors.textPrimary,
-                fontSize: '15px',
-                resize: 'vertical',
-                fontFamily: 'inherit'
-              }}
-            />
-          </div>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
-                Date
-              </label>
-              <input 
-                type="date"
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  background: DESIGN.colors.background,
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: DESIGN.borderRadius.button,
-                  color: DESIGN.colors.textPrimary,
-                  fontSize: '15px'
-                }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
-                Time
-              </label>
-              <input 
-                type="time"
-                value={formData.time}
-                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  background: DESIGN.colors.background,
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: DESIGN.borderRadius.button,
-                  color: DESIGN.colors.textPrimary,
-                  fontSize: '15px'
-                }}
-              />
-            </div>
-          </div>
-          
-          <div>
-            <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
-              Venue Name
-            </label>
-            <input 
-              value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              placeholder="Enter venue name"
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: DESIGN.colors.background,
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: DESIGN.borderRadius.button,
-                color: DESIGN.colors.textPrimary,
-                fontSize: '15px'
-              }}
-            />
-          </div>
-          
-          <div>
-            <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
-              Address
-            </label>
-            <input 
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              placeholder="Enter full address"
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: DESIGN.colors.background,
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: DESIGN.borderRadius.button,
-                color: DESIGN.colors.textPrimary,
-                fontSize: '15px'
-              }}
-            />
-          </div>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
-                Price (NAD)
-              </label>
-              <input 
-                type="number"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                placeholder="0"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  background: DESIGN.colors.background,
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: DESIGN.borderRadius.button,
-                  color: DESIGN.colors.textPrimary,
-                  fontSize: '15px'
-                }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
-                Max Attendees
-              </label>
-              <input 
-                type="number"
-                value={formData.maxAttendees}
-                onChange={(e) => setFormData({ ...formData, maxAttendees: parseInt(e.target.value) || 100 })}
-                placeholder="100"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  background: DESIGN.colors.background,
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: DESIGN.borderRadius.button,
-                  color: DESIGN.colors.textPrimary,
-                  fontSize: '15px'
-                }}
-              />
-            </div>
-          </div>
-          
-          <div>
-            <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
-              Check-in Radius (meters)
-            </label>
-            <input 
-              type="number"
-              value={formData.geofenceRadius}
-              onChange={(e) => setFormData({ ...formData, geofenceRadius: parseInt(e.target.value) || 50 })}
-              placeholder="50"
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: DESIGN.colors.background,
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: DESIGN.borderRadius.button,
-                color: DESIGN.colors.textPrimary,
-                fontSize: '15px'
-              }}
-            />
-            <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>
-              Users must be within this radius to check in
-            </p>
-          </div>
 
-          <div>
-            <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', display: 'block', color: DESIGN.colors.textPrimary }}>
-              Media Type
-            </label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={() => setFormData({ ...formData, mediaType: 'carousel' })}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  border: `1px solid ${formData.mediaType === 'carousel' ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)'}`,
-                  borderRadius: DESIGN.borderRadius.button,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: formData.mediaType === 'carousel' ? `${DESIGN.colors.primary}20` : 'transparent'
-                }}
-              >
-                <Grid3x3 className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
-                <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>Carousel</span>
-              </button>
-              <button
-                onClick={() => setFormData({ ...formData, mediaType: 'video' })}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  border: `1px solid ${formData.mediaType === 'video' ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)'}`,
-                  borderRadius: DESIGN.borderRadius.button,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: formData.mediaType === 'video' ? `${DESIGN.colors.primary}20` : 'transparent'
-                }}
-              >
-                <Film className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
-                <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>Video</span>
-              </button>
-            </div>
-            <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>
-              Display type on event details page
-            </p>
-          </div>
+        {/* Tabs */}
+        <div style={{
+          display: 'flex',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          flexShrink: 0
+        }}>
+          {(['details', 'media'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                flex: 1,
+                padding: '12px',
+                fontSize: '14px',
+                fontWeight: '500',
+                background: activeTab === tab ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                color: DESIGN.colors.textPrimary,
+                border: 'none',
+                cursor: 'pointer',
+                textTransform: 'capitalize'
+              }}
+            >
+              {tab === 'details' ? 'Event Details' : 'Media'}
+            </button>
+          ))}
         </div>
-        
+
+        {/* Scrollable Content */}
+        <div 
+          ref={contentRef}
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: DESIGN.spacing.default,
+            paddingBottom: `calc(${DESIGN.spacing.modalFooterHeight} + ${DESIGN.spacing.default})`
+          }}
+        >
+          {activeTab === 'details' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                  Event Name *
+                </label>
+                <input 
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Enter event name"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: DESIGN.colors.background,
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: DESIGN.borderRadius.button,
+                    color: DESIGN.colors.textPrimary,
+                    fontSize: '15px'
+                  }}
+                />
+              </div>
+              
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                  Description
+                </label>
+                <textarea 
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Enter event description"
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: DESIGN.colors.background,
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: DESIGN.borderRadius.button,
+                    color: DESIGN.colors.textPrimary,
+                    fontSize: '15px',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                    Date *
+                  </label>
+                  <input 
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      background: DESIGN.colors.background,
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: DESIGN.borderRadius.button,
+                      color: DESIGN.colors.textPrimary,
+                      fontSize: '15px'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                    Time *
+                  </label>
+                  <input 
+                    type="time"
+                    value={formData.time}
+                    onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      background: DESIGN.colors.background,
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: DESIGN.borderRadius.button,
+                      color: DESIGN.colors.textPrimary,
+                      fontSize: '15px'
+                    }}
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                  Venue Name
+                </label>
+                <input 
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  placeholder="Enter venue name"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: DESIGN.colors.background,
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: DESIGN.borderRadius.button,
+                    color: DESIGN.colors.textPrimary,
+                    fontSize: '15px'
+                  }}
+                />
+              </div>
+              
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                  Address
+                </label>
+                <input 
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  placeholder="Enter full address"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: DESIGN.colors.background,
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: DESIGN.borderRadius.button,
+                    color: DESIGN.colors.textPrimary,
+                    fontSize: '15px'
+                  }}
+                />
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                    Price (NAD)
+                  </label>
+                  <input 
+                    type="number"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                    placeholder="0"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      background: DESIGN.colors.background,
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: DESIGN.borderRadius.button,
+                      color: DESIGN.colors.textPrimary,
+                      fontSize: '15px'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                    Max Attendees
+                  </label>
+                  <input 
+                    type="number"
+                    value={formData.maxAttendees}
+                    onChange={(e) => setFormData({ ...formData, maxAttendees: parseInt(e.target.value) || 100 })}
+                    placeholder="100"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      background: DESIGN.colors.background,
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: DESIGN.borderRadius.button,
+                      color: DESIGN.colors.textPrimary,
+                      fontSize: '15px'
+                    }}
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                  Check-in Radius (meters) *
+                </label>
+                <input 
+                  type="number"
+                  value={formData.geofenceRadius}
+                  onChange={(e) => setFormData({ ...formData, geofenceRadius: parseInt(e.target.value) || 50 })}
+                  placeholder="50"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: DESIGN.colors.background,
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: DESIGN.borderRadius.button,
+                    color: DESIGN.colors.textPrimary,
+                    fontSize: '15px'
+                  }}
+                />
+                <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>
+                  Users must be within this radius to check in
+                </p>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                  Media Type *
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => setFormData({ ...formData, mediaType: 'carousel' })}
+                    type="button"
+                    style={{
+                      flex: 1,
+                      padding: '12px',
+                      border: `1px solid ${formData.mediaType === 'carousel' ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)'}`,
+                      borderRadius: DESIGN.borderRadius.button,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: formData.mediaType === 'carousel' ? `${DESIGN.colors.primary}20` : 'transparent',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Grid3x3 className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
+                    <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>Carousel</span>
+                  </button>
+                  <button
+                    onClick={() => setFormData({ ...formData, mediaType: 'video' })}
+                    type="button"
+                    style={{
+                      flex: 1,
+                      padding: '12px',
+                      border: `1px solid ${formData.mediaType === 'video' ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)'}`,
+                      borderRadius: DESIGN.borderRadius.button,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: formData.mediaType === 'video' ? `${DESIGN.colors.primary}20` : 'transparent',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Film className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
+                    <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>Video</span>
+                  </button>
+                </div>
+                <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>
+                  Display type on event details page
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                  Upload {formData.mediaType === 'video' ? 'Video' : 'Images'}
+                </label>
+                <div
+                  onClick={() => document.getElementById('file-upload')?.click()}
+                  style={{
+                    width: '100%',
+                    padding: '24px',
+                    border: '2px dashed rgba(255, 255, 255, 0.2)',
+                    borderRadius: DESIGN.borderRadius.button,
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.2s'
+                  }}
+                >
+                  <Upload className="w-8 h-8" style={{ color: DESIGN.colors.textSecondary }} />
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '14px', color: DESIGN.colors.textPrimary, marginBottom: '4px' }}>
+                      Click to upload or drag and drop
+                    </p>
+                    <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
+                      {formData.mediaType === 'video' 
+                        ? 'MP4, MOV up to 100MB' 
+                        : 'JPG, PNG up to 10MB each'
+                      }
+                    </p>
+                  </div>
+                </div>
+                <input
+                  id="file-upload"
+                  type="file"
+                  accept={formData.mediaType === 'video' ? 'video/*' : 'image/*'}
+                  multiple={formData.mediaType !== 'video'}
+                  onChange={handleFileUpload}
+                  style={{ display: 'none' }}
+                />
+              </div>
+
+              {uploadedFiles.length > 0 && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <label style={{ fontSize: '14px', fontWeight: '500', color: DESIGN.colors.textPrimary }}>
+                      Uploaded Files ({uploadedFiles.length})
+                    </label>
+                    <button
+                      onClick={() => setUploadedFiles([])}
+                      type="button"
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        color: DESIGN.colors.danger,
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {uploadedFiles.map((file, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '12px',
+                          background: DESIGN.colors.background,
+                          borderRadius: DESIGN.borderRadius.button,
+                          border: '1px solid rgba(255, 255, 255, 0.1)'
+                        }}
+                      >
+                        {formData.mediaType === 'video' ? (
+                          <Film className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+                        ) : (
+                          <ImageIcon className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+                        )}
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontSize: '13px', color: DESIGN.colors.textPrimary }}>
+                            {formData.mediaType === 'video' ? `Video ${index + 1}` : `Image ${index + 1}`}
+                          </p>
+                          <p style={{ fontSize: '11px', color: DESIGN.colors.textSecondary }}>
+                            {index === 0 ? 'Main Cover' : 'Gallery'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveFile(index)}
+                          type="button"
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: DESIGN.borderRadius.roundButton,
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <X className="w-4 h-4" style={{ color: DESIGN.colors.textPrimary }} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Sticky Footer Buttons */}
         <div style={{
           position: 'sticky',
           bottom: 0,
@@ -425,7 +666,10 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
           borderTop: '1px solid rgba(255, 255, 255, 0.1)',
           padding: DESIGN.spacing.default,
           display: 'flex',
-          gap: '12px'
+          gap: '12px',
+          height: DESIGN.spacing.modalFooterHeight,
+          alignItems: 'center',
+          flexShrink: 0
         }}>
           <button
             onClick={onClose}
@@ -437,7 +681,8 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
               background: 'transparent',
               color: DESIGN.colors.textPrimary,
               fontSize: '15px',
-              fontWeight: '500'
+              fontWeight: '500',
+              cursor: 'pointer'
             }}
           >
             Cancel
@@ -455,6 +700,7 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
               fontSize: '15px',
               fontWeight: '500',
               opacity: isSaving ? 0.7 : 1,
+              cursor: isSaving ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -480,7 +726,6 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(true);
   const { toast } = useToast();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (isOpen && event) {
@@ -565,15 +810,20 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
         borderRadius: DESIGN.borderRadius.card,
         width: '100%',
         maxWidth: '384px',
-        overflow: 'hidden',
-        border: '1px solid rgba(255, 255, 255, 0.1)'
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        display: 'flex',
+        flexDirection: 'column'
       }}>
+        {/* Header */}
         <div style={{
           padding: DESIGN.spacing.default,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          flexShrink: 0
         }}>
           <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: DESIGN.colors.textPrimary }}>Event QR Code</h2>
           <button 
@@ -585,14 +835,22 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
               background: 'rgba(255, 255, 255, 0.1)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              border: 'none',
+              cursor: 'pointer'
             }}
           >
             <X className="w-4 h-4" style={{ color: DESIGN.colors.textPrimary }} />
           </button>
         </div>
         
-        <div style={{ padding: '24px' }}>
+        {/* Scrollable Content */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '24px',
+          paddingBottom: `calc(${DESIGN.spacing.modalFooterHeight} + 24px)`
+        }}>
           <div style={{
             background: '#FFFFFF',
             borderRadius: DESIGN.borderRadius.cardInner,
@@ -645,54 +903,70 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
                   borderRadius: DESIGN.borderRadius.button,
                   background: 'transparent',
                   color: DESIGN.colors.textPrimary,
-                  transition: 'background 0.2s'
+                  transition: 'background 0.2s',
+                  border: 'none',
+                  cursor: 'pointer'
                 }}
               >
                 <Copy className="w-4 h-4" />
               </button>
             </div>
           </div>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <button
-              onClick={shareQRCode}
-              style={{
-                padding: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                borderRadius: DESIGN.borderRadius.button,
-                background: 'transparent',
-                color: DESIGN.colors.textPrimary,
-                fontSize: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              <Share2 className="w-4 h-4" />
-              Share
-            </button>
-            <button
-              onClick={downloadQRCode}
-              disabled={!qrCodeDataUrl}
-              style={{
-                padding: '12px',
-                border: 'none',
-                borderRadius: DESIGN.borderRadius.button,
-                background: DESIGN.colors.primary,
-                color: DESIGN.colors.background,
-                fontSize: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                opacity: !qrCodeDataUrl ? 0.5 : 1
-              }}
-            >
-              <Download className="w-4 h-4" />
-              Download
-            </button>
-          </div>
+        </div>
+
+        {/* Footer Buttons */}
+        <div style={{
+          position: 'sticky',
+          bottom: 0,
+          background: DESIGN.colors.card,
+          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+          padding: '16px 24px',
+          display: 'flex',
+          gap: '12px',
+          flexShrink: 0
+        }}>
+          <button
+            onClick={shareQRCode}
+            style={{
+              flex: 1,
+              padding: '12px',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: DESIGN.borderRadius.button,
+              background: 'transparent',
+              color: DESIGN.colors.textPrimary,
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              cursor: 'pointer'
+            }}
+          >
+            <Share2 className="w-4 h-4" />
+            Share
+          </button>
+          <button
+            onClick={downloadQRCode}
+            disabled={!qrCodeDataUrl}
+            style={{
+              flex: 1,
+              padding: '12px',
+              border: 'none',
+              borderRadius: DESIGN.borderRadius.button,
+              background: DESIGN.colors.primary,
+              color: DESIGN.colors.background,
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              opacity: !qrCodeDataUrl ? 0.5 : 1,
+              cursor: !qrCodeDataUrl ? 'not-allowed' : 'pointer'
+            }}
+          >
+            <Download className="w-4 h-4" />
+            Download
+          </button>
         </div>
       </div>
     </div>
@@ -703,7 +977,7 @@ interface DeleteEventModalProps {
   isOpen: boolean;
   onClose: () => void;
   event: Event;
-  onDelete: () => void;
+  onDelete: () => Promise<void>;
 }
 
 function DeleteEventModal({ isOpen, onClose, event, onDelete }: DeleteEventModalProps) {
@@ -742,10 +1016,20 @@ function DeleteEventModal({ isOpen, onClose, event, onDelete }: DeleteEventModal
         borderRadius: DESIGN.borderRadius.card,
         width: '100%',
         maxWidth: '384px',
-        overflow: 'hidden',
-        border: '1px solid rgba(255, 255, 255, 0.1)'
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        display: 'flex',
+        flexDirection: 'column'
       }}>
-        <div style={{ padding: '24px', textAlign: 'center' }}>
+        {/* Content */}
+        <div style={{ 
+          flex: 1,
+          overflowY: 'auto',
+          padding: '24px',
+          paddingBottom: `calc(${DESIGN.spacing.modalFooterHeight} + 24px)`,
+          textAlign: 'center' 
+        }}>
           <div style={{
             width: '64px',
             height: '64px',
@@ -791,46 +1075,58 @@ function DeleteEventModal({ isOpen, onClose, event, onDelete }: DeleteEventModal
               }}
             />
           </div>
-          
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button
-              onClick={onClose}
-              style={{
-                flex: 1,
-                padding: '12px',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                borderRadius: DESIGN.borderRadius.button,
-                background: 'transparent',
-                color: DESIGN.colors.textPrimary,
-                fontSize: '15px',
-                fontWeight: '500'
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={confirmText !== 'DELETE' || isDeleting}
-              style={{
-                flex: 1,
-                padding: '12px',
-                border: 'none',
-                borderRadius: DESIGN.borderRadius.button,
-                background: DESIGN.colors.danger,
-                color: DESIGN.colors.textPrimary,
-                fontSize: '15px',
-                fontWeight: '500',
-                opacity: (confirmText !== 'DELETE' || isDeleting) ? 0.5 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
-              Delete
-            </button>
-          </div>
+        </div>
+
+        {/* Footer Buttons */}
+        <div style={{
+          position: 'sticky',
+          bottom: 0,
+          background: DESIGN.colors.card,
+          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+          padding: '16px 24px',
+          display: 'flex',
+          gap: '12px',
+          flexShrink: 0
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1,
+              padding: '12px',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: DESIGN.borderRadius.button,
+              background: 'transparent',
+              color: DESIGN.colors.textPrimary,
+              fontSize: '15px',
+              fontWeight: '500',
+              cursor: 'pointer'
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={confirmText !== 'DELETE' || isDeleting}
+            style={{
+              flex: 1,
+              padding: '12px',
+              border: 'none',
+              borderRadius: DESIGN.borderRadius.button,
+              background: DESIGN.colors.danger,
+              color: DESIGN.colors.textPrimary,
+              fontSize: '15px',
+              fontWeight: '500',
+              opacity: (confirmText !== 'DELETE' || isDeleting) ? 0.5 : 1,
+              cursor: (confirmText !== 'DELETE' || isDeleting) ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+            Delete
+          </button>
         </div>
       </div>
     </div>
@@ -845,6 +1141,18 @@ export default function EventManager() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [announcementText, setAnnouncementText] = useState('');
   
+  // Settings state
+  const [settings, setSettings] = useState({
+    defaultRadius: 100,
+    defaultThemeColor: '#8B5CF6',
+    defaultMediaType: 'carousel' as 'carousel' | 'video',
+    notifications: {
+      emailCheckin: true,
+      pushNewAttendees: true,
+      weeklyAnalytics: false
+    }
+  });
+  
   // Modal states
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
@@ -855,6 +1163,23 @@ export default function EventManager() {
   const selectedEvent = selectedEventId ? events.find(e => e.id === selectedEventId) : null;
 
   const isPro = user?.subscription.tier === 'pro' || user?.subscription.tier === 'max';
+
+  // Load saved settings from localStorage
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('eventManagerSettings');
+    if (savedSettings) {
+      try {
+        setSettings(JSON.parse(savedSettings));
+      } catch (error) {
+        console.error('Failed to load settings:', error);
+      }
+    }
+  }, []);
+
+  // Save settings to localStorage
+  useEffect(() => {
+    localStorage.setItem('eventManagerSettings', JSON.stringify(settings));
+  }, [settings]);
 
   if (!isPro) {
     return (
@@ -897,7 +1222,8 @@ export default function EventManager() {
               background: DESIGN.colors.primary,
               color: DESIGN.colors.background,
               fontSize: '16px',
-              fontWeight: '500'
+              fontWeight: '500',
+              cursor: 'pointer'
             }}
           >
             Upgrade Now
@@ -951,6 +1277,43 @@ export default function EventManager() {
     { id: '4', name: 'Alex Kim', photo: 'https://i.pravatar.cc/100?img=15', checkedIn: false, ticketType: 'VIP' },
   ];
 
+  const handleSendAnnouncement = () => {
+    if (!announcementText.trim()) {
+      toast({ title: 'Error', description: 'Please enter an announcement message', variant: 'destructive' });
+      return;
+    }
+
+    // In a real app, this would send to a backend
+    toast({ 
+      title: 'Announcement Sent!', 
+      description: 'Your message has been sent to all attendees'
+    });
+    setAnnouncementText('');
+  };
+
+  const handleExportAttendees = () => {
+    // In a real app, this would generate and download a CSV
+    toast({ 
+      title: 'Export Started', 
+      description: 'CSV file will download shortly'
+    });
+    
+    // Mock CSV generation
+    const csvContent = 'data:text/csv;charset=utf-8,' + 
+      'Name,Email,Ticket Type,Checked In\n' +
+      mockAttendees.map(a => 
+        `${a.name},${a.name.toLowerCase().replace(' ', '.')}@example.com,${a.ticketType},${a.checkedIn ? 'Yes' : 'No'}`
+      ).join('\n');
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `${selectedEvent?.name || 'attendees'}_list.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div style={{
       position: 'fixed',
@@ -983,7 +1346,8 @@ export default function EventManager() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: 'none'
+              border: 'none',
+              cursor: 'pointer'
             }}
           >
             <ChevronLeft className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
@@ -1004,7 +1368,8 @@ export default function EventManager() {
               fontWeight: '500',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '4px',
+              cursor: 'pointer'
             }}
           >
             <Plus className="w-4 h-4" />
@@ -1043,7 +1408,8 @@ export default function EventManager() {
                 gap: '6px',
                 background: activeTab === tab.key ? DESIGN.colors.primary : DESIGN.colors.card,
                 color: activeTab === tab.key ? DESIGN.colors.background : DESIGN.colors.textSecondary,
-                border: 'none'
+                border: 'none',
+                cursor: 'pointer'
               }}
             >
               <tab.icon className="w-4 h-4" />
@@ -1053,8 +1419,12 @@ export default function EventManager() {
         </div>
       </div>
 
-      {/* Content */}
-      <div style={{ padding: DESIGN.spacing.default, flex: 1, overflowY: 'auto' }}>
+      {/* Scrollable Content */}
+      <div style={{ 
+        flex: 1, 
+        overflowY: 'auto',
+        padding: DESIGN.spacing.default 
+      }}>
         {/* My Events Tab */}
         {activeTab === 'events' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1132,7 +1502,8 @@ export default function EventManager() {
                               fontSize: '12px',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '4px'
+                              gap: '4px',
+                              cursor: 'pointer'
                             }}
                           >
                             <Eye className="w-3 h-3" />
@@ -1150,7 +1521,8 @@ export default function EventManager() {
                               fontSize: '12px',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '4px'
+                              gap: '4px',
+                              cursor: 'pointer'
                             }}
                           >
                             <Edit className="w-3 h-3" />
@@ -1168,7 +1540,8 @@ export default function EventManager() {
                               fontSize: '12px',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '4px'
+                              gap: '4px',
+                              cursor: 'pointer'
                             }}
                           >
                             <QrCode className="w-3 h-3" />
@@ -1185,7 +1558,8 @@ export default function EventManager() {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              border: 'none'
+                              border: 'none',
+                              cursor: 'pointer'
                             }}
                           >
                             <Trash2 className="w-3 h-3" />
@@ -1218,7 +1592,8 @@ export default function EventManager() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    margin: '0 auto'
+                    margin: '0 auto',
+                    cursor: 'pointer'
                   }}
                 >
                   <Plus className="w-4 h-4" />
@@ -1249,7 +1624,8 @@ export default function EventManager() {
                       border: '1px solid',
                       background: selectedEventId === event.id ? DESIGN.colors.primary : DESIGN.colors.card,
                       color: selectedEventId === event.id ? DESIGN.colors.background : DESIGN.colors.textSecondary,
-                      borderColor: selectedEventId === event.id ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)'
+                      borderColor: selectedEventId === event.id ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)',
+                      cursor: 'pointer'
                     }}
                   >
                     {event.name}
@@ -1298,6 +1674,7 @@ export default function EventManager() {
 
             {/* Export Button */}
             <button
+              onClick={handleExportAttendees}
               style={{
                 width: '100%',
                 padding: '12px',
@@ -1309,7 +1686,8 @@ export default function EventManager() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px'
+                gap: '8px',
+                cursor: 'pointer'
               }}
             >
               <Download className="w-4 h-4" />
@@ -1506,7 +1884,8 @@ export default function EventManager() {
                     whiteSpace: 'nowrap',
                     background: DESIGN.colors.primary,
                     color: DESIGN.colors.background,
-                    border: 'none'
+                    border: 'none',
+                    cursor: 'pointer'
                   }}>
                     All Events
                   </button>
@@ -1521,7 +1900,8 @@ export default function EventManager() {
                         whiteSpace: 'nowrap',
                         background: DESIGN.colors.card,
                         color: DESIGN.colors.textSecondary,
-                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        cursor: 'pointer'
                       }}
                     >
                       {event.name}
@@ -1550,6 +1930,7 @@ export default function EventManager() {
               />
 
               <button
+                onClick={handleSendAnnouncement}
                 disabled={!announcementText.trim()}
                 style={{
                   width: '100%',
@@ -1563,7 +1944,8 @@ export default function EventManager() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  opacity: !announcementText.trim() ? 0.5 : 1
+                  opacity: !announcementText.trim() ? 0.5 : 1,
+                  cursor: !announcementText.trim() ? 'not-allowed' : 'pointer'
                 }}
               >
                 <Send className="w-4 h-4" />
@@ -1597,7 +1979,8 @@ export default function EventManager() {
                       border: '1px solid rgba(255, 255, 255, 0.1)',
                       fontSize: '14px',
                       color: DESIGN.colors.textPrimary,
-                      transition: 'border-color 0.2s'
+                      transition: 'border-color 0.2s',
+                      cursor: 'pointer'
                     }}
                   >
                     {template}
@@ -1623,15 +2006,23 @@ export default function EventManager() {
                   <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
                     Default Check-in Radius
                   </label>
-                  <input type="number" defaultValue={100} style={{
-                    width: '100%',
-                    padding: '12px',
-                    background: DESIGN.colors.background,
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: DESIGN.borderRadius.button,
-                    color: DESIGN.colors.textPrimary,
-                    fontSize: '15px'
-                  }} />
+                  <input 
+                    type="number" 
+                    value={settings.defaultRadius}
+                    onChange={(e) => setSettings(prev => ({ 
+                      ...prev, 
+                      defaultRadius: parseInt(e.target.value) || 100 
+                    }))}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      background: DESIGN.colors.background,
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: DESIGN.borderRadius.button,
+                      color: DESIGN.colors.textPrimary,
+                      fontSize: '15px'
+                    }}
+                  />
                   <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>Default radius in meters</p>
                 </div>
                 <div>
@@ -1642,12 +2033,14 @@ export default function EventManager() {
                     {['#8B5CF6', '#EF4444', '#10B981', '#F59E0B', '#3B82F6'].map(color => (
                       <button
                         key={color}
+                        onClick={() => setSettings(prev => ({ ...prev, defaultThemeColor: color }))}
                         style={{
                           width: '40px',
                           height: '40px',
                           borderRadius: DESIGN.borderRadius.roundButton,
-                          border: '2px solid rgba(255, 255, 255, 0.1)',
-                          background: color
+                          border: `2px solid ${settings.defaultThemeColor === color ? DESIGN.colors.textPrimary : 'rgba(255, 255, 255, 0.1)'}`,
+                          background: color,
+                          cursor: 'pointer'
                         }}
                       />
                     ))}
@@ -1658,31 +2051,39 @@ export default function EventManager() {
                     Default Media Type
                   </label>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button style={{
-                      flex: 1,
-                      padding: '12px',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: DESIGN.borderRadius.button,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '8px',
-                      background: 'transparent'
-                    }}>
+                    <button 
+                      onClick={() => setSettings(prev => ({ ...prev, defaultMediaType: 'carousel' }))}
+                      style={{
+                        flex: 1,
+                        padding: '12px',
+                        border: `1px solid ${settings.defaultMediaType === 'carousel' ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)'}`,
+                        borderRadius: DESIGN.borderRadius.button,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: settings.defaultMediaType === 'carousel' ? `${DESIGN.colors.primary}20` : 'transparent',
+                        cursor: 'pointer'
+                      }}
+                    >
                       <Grid3x3 className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
                       <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>Carousel</span>
                     </button>
-                    <button style={{
-                      flex: 1,
-                      padding: '12px',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: DESIGN.borderRadius.button,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '8px',
-                      background: 'transparent'
-                    }}>
+                    <button 
+                      onClick={() => setSettings(prev => ({ ...prev, defaultMediaType: 'video' }))}
+                      style={{
+                        flex: 1,
+                        padding: '12px',
+                        border: `1px solid ${settings.defaultMediaType === 'video' ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)'}`,
+                        borderRadius: DESIGN.borderRadius.button,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: settings.defaultMediaType === 'video' ? `${DESIGN.colors.primary}20` : 'transparent',
+                        cursor: 'pointer'
+                      }}
+                    >
                       <Film className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
                       <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>Video</span>
                     </button>
@@ -1699,33 +2100,30 @@ export default function EventManager() {
             }}>
               <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: DESIGN.colors.textPrimary }}>Notifications</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {[
-                  'Email me when someone checks in',
-                  'Push notifications for new attendees',
-                  'Weekly analytics summary',
-                ].map((setting, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
-                    <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>{setting}</span>
-                    <div style={{
-                      width: '48px',
-                      height: '24px',
-                      background: `${DESIGN.colors.primary}20`,
-                      borderRadius: DESIGN.borderRadius.roundButton,
-                      position: 'relative',
-                      cursor: 'pointer'
-                    }}>
-                      <div style={{
-                        position: 'absolute',
-                        right: '4px',
-                        top: '4px',
-                        width: '16px',
-                        height: '16px',
-                        background: DESIGN.colors.primary,
-                        borderRadius: DESIGN.borderRadius.roundButton
-                      }} />
-                    </div>
-                  </div>
-                ))}
+                <ToggleSwitch
+                  enabled={settings.notifications.emailCheckin}
+                  onChange={(enabled) => setSettings(prev => ({
+                    ...prev,
+                    notifications: { ...prev.notifications, emailCheckin: enabled }
+                  }))}
+                  label="Email me when someone checks in"
+                />
+                <ToggleSwitch
+                  enabled={settings.notifications.pushNewAttendees}
+                  onChange={(enabled) => setSettings(prev => ({
+                    ...prev,
+                    notifications: { ...prev.notifications, pushNewAttendees: enabled }
+                  }))}
+                  label="Push notifications for new attendees"
+                />
+                <ToggleSwitch
+                  enabled={settings.notifications.weeklyAnalytics}
+                  onChange={(enabled) => setSettings(prev => ({
+                    ...prev,
+                    notifications: { ...prev.notifications, weeklyAnalytics: enabled }
+                  }))}
+                  label="Weekly analytics summary"
+                />
               </div>
             </div>
 
@@ -1748,7 +2146,8 @@ export default function EventManager() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px'
+                gap: '8px',
+                cursor: 'pointer'
               }}
             >
               <Trash2 className="w-4 h-4" />
