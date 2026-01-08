@@ -42,6 +42,44 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 type Tab = 'matches' | 'friends';
 
+// Design Constants
+const DESIGN = {
+  colors: {
+    primary: '#C4B5FD',
+    lavenderLight: '#E9D5FF',
+    accentPink: '#FFB8E6',
+    background: '#1A1A1A',
+    card: '#2D2D2D',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#B8B8B8'
+  },
+  borderRadius: {
+    card: '24px',
+    cardInner: '20px',
+    button: '12px',
+    roundButton: '50%',
+    modalTop: '20px',
+    smallPill: '8px',
+    message: '20px',
+    input: '9999px'
+  },
+  shadows: {
+    card: '0 8px 32px rgba(0, 0, 0, 0.4)',
+    button: '0 4px 16px rgba(0, 0, 0, 0.3)',
+    likeButton: '0 4px 16px rgba(255, 184, 230, 0.4)'
+  },
+  typography: {
+    h1: '28px',
+    h2: '24px',
+    h3: '22px',
+    bodyLarge: '15px',
+    body: '14px',
+    small: '13px',
+    caption: '13px',
+    button: '16px'
+  }
+};
+
 // Quick Add Modal Component
 function QuickAddModal({ 
   isOpen, 
@@ -65,44 +103,74 @@ function QuickAddModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md bg-background border-border">
+      <DialogContent className="max-w-md" style={{
+        background: DESIGN.colors.background,
+        borderColor: DESIGN.colors.card,
+        borderRadius: DESIGN.borderRadius.card
+      }}>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <UserPlus className="w-5 h-5 text-primary" />
+          <DialogTitle className="flex items-center gap-2" style={{
+            fontSize: DESIGN.typography.h2,
+            color: DESIGN.colors.textPrimary
+          }}>
+            <UserPlus className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
             Quick Add Friends
           </DialogTitle>
         </DialogHeader>
         
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" 
+            style={{ color: DESIGN.colors.textSecondary }} />
           <Input
             type="text"
             placeholder="Search by username..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-card border-border"
+            className="pl-10"
+            style={{
+              background: DESIGN.colors.card,
+              borderColor: DESIGN.colors.card,
+              borderRadius: DESIGN.borderRadius.input,
+              color: DESIGN.colors.textPrimary
+            }}
           />
         </div>
 
         {/* Search Results */}
         {searchQuery && (
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">Search Results</p>
+            <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+              Search Results
+            </p>
             {searchResults.length > 0 ? (
               searchResults.map(user => (
-                <div key={user.id} className="flex items-center gap-3 p-3 bg-card rounded-xl border border-border">
-                  <img src={user.photo} alt={user.name} className="w-10 h-10 rounded-full object-cover" />
+                <div key={user.id} className="flex items-center gap-3 p-3 rounded-xl"
+                  style={{
+                    background: DESIGN.colors.card,
+                    border: `1px solid ${DESIGN.colors.card}`,
+                    borderRadius: DESIGN.borderRadius.card
+                  }}>
+                  <img src={user.photo} alt={user.name} 
+                    className="w-10 h-10 rounded-full object-cover" 
+                    style={{ border: `2px solid ${DESIGN.colors.background}` }} />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{user.name}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="font-medium text-sm" style={{ color: DESIGN.colors.textPrimary }}>
+                      {user.name}
+                    </p>
+                    <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                       {user.location}
                     </p>
                   </div>
                   <Button 
                     size="sm" 
                     onClick={() => onAddFriend(user.id)}
-                    className="h-8"
+                    className="h-8 rounded-[8px]"
+                    style={{
+                      background: DESIGN.colors.primary,
+                      color: DESIGN.colors.background,
+                      borderRadius: DESIGN.borderRadius.smallPill
+                    }}
                   >
                     <UserPlus className="w-4 h-4 mr-1" />
                     Add
@@ -110,7 +178,9 @@ function QuickAddModal({
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No users found</p>
+              <p className="text-sm text-center py-4" style={{ color: DESIGN.colors.textSecondary }}>
+                No users found
+              </p>
             )}
           </div>
         )}
@@ -118,13 +188,24 @@ function QuickAddModal({
         {/* Suggestions */}
         {!searchQuery && (
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">Suggestions</p>
+            <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+              Suggestions
+            </p>
             {suggestions.map(user => (
-              <div key={user.id} className="flex items-center gap-3 p-3 bg-card rounded-xl border border-border">
-                <img src={user.photo} alt={user.name} className="w-10 h-10 rounded-full object-cover" />
+              <div key={user.id} className="flex items-center gap-3 p-3 rounded-xl"
+                style={{
+                  background: DESIGN.colors.card,
+                  border: `1px solid ${DESIGN.colors.card}`,
+                  borderRadius: DESIGN.borderRadius.card
+                }}>
+                <img src={user.photo} alt={user.name} 
+                  className="w-10 h-10 rounded-full object-cover"
+                  style={{ border: `2px solid ${DESIGN.colors.background}` }} />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">{user.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="font-medium text-sm" style={{ color: DESIGN.colors.textPrimary }}>
+                    {user.name}
+                  </p>
+                  <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                     {Math.floor(Math.random() * 5)} mutual friends
                   </p>
                 </div>
@@ -132,7 +213,12 @@ function QuickAddModal({
                   size="sm" 
                   variant="outline"
                   onClick={() => onAddFriend(user.id)}
-                  className="h-8"
+                  className="h-8 rounded-[8px]"
+                  style={{
+                    borderColor: DESIGN.colors.primary,
+                    color: DESIGN.colors.textPrimary,
+                    borderRadius: DESIGN.borderRadius.smallPill
+                  }}
                 >
                   <UserPlus className="w-4 h-4 mr-1" />
                   Add
@@ -307,16 +393,25 @@ export default function Chats() {
   // Conversation View
   if (selectedMatch) {
     return (
-      <div className="app-container min-h-screen bg-background flex flex-col">
+      <div className="app-container min-h-screen flex flex-col" style={{
+        background: DESIGN.colors.background
+      }}>
         {/* Chat Header */}
-        <header className="sticky top-0 z-30 bg-background border-b border-border">
+        <header className="sticky top-0 z-30 border-b" style={{
+          background: DESIGN.colors.background,
+          borderColor: DESIGN.colors.card
+        }}>
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setSelectedMatch(null)}
-                className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors"
+                className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
+                style={{
+                  background: DESIGN.colors.card,
+                  borderRadius: DESIGN.borderRadius.roundButton
+                }}
               >
-                <ArrowLeft className="w-5 h-5" />
+                <ArrowLeft className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
               </button>
               <div className="flex items-center gap-3">
                 <div className="relative">
@@ -324,14 +419,21 @@ export default function Chats() {
                     src={selectedMatch.matchProfile.photo}
                     alt={selectedMatch.matchProfile.name}
                     className="w-10 h-10 rounded-full object-cover"
+                    style={{ border: `2px solid ${DESIGN.colors.background}` }}
                   />
                   {selectedMatch.online && (
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full" 
+                      style={{ border: `2px solid ${DESIGN.colors.background}` }} />
                   )}
                 </div>
                 <div>
-                  <h3 className="font-semibold">{selectedMatch.matchProfile.name}</h3>
-                  <p className="text-xs text-muted-foreground">
+                  <h3 className="font-semibold" style={{
+                    fontSize: DESIGN.typography.bodyLarge,
+                    color: DESIGN.colors.textPrimary
+                  }}>
+                    {selectedMatch.matchProfile.name}
+                  </h3>
+                  <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                     {selectedMatch.online ? 'Online' : `Active ${formatTime(selectedMatch.timestamp)}`}
                   </p>
                 </div>
@@ -341,31 +443,44 @@ export default function Chats() {
             <div className="relative">
               <button 
                 onClick={() => setShowMoreOptions(!showMoreOptions)}
-                className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors"
+                className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
+                style={{
+                  background: DESIGN.colors.card,
+                  borderRadius: DESIGN.borderRadius.roundButton
+                }}
               >
-                <MoreVertical className="w-5 h-5" />
+                <MoreVertical className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
               </button>
               
               {showMoreOptions && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-card border border-border rounded-xl shadow-lg z-50 py-2">
-                  <button className="w-full px-4 py-3 text-left hover:bg-muted/50 text-sm flex items-center gap-3">
+                <div className="absolute right-0 top-full mt-2 w-48 py-2 z-50"
+                  style={{
+                    background: DESIGN.colors.card,
+                    border: `1px solid ${DESIGN.colors.card}`,
+                    borderRadius: DESIGN.borderRadius.card,
+                    boxShadow: DESIGN.shadows.card
+                  }}>
+                  <button className="w-full px-4 py-3 text-left hover:opacity-80 transition-opacity text-sm flex items-center gap-3"
+                    style={{ color: DESIGN.colors.textPrimary }}>
                     <Users className="w-4 h-4" />
                     View Profile
                   </button>
-                  <button className="w-full px-4 py-3 text-left hover:bg-muted/50 text-sm flex items-center gap-3">
+                  <button className="w-full px-4 py-3 text-left hover:opacity-80 transition-opacity text-sm flex items-center gap-3"
+                    style={{ color: DESIGN.colors.textPrimary }}>
                     <Pin className="w-4 h-4" />
                     Pin Conversation
                   </button>
-                  <button className="w-full px-4 py-3 text-left hover:bg-muted/50 text-sm flex items-center gap-3">
+                  <button className="w-full px-4 py-3 text-left hover:opacity-80 transition-opacity text-sm flex items-center gap-3"
+                    style={{ color: DESIGN.colors.textPrimary }}>
                     <BellOff className="w-4 h-4" />
                     Mute Notifications
                   </button>
-                  <div className="border-t border-border my-1" />
-                  <button className="w-full px-4 py-3 text-left hover:bg-muted/50 text-sm flex items-center gap-3 text-red-500">
+                  <div className="my-1" style={{ borderTop: `1px solid ${DESIGN.colors.textSecondary}20` }} />
+                  <button className="w-full px-4 py-3 text-left hover:opacity-80 transition-opacity text-sm flex items-center gap-3 text-red-500">
                     <Trash2 className="w-4 h-4" />
                     Unmatch
                   </button>
-                  <button className="w-full px-4 py-3 text-left hover:bg-muted/50 text-sm flex items-center gap-3 text-red-500">
+                  <button className="w-full px-4 py-3 text-left hover:opacity-80 transition-opacity text-sm flex items-center gap-3 text-red-500">
                     <Flag className="w-4 h-4" />
                     Report
                   </button>
@@ -383,14 +498,25 @@ export default function Chats() {
               <img
                 src={selectedMatch.matchProfile.photo}
                 alt={selectedMatch.matchProfile.name}
-                className="w-full h-full rounded-full object-cover border-4 border-primary/20"
+                className="w-full h-full rounded-full object-cover"
+                style={{ border: `4px solid ${DESIGN.colors.primary}20` }}
               />
             </div>
-            <h3 className="font-bold text-lg">{selectedMatch.matchProfile.name}</h3>
-            <p className="text-sm text-muted-foreground mb-2">
+            <h3 className="font-bold" style={{
+              fontSize: DESIGN.typography.h3,
+              color: DESIGN.colors.textPrimary
+            }}>
+              {selectedMatch.matchProfile.name}
+            </h3>
+            <p className="text-sm mb-2" style={{ color: DESIGN.colors.textSecondary }}>
               Matched at {selectedMatch.eventName}
             </p>
-            <span className="inline-flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium"
+              style={{
+                background: `${DESIGN.colors.primary}10`,
+                color: DESIGN.colors.primary,
+                borderRadius: DESIGN.borderRadius.smallPill
+              }}>
               <Heart className="w-3 h-3" />
               {formatTime(selectedMatch.timestamp)}
             </span>
@@ -405,7 +531,7 @@ export default function Chats() {
             return (
               <div key={message.id}>
                 {showTime && (
-                  <p className="text-center text-xs text-muted-foreground my-4">
+                  <p className="text-center text-xs my-4" style={{ color: DESIGN.colors.textSecondary }}>
                     {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 )}
@@ -415,17 +541,30 @@ export default function Chats() {
                   className={cn('flex', isMe ? 'justify-end' : 'justify-start')}
                 >
                   <div className={cn(
-                    'max-w-[75%] px-4 py-2.5 rounded-2xl',
+                    'max-w-[75%] px-4 py-2.5',
                     isMe 
-                      ? 'bg-primary text-primary-foreground rounded-br-md' 
-                      : 'bg-card border border-border rounded-bl-md'
-                  )}>
+                      ? 'rounded-br-md' 
+                      : 'rounded-bl-md'
+                  )}
+                  style={{
+                    borderRadius: DESIGN.borderRadius.message,
+                    ...(isMe 
+                      ? { 
+                          background: DESIGN.colors.primary, 
+                          color: DESIGN.colors.background 
+                        }
+                      : { 
+                          background: DESIGN.colors.card, 
+                          border: `1px solid ${DESIGN.colors.card}`,
+                          color: DESIGN.colors.textPrimary 
+                        })
+                  }}>
                     <p className="text-sm">{message.text}</p>
                     <div className={cn(
                       'flex items-center gap-1 mt-1',
                       isMe ? 'justify-end' : 'justify-start'
                     )}>
-                      <span className="text-[10px] opacity-70">
+                      <span className="text-[10px]" style={{ opacity: 0.7 }}>
                         {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       {isMe && (
@@ -444,11 +583,28 @@ export default function Chats() {
           {/* Typing Indicator */}
           {isTyping && (
             <div className="flex justify-start">
-              <div className="bg-card border border-border px-4 py-3 rounded-2xl rounded-bl-md">
+              <div className="px-4 py-3" style={{
+                background: DESIGN.colors.card,
+                border: `1px solid ${DESIGN.colors.card}`,
+                borderRadius: DESIGN.borderRadius.message,
+                borderBottomLeftRadius: '4px'
+              }}>
                 <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <span className="w-2 h-2 rounded-full animate-bounce" 
+                    style={{ 
+                      background: `${DESIGN.colors.textSecondary}80`,
+                      animationDelay: '0ms' 
+                    }} />
+                  <span className="w-2 h-2 rounded-full animate-bounce" 
+                    style={{ 
+                      background: `${DESIGN.colors.textSecondary}80`,
+                      animationDelay: '150ms' 
+                    }} />
+                  <span className="w-2 h-2 rounded-full animate-bounce" 
+                    style={{ 
+                      background: `${DESIGN.colors.textSecondary}80`,
+                      animationDelay: '300ms' 
+                    }} />
                 </div>
               </div>
             </div>
@@ -458,19 +614,30 @@ export default function Chats() {
         </div>
 
         {/* Message Input */}
-        <div className="sticky bottom-0 bg-background border-t border-border p-4">
+        <div className="sticky bottom-0 border-t p-4" style={{
+          background: DESIGN.colors.background,
+          borderColor: DESIGN.colors.card
+        }}>
           <form onSubmit={handleSendMessage} className="flex items-center gap-2">
             <button
               type="button"
-              className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors"
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
+              style={{
+                background: DESIGN.colors.card,
+                borderRadius: DESIGN.borderRadius.roundButton
+              }}
             >
-              <Paperclip className="w-5 h-5 text-muted-foreground" />
+              <Paperclip className="w-5 h-5" style={{ color: DESIGN.colors.textSecondary }} />
             </button>
             <button
               type="button"
-              className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors"
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
+              style={{
+                background: DESIGN.colors.card,
+                borderRadius: DESIGN.borderRadius.roundButton
+              }}
             >
-              <Camera className="w-5 h-5 text-muted-foreground" />
+              <Camera className="w-5 h-5" style={{ color: DESIGN.colors.textSecondary }} />
             </button>
             <Input
               type="text"
@@ -478,13 +645,23 @@ export default function Chats() {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={handleKeyPress}
-              className="flex-1 bg-card border-border rounded-full h-10"
+              className="flex-1 h-10"
+              style={{
+                background: DESIGN.colors.card,
+                borderColor: DESIGN.colors.card,
+                borderRadius: DESIGN.borderRadius.input,
+                color: DESIGN.colors.textPrimary
+              }}
             />
             <button
               type="button"
-              className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors"
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
+              style={{
+                background: DESIGN.colors.card,
+                borderRadius: DESIGN.borderRadius.roundButton
+              }}
             >
-              <Smile className="w-5 h-5 text-muted-foreground" />
+              <Smile className="w-5 h-5" style={{ color: DESIGN.colors.textSecondary }} />
             </button>
             <button
               type="submit"
@@ -492,9 +669,14 @@ export default function Chats() {
               className={cn(
                 'w-10 h-10 rounded-full flex items-center justify-center transition-all',
                 newMessage.trim()
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'bg-card text-muted-foreground'
+                  ? 'hover:opacity-90'
+                  : ''
               )}
+              style={{
+                background: newMessage.trim() ? DESIGN.colors.primary : DESIGN.colors.card,
+                color: newMessage.trim() ? DESIGN.colors.background : DESIGN.colors.textSecondary,
+                borderRadius: DESIGN.borderRadius.roundButton
+              }}
             >
               <Send className="w-5 h-5" />
             </button>
@@ -506,21 +688,39 @@ export default function Chats() {
 
   // Main Chats List View
   return (
-    <div className="app-container min-h-screen bg-background pb-nav">
+    <div className="app-container min-h-screen pb-nav" style={{
+      background: DESIGN.colors.background
+    }}>
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-background border-b border-border">
+      <div className="sticky top-0 z-30 border-b" style={{
+        background: DESIGN.colors.background,
+        borderColor: DESIGN.colors.card
+      }}>
         <div className="flex items-center justify-between p-4">
-          <h1 className="text-2xl font-bold">Chats</h1>
+          <h1 className="font-bold" style={{
+            fontSize: DESIGN.typography.h1,
+            color: DESIGN.colors.textPrimary
+          }}>
+            Chats
+          </h1>
           <div className="flex items-center gap-2">
-            <button className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-card/80 transition-colors">
-              <Filter className="w-5 h-5" />
+            <button className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
+              style={{
+                background: DESIGN.colors.card,
+                borderRadius: DESIGN.borderRadius.roundButton
+              }}>
+              <Filter className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
             </button>
             {activeTab === 'friends' && (
               <button 
                 onClick={() => setShowQuickAdd(true)}
-                className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-colors"
+                className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
+                style={{
+                  background: `${DESIGN.colors.primary}10`,
+                  borderRadius: DESIGN.borderRadius.roundButton
+                }}
               >
-                <UserPlus className="w-5 h-5 text-primary" />
+                <UserPlus className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
               </button>
             )}
           </div>
@@ -531,11 +731,24 @@ export default function Chats() {
           <button
             onClick={() => setActiveTab('matches')}
             className={cn(
-              'flex-1 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2',
+              'flex-1 py-2.5 text-sm font-medium transition-all flex items-center justify-center gap-2',
               activeTab === 'matches' 
-                ? 'bg-primary text-primary-foreground' 
-                : 'bg-card border border-border text-muted-foreground'
+                ? '' 
+                : ''
             )}
+            style={{
+              borderRadius: DESIGN.borderRadius.card,
+              ...(activeTab === 'matches' 
+                ? { 
+                    background: DESIGN.colors.primary, 
+                    color: DESIGN.colors.background 
+                  }
+                : { 
+                    background: DESIGN.colors.card, 
+                    border: `1px solid ${DESIGN.colors.card}`,
+                    color: DESIGN.colors.textSecondary 
+                  })
+            }}
           >
             <Heart className="w-4 h-4" />
             Matches
@@ -551,11 +764,24 @@ export default function Chats() {
           <button
             onClick={() => setActiveTab('friends')}
             className={cn(
-              'flex-1 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2',
+              'flex-1 py-2.5 text-sm font-medium transition-all flex items-center justify-center gap-2',
               activeTab === 'friends' 
-                ? 'bg-primary text-primary-foreground' 
-                : 'bg-card border border-border text-muted-foreground'
+                ? '' 
+                : ''
             )}
+            style={{
+              borderRadius: DESIGN.borderRadius.card,
+              ...(activeTab === 'friends' 
+                ? { 
+                    background: DESIGN.colors.primary, 
+                    color: DESIGN.colors.background 
+                  }
+                : { 
+                    background: DESIGN.colors.card, 
+                    border: `1px solid ${DESIGN.colors.card}`,
+                    color: DESIGN.colors.textSecondary 
+                  })
+            }}
           >
             <Users className="w-4 h-4" />
             Friends
@@ -573,13 +799,20 @@ export default function Chats() {
         {/* Search */}
         <div className="px-4 pb-3">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" 
+              style={{ color: DESIGN.colors.textSecondary }} />
             <Input
               type="text"
               placeholder={`Search ${activeTab}...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-10 pl-10 bg-card border-border rounded-xl"
+              className="h-10 pl-10"
+              style={{
+                background: DESIGN.colors.card,
+                borderColor: DESIGN.colors.card,
+                borderRadius: DESIGN.borderRadius.card,
+                color: DESIGN.colors.textPrimary
+              }}
             />
           </div>
         </div>
@@ -597,39 +830,57 @@ export default function Chats() {
                     key={match.id}
                     onClick={() => setSelectedMatch(match)}
                     className={cn(
-                      'w-full p-4 bg-card rounded-xl border border-border flex items-center gap-4 hover:bg-card/80 transition-all text-left',
-                      match.unread && 'border-l-4 border-l-primary bg-primary/5'
+                      'w-full p-4 flex items-center gap-4 text-left hover:opacity-80 transition-all',
+                      match.unread && 'border-l-4'
                     )}
+                    style={{
+                      background: DESIGN.colors.card,
+                      border: `1px solid ${DESIGN.colors.card}`,
+                      borderRadius: DESIGN.borderRadius.card,
+                      ...(match.unread && {
+                        borderLeftColor: DESIGN.colors.primary,
+                        background: `${DESIGN.colors.primary}05`
+                      })
+                    }}
                   >
                     <div className="relative">
                       <img
                         src={match.matchProfile.photo}
                         alt={match.matchProfile.name}
-                        className="w-14 h-14 rounded-full object-cover border-2 border-background"
+                        className="w-14 h-14 rounded-full object-cover"
+                        style={{ border: `2px solid ${DESIGN.colors.background}` }}
                       />
                       {match.online && (
-                        <span className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-background" />
+                        <span className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full"
+                          style={{ border: `2px solid ${DESIGN.colors.background}` }} />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <h3 className={cn('font-semibold', match.unread && 'font-bold')}>
+                        <h3 className={cn('font-semibold', match.unread && 'font-bold')}
+                          style={{ color: DESIGN.colors.textPrimary }}>
                           {match.matchProfile.name}
                         </h3>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                           {formatTime(match.timestamp)}
                         </span>
                       </div>
-                      <p className="text-sm text-muted-foreground truncate mb-1.5">
+                      <p className="text-sm truncate mb-1.5" style={{ color: DESIGN.colors.textSecondary }}>
                         {match.lastMessage || 'Say hi 👋'}
                       </p>
-                      <span className="inline-flex items-center gap-1 text-xs text-primary px-2 py-0.5 bg-primary/10 rounded-full">
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+                        style={{
+                          color: DESIGN.colors.primary,
+                          background: `${DESIGN.colors.primary}10`,
+                          borderRadius: DESIGN.borderRadius.smallPill
+                        }}>
                         <Star className="w-3 h-3" />
                         {match.eventName}
                       </span>
                     </div>
                     {match.unread && (
-                      <span className="w-3 h-3 rounded-full bg-primary flex-shrink-0" />
+                      <span className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ background: DESIGN.colors.primary }} />
                     )}
                   </button>
                 ))}
@@ -637,14 +888,29 @@ export default function Chats() {
             ) : (
               // Empty State for Matches
               <div className="text-center py-16">
-                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
-                  <Heart className="w-12 h-12 text-primary" />
+                <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"
+                  style={{
+                    background: `${DESIGN.colors.primary}10`,
+                    borderRadius: DESIGN.borderRadius.roundButton
+                  }}>
+                  <Heart className="w-12 h-12" style={{ color: DESIGN.colors.primary }} />
                 </div>
-                <h3 className="text-xl font-bold mb-2">No Matches Yet</h3>
-                <p className="text-muted-foreground text-sm mb-6 max-w-xs mx-auto">
+                <h3 className="font-bold mb-2" style={{
+                  fontSize: DESIGN.typography.h3,
+                  color: DESIGN.colors.textPrimary
+                }}>
+                  No Matches Yet
+                </h3>
+                <p className="text-sm mb-6 max-w-xs mx-auto" style={{ color: DESIGN.colors.textSecondary }}>
                   Visit the Connect page to start meeting people at events! You'll see matches here once someone likes you back.
                 </p>
-                <Button onClick={() => navigate('/connect')} className="rounded-xl">
+                <Button onClick={() => navigate('/connect')} 
+                  className="rounded-xl"
+                  style={{
+                    background: DESIGN.colors.primary,
+                    color: DESIGN.colors.background,
+                    borderRadius: DESIGN.borderRadius.button
+                  }}>
                   <Sparkles className="w-4 h-4 mr-2" />
                   Go to Connect
                 </Button>
@@ -656,22 +922,30 @@ export default function Chats() {
             {/* Friend Requests Section */}
             {friendRequests.length > 0 && (
               <div className="mb-6">
-                <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                <h2 className="text-sm font-semibold mb-3 flex items-center gap-2"
+                  style={{ color: DESIGN.colors.textSecondary }}>
                   <UserPlus className="w-4 h-4" />
                   Friend Requests ({friendRequests.length})
                 </h2>
                 <div className="space-y-2">
                   {friendRequests.map(request => (
-                    <div key={request.id} className="bg-card rounded-xl p-4 border border-border">
+                    <div key={request.id} className="p-4" style={{
+                      background: DESIGN.colors.card,
+                      border: `1px solid ${DESIGN.colors.card}`,
+                      borderRadius: DESIGN.borderRadius.card
+                    }}>
                       <div className="flex items-center gap-3">
                         <img
                           src={request.photo}
                           alt={request.name}
                           className="w-12 h-12 rounded-full object-cover"
+                          style={{ border: `2px solid ${DESIGN.colors.background}` }}
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm">{request.name}</p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="font-semibold text-sm" style={{ color: DESIGN.colors.textPrimary }}>
+                            {request.name}
+                          </p>
+                          <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                             {request.mutualFriends} mutual friends
                           </p>
                         </div>
@@ -681,6 +955,10 @@ export default function Chats() {
                             variant="outline" 
                             className="h-9 w-9 p-0 rounded-full"
                             onClick={() => handleDeclineRequest(request.id)}
+                            style={{
+                              borderColor: DESIGN.colors.card,
+                              borderRadius: DESIGN.borderRadius.roundButton
+                            }}
                           >
                             <X className="w-4 h-4" />
                           </Button>
@@ -688,6 +966,11 @@ export default function Chats() {
                             size="sm" 
                             className="h-9 w-9 p-0 rounded-full"
                             onClick={() => handleAcceptRequest(request.id)}
+                            style={{
+                              background: DESIGN.colors.primary,
+                              color: DESIGN.colors.background,
+                              borderRadius: DESIGN.borderRadius.roundButton
+                            }}
                           >
                             <Check className="w-4 h-4" />
                           </Button>
@@ -707,14 +990,29 @@ export default function Chats() {
             ) : (
               // Empty State for Friends
               <div className="text-center py-16">
-                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
-                  <Users className="w-12 h-12 text-primary" />
+                <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"
+                  style={{
+                    background: `${DESIGN.colors.primary}10`,
+                    borderRadius: DESIGN.borderRadius.roundButton
+                  }}>
+                  <Users className="w-12 h-12" style={{ color: DESIGN.colors.primary }} />
                 </div>
-                <h3 className="text-xl font-bold mb-2">Build Your Network</h3>
-                <p className="text-muted-foreground text-sm mb-6 max-w-xs mx-auto">
+                <h3 className="font-bold mb-2" style={{
+                  fontSize: DESIGN.typography.h3,
+                  color: DESIGN.colors.textPrimary
+                }}>
+                  Build Your Network
+                </h3>
+                <p className="text-sm mb-6 max-w-xs mx-auto" style={{ color: DESIGN.colors.textSecondary }}>
                   Add friends to see their event plans, chat anytime, and make the most of your social experiences!
                 </p>
-                <Button onClick={() => setShowQuickAdd(true)} className="rounded-xl">
+                <Button onClick={() => setShowQuickAdd(true)} 
+                  className="rounded-xl"
+                  style={{
+                    background: DESIGN.colors.primary,
+                    color: DESIGN.colors.background,
+                    borderRadius: DESIGN.borderRadius.button
+                  }}>
                   <UserPlus className="w-4 h-4 mr-2" />
                   Quick Add Friends
                 </Button>
