@@ -157,10 +157,13 @@ export default function EventDetail() {
       
       // Start new interval (rotate every 5 seconds)
       carouselIntervalRef.current = setInterval(() => {
-        setCurrentImageIndex((prev) => (prev + 1) % event.images.length);
+        setCurrentImageIndex((prev) => {
+          if (!event.images) return prev;
+          return (prev + 1) % event.images.length;
+        });
       }, 5000);
     }
-  }, [event?.mediaType, event?.images]);
+  }, [event?.mediaType, event?.images?.length]);
 
   // Stop carousel rotation
   const stopCarouselRotation = useCallback(() => {
@@ -182,7 +185,7 @@ export default function EventDetail() {
         startCarouselRotation();
       }, 3000);
     }
-  }, [event, startCarouselRotation, stopCarouselRotation]);
+  }, [event?.images?.length, startCarouselRotation, stopCarouselRotation]);
 
   const prevImage = useCallback(() => {
     if (event?.images && event.images.length > 0) {
@@ -195,7 +198,7 @@ export default function EventDetail() {
         startCarouselRotation();
       }, 3000);
     }
-  }, [event, startCarouselRotation, stopCarouselRotation]);
+  }, [event?.images?.length, startCarouselRotation, stopCarouselRotation]);
 
   // Handle video playback
   const toggleVideoPlay = useCallback(() => {
@@ -414,15 +417,15 @@ export default function EventDetail() {
   // Setup main video and carousel on mount and when event changes
   useEffect(() => {
     if (event?.mediaType === 'video') {
-      setupMainVideo();
+      const cleanup = setupMainVideo();
+      return cleanup;
     } else if (event?.mediaType === 'carousel') {
       startCarouselRotation();
+      return () => {
+        stopCarouselRotation();
+      };
     }
-    
-    return () => {
-      stopCarouselRotation();
-    };
-  }, [event?.mediaType, event?.videos, event?.images, setupMainVideo, startCarouselRotation, stopCarouselRotation]);
+  }, [event?.mediaType, event?.id, setupMainVideo, startCarouselRotation, stopCarouselRotation]);
 
   // Setup fullscreen video when modal opens
   useEffect(() => {
@@ -692,14 +695,18 @@ export default function EventDetail() {
               }}
             />
             
-            {/* Video Controls Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            {/* Video Controls Overlay - ALWAYS VISIBLE ON MOBILE */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
               <div className="absolute bottom-0 left-0 right-0 p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={toggleVideoPlay}
-                      className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleVideoPlay();
+                      }}
+                      className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95"
                       style={{
                         background: 'rgba(255, 255, 255, 0.9)',
                         color: DESIGN.colors.background
@@ -713,8 +720,12 @@ export default function EventDetail() {
                       )}
                     </button>
                     <button
-                      onClick={toggleVideoMute}
-                      className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleVideoMute();
+                      }}
+                      className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95"
                       style={{
                         background: 'rgba(255, 255, 255, 0.9)',
                         color: DESIGN.colors.background
@@ -729,8 +740,12 @@ export default function EventDetail() {
                     </button>
                   </div>
                   <button
-                    onClick={openVideoModal}
-                    className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openVideoModal();
+                    }}
+                    className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95"
                     style={{
                       background: 'rgba(255, 255, 255, 0.9)',
                       color: DESIGN.colors.background
@@ -791,8 +806,12 @@ export default function EventDetail() {
                 {event.images.length > 1 && (
                   <>
                     <button
-                      onClick={prevImage}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        prevImage();
+                      }}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 z-10"
                       style={{
                         background: 'rgba(0, 0, 0, 0.6)',
                         color: DESIGN.colors.textPrimary
@@ -802,8 +821,12 @@ export default function EventDetail() {
                       <ChevronLeft className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={nextImage}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        nextImage();
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 z-10"
                       style={{
                         background: 'rgba(0, 0, 0, 0.6)',
                         color: DESIGN.colors.textPrimary
@@ -814,17 +837,19 @@ export default function EventDetail() {
                     </button>
                     
                     {/* Carousel Dots */}
-                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
                       {event.images.map((_, index) => (
                         <button
                           key={index}
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             stopCarouselRotation();
                             setCurrentImageIndex(index);
                             setTimeout(() => startCarouselRotation(), 3000);
                           }}
                           className={cn(
-                            'w-2 h-2 rounded-full transition-all duration-300 hover:scale-125',
+                            'w-2 h-2 rounded-full transition-all duration-300 hover:scale-125 active:scale-110',
                             index === currentImageIndex 
                               ? 'bg-white w-4' 
                               : 'bg-white/50'
@@ -933,7 +958,7 @@ export default function EventDetail() {
               style={{ color: DESIGN.colors.textSecondary }}
             >
               <span className="font-medium" style={{ color: DESIGN.colors.primary }}>
-                {event.price === 0 ? 'FREE' : `N$${event.price}`}
+                {event.price === 0 ? 'FREE' : `N${event.price}`}
               </span>
               <span className="mx-1" aria-hidden="true">•</span>
               <span>{event.attendees} attending</span>
@@ -1310,7 +1335,7 @@ export default function EventDetail() {
                   color: DESIGN.colors.textPrimary 
                 }}
               >
-                {event.price === 0 ? 'FREE ENTRY' : `N$${event.price}`}
+                {event.price === 0 ? 'FREE ENTRY' : `N${event.price}`}
               </p>
               <p 
                 className="text-xs truncate"
