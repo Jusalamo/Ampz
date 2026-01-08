@@ -1,58 +1,116 @@
+// demo.ts - Complete Demo Mode System
 import { User, Event, ConnectionProfile, Match, Ticket, AppNotification, CommunityPhoto, CommunityComment } from './types';
 
-// Set to false for production - real users get clean slate
-// Set to true for demo mode - shows pre-populated demo data
-export const isDemoUser = false; // Default to false for production
+// ============================================================================
+// DEMO STATE MANAGEMENT
+// ============================================================================
 
-// For production users: null (real users will have their own data)
-// For demo users: pre-populated demo user data
-export const demoUser: User | null = isDemoUser ? {
-  id: 'demo-user',
-  email: 'demo@amps.app',
-  createdAt: new Date().toISOString(),
-  profile: {
-    name: 'Alex Demo',
-    age: 28,
-    bio: 'Music lover, adventure seeker, and tech enthusiast. Always looking for the next great event!',
-    occupation: 'Software Developer',
-    company: 'TechCorp Namibia',
-    location: 'Windhoek, Namibia',
-    gender: 'Non-binary',
-    interests: ['Music', 'Tech', 'Travel', 'Photography', 'Art'],
-    profilePhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
-    phone: '+264 81 123 4567',
-  },
-  subscription: {
-    tier: 'pro',
-    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  settings: {
-    theme: 'dark',
-    currency: 'NAD',
-    notifications: {
-      matches: true,
-      messages: true,
-      events: true,
-      profileViews: true,
-    },
-    privacy: {
-      searchable: true,
-      showDistance: true,
-      showOnline: true,
-      messageFrom: 'everyone',
-    },
-  },
-  blockedUsers: [],
-  bookmarkedEvents: ['event-1', 'event-3'],
-  createdEvents: [],
-  likesRemaining: Infinity,
-  lastLikeReset: new Date().toISOString(),
-  isDemo: true,
-} : null;
+const DEMO_KEY = 'amps_demo_mode';
+const DEMO_TIMESTAMP_KEY = 'amps_demo_timestamp';
+const DEMO_USER_KEY = 'amps_demo_user_data';
+const DEMO_ACTIONS_KEY = 'amps_demo_user_actions';
 
-// For production users: empty array (real users will see real events)
-// For demo users: pre-populated demo events
-export const demoEvents: Event[] = isDemoUser ? [
+// Demo expiration time (2 hours in milliseconds)
+const DEMO_EXPIRY_MS = 2 * 60 * 60 * 1000;
+
+export const getDemoMode = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return sessionStorage.getItem(DEMO_KEY) === 'true';
+};
+
+export const setDemoMode = (enabled: boolean): void => {
+  if (typeof window === 'undefined') return;
+  
+  if (enabled) {
+    sessionStorage.setItem(DEMO_KEY, 'true');
+    sessionStorage.setItem(DEMO_TIMESTAMP_KEY, Date.now().toString());
+    initializeDemoSession();
+  } else {
+    // Clear all demo data
+    sessionStorage.removeItem(DEMO_KEY);
+    sessionStorage.removeItem(DEMO_TIMESTAMP_KEY);
+    sessionStorage.removeItem(DEMO_USER_KEY);
+    sessionStorage.removeItem(DEMO_ACTIONS_KEY);
+  }
+};
+
+export const isDemoExpired = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  
+  const timestamp = sessionStorage.getItem(DEMO_TIMESTAMP_KEY);
+  if (!timestamp) return true;
+  
+  const demoStart = parseInt(timestamp, 10);
+  const now = Date.now();
+  return (now - demoStart) > DEMO_EXPIRY_MS;
+};
+
+export const isDemoUser = getDemoMode() && !isDemoExpired();
+
+// Initialize demo session with fresh data
+const initializeDemoSession = (): void => {
+  // Store the initial demo user
+  const demoUserData = {
+    id: `demo-user-${Date.now()}`,
+    email: 'demo@amps.app',
+    createdAt: new Date().toISOString(),
+    profile: {
+      name: 'Alex Demo',
+      age: 28,
+      bio: 'Music lover, adventure seeker, and tech enthusiast. Always looking for the next great event!',
+      occupation: 'Software Developer',
+      company: 'TechCorp Namibia',
+      location: 'Windhoek, Namibia',
+      gender: 'Non-binary',
+      interests: ['Music', 'Tech', 'Travel', 'Photography', 'Art'],
+      profilePhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
+      phone: '+264 81 123 4567',
+    },
+    subscription: {
+      tier: 'pro',
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    settings: {
+      theme: 'dark',
+      currency: 'NAD',
+      notifications: {
+        matches: true,
+        messages: true,
+        events: true,
+        profileViews: true,
+      },
+      privacy: {
+        searchable: true,
+        showDistance: true,
+        showOnline: true,
+        messageFrom: 'everyone',
+      },
+    },
+    blockedUsers: [],
+    bookmarkedEvents: ['event-1', 'event-3'],
+    createdEvents: [],
+    likesRemaining: Infinity,
+    lastLikeReset: new Date().toISOString(),
+    isDemo: true,
+  };
+  
+  sessionStorage.setItem(DEMO_USER_KEY, JSON.stringify(demoUserData));
+  sessionStorage.setItem(DEMO_ACTIONS_KEY, JSON.stringify({
+    likes: [],
+    messages: [],
+    created: [],
+    joined: [],
+    uploadedPhotos: [],
+    comments: [],
+  }));
+};
+
+// ============================================================================
+// DEMO DATA FUNCTIONS
+// ============================================================================
+
+// Base demo data (read-only)
+const demoEventsData: Event[] = [
   {
     id: 'event-1',
     name: 'Windhoek Jazz Night',
@@ -191,11 +249,9 @@ export const demoEvents: Event[] = isDemoUser ? [
     isFeatured: false,
     isDemo: true,
   },
-] : [];
+];
 
-// For production users: empty array (real users will see real connections)
-// For demo users: pre-populated demo connection profiles
-export const demoConnectionProfiles: ConnectionProfile[] = isDemoUser ? [
+const demoConnectionProfilesData: ConnectionProfile[] = [
   {
     id: 'conn-1',
     userId: 'user-1',
@@ -266,11 +322,9 @@ export const demoConnectionProfiles: ConnectionProfile[] = isDemoUser ? [
     isPublic: true,
     isDemo: true,
   },
-] : [];
+];
 
-// For production users: empty array (real users will have their own matches)
-// For demo users: pre-populated demo matches
-export const demoMatches: Match[] = isDemoUser ? [
+const demoMatchesData: Match[] = [
   {
     id: 'match-1',
     matchProfile: {
@@ -321,11 +375,9 @@ export const demoMatches: Match[] = isDemoUser ? [
     online: false,
     isDemo: true,
   },
-] : [];
+];
 
-// For production users: empty array (real users will have their own tickets)
-// For demo users: pre-populated demo tickets
-export const demoTickets: Ticket[] = isDemoUser ? [
+const demoTicketsData: Ticket[] = [
   {
     id: 'ticket-1',
     eventId: 'event-1',
@@ -341,11 +393,9 @@ export const demoTickets: Ticket[] = isDemoUser ? [
     status: 'active',
     isDemo: true,
   },
-] : [];
+];
 
-// For production users: empty array (real users will have their own notifications)
-// For demo users: pre-populated demo notifications
-export const demoNotifications: AppNotification[] = isDemoUser ? [
+const demoNotificationsData: AppNotification[] = [
   {
     id: 'notif-1',
     type: 'match',
@@ -376,11 +426,9 @@ export const demoNotifications: AppNotification[] = isDemoUser ? [
     data: { eventId: 'event-1' },
     isDemo: true,
   },
-] : [];
+];
 
-// For production users: empty array (real users will see real community photos)
-// For demo users: pre-populated demo community photos
-export const demoCommunityPhotos: CommunityPhoto[] = isDemoUser ? [
+const demoCommunityPhotosData: CommunityPhoto[] = [
   {
     id: 'photo-1',
     eventId: 'event-1',
@@ -405,11 +453,9 @@ export const demoCommunityPhotos: CommunityPhoto[] = isDemoUser ? [
     likedBy: [],
     isDemo: true,
   },
-] : [];
+];
 
-// For production users: empty array (real users will see real community comments)
-// For demo users: pre-populated demo community comments
-export const demoCommunityComments: CommunityComment[] = isDemoUser ? [
+const demoCommunityCommentsData: CommunityComment[] = [
   {
     id: 'comment-1',
     eventId: 'event-1',
@@ -447,4 +493,380 @@ export const demoCommunityComments: CommunityComment[] = isDemoUser ? [
     replyTo: 'comment-2',
     isDemo: true,
   },
-] : [];
+];
+
+// ============================================================================
+// PUBLIC API FUNCTIONS
+// ============================================================================
+
+export const getDemoUser = (): User | null => {
+  if (!isDemoUser) return null;
+  
+  try {
+    const stored = sessionStorage.getItem(DEMO_USER_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error('Error parsing demo user:', error);
+  }
+  
+  // Fallback to default
+  return {
+    id: `demo-user-${Date.now()}`,
+    email: 'demo@amps.app',
+    createdAt: new Date().toISOString(),
+    profile: {
+      name: 'Alex Demo',
+      age: 28,
+      bio: 'Music lover, adventure seeker, and tech enthusiast. Always looking for the next great event!',
+      occupation: 'Software Developer',
+      company: 'TechCorp Namibia',
+      location: 'Windhoek, Namibia',
+      gender: 'Non-binary',
+      interests: ['Music', 'Tech', 'Travel', 'Photography', 'Art'],
+      profilePhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
+      phone: '+264 81 123 4567',
+    },
+    subscription: {
+      tier: 'pro',
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    settings: {
+      theme: 'dark',
+      currency: 'NAD',
+      notifications: {
+        matches: true,
+        messages: true,
+        events: true,
+        profileViews: true,
+      },
+      privacy: {
+        searchable: true,
+        showDistance: true,
+        showOnline: true,
+        messageFrom: 'everyone',
+      },
+    },
+    blockedUsers: [],
+    bookmarkedEvents: ['event-1', 'event-3'],
+    createdEvents: [],
+    likesRemaining: Infinity,
+    lastLikeReset: new Date().toISOString(),
+    isDemo: true,
+  };
+};
+
+export const getDemoEvents = (): Event[] => {
+  if (!isDemoUser) return [];
+  return [...demoEventsData];
+};
+
+export const getDemoConnectionProfiles = (): ConnectionProfile[] => {
+  if (!isDemoUser) return [];
+  return [...demoConnectionProfilesData];
+};
+
+export const getDemoMatches = (): Match[] => {
+  if (!isDemoUser) return [];
+  return [...demoMatchesData];
+};
+
+export const getDemoTickets = (): Ticket[] => {
+  if (!isDemoUser) return [];
+  return [...demoTicketsData];
+};
+
+export const getDemoNotifications = (): AppNotification[] => {
+  if (!isDemoUser) return [];
+  return [...demoNotificationsData];
+};
+
+export const getDemoCommunityPhotos = (): CommunityPhoto[] => {
+  if (!isDemoUser) return [];
+  return [...demoCommunityPhotosData];
+};
+
+export const getDemoCommunityComments = (): CommunityComment[] => {
+  if (!isDemoUser) return [];
+  return [...demoCommunityCommentsData];
+};
+
+// ============================================================================
+// DEMO ACTIONS TRACKING (User interactions in demo mode)
+// ============================================================================
+
+export interface DemoUserActions {
+  likes: string[]; // IDs of liked profiles/photos/comments
+  messages: Array<{
+    matchId: string;
+    message: string;
+    timestamp: string;
+  }>;
+  created: Array<{
+    type: 'event' | 'comment' | 'photo';
+    id: string;
+    data: any;
+  }>;
+  joined: string[]; // Event IDs
+  uploadedPhotos: Array<{
+    eventId: string;
+    imageUrl: string;
+    timestamp: string;
+  }>;
+  comments: Array<{
+    eventId: string;
+    text: string;
+    timestamp: string;
+  }>;
+}
+
+export const getDemoUserActions = (): DemoUserActions => {
+  try {
+    const stored = sessionStorage.getItem(DEMO_ACTIONS_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error('Error parsing demo actions:', error);
+  }
+  
+  return {
+    likes: [],
+    messages: [],
+    created: [],
+    joined: [],
+    uploadedPhotos: [],
+    comments: [],
+  };
+};
+
+export const updateDemoUserActions = (updates: Partial<DemoUserActions>): void => {
+  if (!isDemoUser) return;
+  
+  const currentActions = getDemoUserActions();
+  const updatedActions = {
+    ...currentActions,
+    ...updates,
+  };
+  
+  sessionStorage.setItem(DEMO_ACTIONS_KEY, JSON.stringify(updatedActions));
+};
+
+// Helper functions for common actions
+export const demoLikeProfile = (profileId: string): void => {
+  const actions = getDemoUserActions();
+  if (!actions.likes.includes(profileId)) {
+    actions.likes.push(profileId);
+    updateDemoUserActions({ likes: actions.likes });
+  }
+};
+
+export const demoJoinEvent = (eventId: string): void => {
+  const actions = getDemoUserActions();
+  if (!actions.joined.includes(eventId)) {
+    actions.joined.push(eventId);
+    updateDemoUserActions({ joined: actions.joined });
+  }
+};
+
+export const demoAddMessage = (matchId: string, message: string): void => {
+  const actions = getDemoUserActions();
+  actions.messages.push({
+    matchId,
+    message,
+    timestamp: new Date().toISOString(),
+  });
+  updateDemoUserActions({ messages: actions.messages });
+};
+
+// ============================================================================
+// DEMO COMPONENTS & HOOKS
+// ============================================================================
+
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+
+interface DemoContextType {
+  isDemo: boolean;
+  enterDemoMode: () => void;
+  exitDemoMode: () => void;
+  demoUser: User | null;
+  demoActions: DemoUserActions;
+}
+
+const DemoContext = createContext<DemoContextType | undefined>(undefined);
+
+export const useDemo = () => {
+  const context = useContext(DemoContext);
+  if (!context) {
+    throw new Error('useDemo must be used within DemoProvider');
+  }
+  return context;
+};
+
+export const DemoProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [isDemo, setIsDemo] = useState(false);
+  const [demoUser, setDemoUser] = useState<User | null>(null);
+  const [demoActions, setDemoActions] = useState<DemoUserActions>(getDemoUserActions());
+
+  useEffect(() => {
+    const demoMode = getDemoMode();
+    if (demoMode && isDemoExpired()) {
+      exitDemoMode();
+    } else {
+      setIsDemo(demoMode);
+      if (demoMode) {
+        setDemoUser(getDemoUser());
+        setDemoActions(getDemoUserActions());
+      }
+    }
+  }, []);
+
+  const enterDemoMode = () => {
+    setDemoMode(true);
+    setIsDemo(true);
+    setDemoUser(getDemoUser());
+    setDemoActions(getDemoUserActions());
+    
+    // Refresh to apply demo mode to all components
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
+  };
+
+  const exitDemoMode = () => {
+    setDemoMode(false);
+    setIsDemo(false);
+    setDemoUser(null);
+    setDemoActions(getDemoUserActions());
+    
+    // Clear demo data
+    const demoKeys = Object.keys(sessionStorage).filter(key => 
+      key.includes('demo') || key.includes('DEMO')
+    );
+    demoKeys.forEach(key => sessionStorage.removeItem(key));
+    
+    // Redirect to home
+    window.location.href = '/';
+  };
+
+  return (
+    <DemoContext.Provider value={{ 
+      isDemo, 
+      enterDemoMode, 
+      exitDemoMode, 
+      demoUser, 
+      demoActions 
+    }}>
+      {children}
+    </DemoContext.Provider>
+  );
+};
+
+// Demo Button Component
+export const TryDemoButton: React.FC<{ className?: string }> = ({ className }) => {
+  const { enterDemoMode } = useDemo();
+  
+  return (
+    <button
+      onClick={enterDemoMode}
+      className={`px-4 py-2 border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors ${className || ''}`}
+    >
+      Try Demo
+    </button>
+  );
+};
+
+// Demo Banner Component
+export const DemoBanner: React.FC = () => {
+  const { isDemo, exitDemoMode } = useDemo();
+  
+  if (!isDemo) return null;
+  
+  const demoStart = sessionStorage.getItem(DEMO_TIMESTAMP_KEY);
+  const timeLeft = demoStart ? 
+    Math.max(0, DEMO_EXPIRY_MS - (Date.now() - parseInt(demoStart, 10))) : 0;
+  const minutesLeft = Math.floor(timeLeft / (1000 * 60));
+  
+  return (
+    <div className="bg-purple-100 border-b border-purple-300 text-purple-800 p-2 text-center">
+      <div className="container mx-auto flex items-center justify-between">
+        <span className="font-medium">DEMO MODE ACTIVE</span>
+        <div className="flex items-center gap-4">
+          <span className="text-sm">
+            {minutesLeft > 0 ? `${minutesLeft} minutes remaining` : 'Expiring soon'}
+          </span>
+          <button
+            onClick={exitDemoMode}
+            className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
+          >
+            Exit Demo
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Demo Guard Hook
+export const useDemoGuard = (redirectTo: string = '/') => {
+  const { isDemo } = useDemo();
+  
+  useEffect(() => {
+    if (!isDemo) {
+      window.location.href = redirectTo;
+    }
+  }, [isDemo, redirectTo]);
+  
+  return isDemo;
+};
+
+// Check if data is demo data
+export const isDemoData = (data: any): boolean => {
+  return data?.isDemo === true;
+};
+
+// Reset demo to initial state
+export const resetDemo = (): void => {
+  if (isDemoUser) {
+    initializeDemoSession();
+    sessionStorage.setItem(DEMO_TIMESTAMP_KEY, Date.now().toString());
+    window.location.reload();
+  }
+};
+
+export default {
+  // State management
+  getDemoMode,
+  setDemoMode,
+  isDemoExpired,
+  isDemoUser,
+  
+  // Data getters
+  getDemoUser,
+  getDemoEvents,
+  getDemoConnectionProfiles,
+  getDemoMatches,
+  getDemoTickets,
+  getDemoNotifications,
+  getDemoCommunityPhotos,
+  getDemoCommunityComments,
+  
+  // Actions
+  getDemoUserActions,
+  updateDemoUserActions,
+  demoLikeProfile,
+  demoJoinEvent,
+  demoAddMessage,
+  
+  // Components & Context
+  DemoProvider,
+  useDemo,
+  TryDemoButton,
+  DemoBanner,
+  useDemoGuard,
+  
+  // Utilities
+  isDemoData,
+  resetDemo,
+};
