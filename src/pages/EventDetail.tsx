@@ -8,6 +8,46 @@ import { CommunityComments } from '@/components/CommunityComments';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
+// Design Constants
+const DESIGN = {
+  colors: {
+    primary: '#C4B5FD',
+    lavenderLight: '#E9D5FF',
+    accentPink: '#FFB8E6',
+    background: '#1A1A1A',
+    card: '#2D2D2D',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#B8B8B8',
+    success: '#10B981',
+    warning: '#F59E0B',
+    danger: '#EF4444'
+  },
+  spacing: {
+    app: '16px',
+    card: '16px',
+    button: '12px',
+    modal: '20px'
+  },
+  borderRadius: {
+    card: '24px',
+    cardInner: '20px',
+    button: '12px',
+    roundButton: '50%',
+    modalTop: '20px',
+    smallPill: '8px'
+  },
+  typography: {
+    h1: '28px',
+    h2: '24px',
+    h3: '22px',
+    h4: '18px',
+    bodyLarge: '15px',
+    body: '14px',
+    small: '13px',
+    caption: '12px'
+  }
+};
+
 // Add missing interface for event
 interface EventType {
   id: string;
@@ -156,14 +196,40 @@ export default function EventDetail() {
 
   if (!event) {
     return (
-      <div className="app-container min-h-screen bg-background flex items-center justify-center p-4">
+      <div 
+        className="min-h-screen flex items-center justify-center p-4"
+        style={{ background: DESIGN.colors.background }}
+      >
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-card flex items-center justify-center">
-            <Calendar className="w-8 h-8 text-muted-foreground" />
+          <div 
+            className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
+            style={{ 
+              background: DESIGN.colors.card,
+              borderRadius: '50%'
+            }}
+          >
+            <Calendar className="w-8 h-8" style={{ color: DESIGN.colors.textSecondary }} />
           </div>
-          <h2 className="text-xl font-bold mb-2">Event not found</h2>
-          <p className="text-muted-foreground mb-6">The event you're looking for doesn't exist or has been removed.</p>
-          <Button onClick={() => navigate('/')} className="rounded-lg">
+          <h2 
+            className="text-xl font-bold mb-2"
+            style={{ color: DESIGN.colors.textPrimary }}
+          >
+            Event not found
+          </h2>
+          <p 
+            className="mb-6"
+            style={{ color: DESIGN.colors.textSecondary }}
+          >
+            The event you're looking for doesn't exist or has been removed.
+          </p>
+          <Button 
+            onClick={() => navigate('/')}
+            className="rounded-[12px] h-12 px-6"
+            style={{ 
+              background: DESIGN.colors.primary,
+              color: DESIGN.colors.background
+            }}
+          >
             Browse Events
           </Button>
         </div>
@@ -185,45 +251,71 @@ export default function EventDetail() {
   }, [event.date]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div 
+      className="min-h-screen"
+      style={{ background: DESIGN.colors.background }}
+    >
       {/* Fixed Header */}
       <header 
         className={cn(
           'fixed top-0 left-0 right-0 z-40 transition-all duration-300',
           isScrolled 
-            ? 'bg-background/95 backdrop-blur-xl border-b border-border shadow-sm' 
+            ? 'bg-background/95 backdrop-blur-xl' 
             : 'bg-transparent'
         )}
+        style={{
+          background: isScrolled ? `${DESIGN.colors.background}F2` : 'transparent',
+          borderBottom: isScrolled ? `1px solid ${DESIGN.colors.textSecondary}20` : 'none'
+        }}
       >
-        <div className="flex items-center justify-between px-4 h-14 pt-safe max-w-app mx-auto">
+        <div 
+          className="flex items-center justify-between px-4 h-14 pt-safe max-w-app mx-auto"
+          style={{ paddingLeft: DESIGN.spacing.app, paddingRight: DESIGN.spacing.app }}
+        >
           <button
             onClick={handleBack}
             className={cn(
-              'w-9 h-9 rounded-full flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background',
+              'w-9 h-9 rounded-full flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2',
               isScrolled 
                 ? 'bg-card hover:bg-card/80' 
                 : 'bg-black/40 backdrop-blur-sm hover:bg-black/60'
             )}
+            style={{
+              borderRadius: DESIGN.borderRadius.roundButton,
+              background: isScrolled ? DESIGN.colors.card : 'rgba(0, 0, 0, 0.4)',
+              color: DESIGN.colors.textPrimary,
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
+            }}
             aria-label="Go back"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
           
           {isScrolled && (
-            <h1 className="text-sm font-semibold truncate max-w-[180px]" aria-label={event.name}>
+            <h1 
+              className="text-sm font-semibold truncate max-w-[180px]" 
+              aria-label={event.name}
+              style={{ color: DESIGN.colors.textPrimary }}
+            >
               {event.name}
             </h1>
           )}
           
-          <div className="flex gap-1">
+          <div className="flex gap-2">
             <button 
               onClick={handleShare}
               className={cn(
-                'w-9 h-9 rounded-full flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background',
+                'w-9 h-9 rounded-full flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2',
                 isScrolled 
                   ? 'bg-card hover:bg-card/80' 
                   : 'bg-black/40 backdrop-blur-sm hover:bg-black/60'
               )}
+              style={{
+                borderRadius: DESIGN.borderRadius.roundButton,
+                background: isScrolled ? DESIGN.colors.card : 'rgba(0, 0, 0, 0.4)',
+                color: DESIGN.colors.textPrimary,
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
+              }}
               aria-label="Share event"
             >
               <Share2 className="w-4 h-4" />
@@ -231,13 +323,19 @@ export default function EventDetail() {
             <button
               onClick={handleBookmark}
               className={cn(
-                'w-9 h-9 rounded-full flex items-center justify-center transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background',
+                'w-9 h-9 rounded-full flex items-center justify-center transition-all focus:outline-none focus:ring-2 focus:ring-offset-2',
                 isBookmarked 
                   ? 'bg-primary text-primary-foreground' 
                   : isScrolled 
                     ? 'bg-card hover:bg-card/80'
                     : 'bg-black/40 backdrop-blur-sm hover:bg-black/60'
               )}
+              style={{
+                borderRadius: DESIGN.borderRadius.roundButton,
+                background: isBookmarked ? DESIGN.colors.primary : isScrolled ? DESIGN.colors.card : 'rgba(0, 0, 0, 0.4)',
+                color: isBookmarked ? DESIGN.colors.background : DESIGN.colors.textPrimary,
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
+              }}
               aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark event'}
             >
               <Bookmark className={cn('w-4 h-4', isBookmarked && 'fill-current')} />
@@ -266,9 +364,15 @@ export default function EventDetail() {
           <span className={cn(
             'px-3 py-1.5 text-xs font-semibold rounded-full flex items-center gap-1.5 backdrop-blur-sm',
             isLive 
-              ? 'bg-red-500/90 text-white animate-pulse border border-red-300' 
-              : 'bg-card/90 text-foreground border border-border'
-          )}>
+              ? 'bg-red-500/90 text-white animate-pulse' 
+              : 'bg-card/90 text-foreground'
+          )}
+          style={{
+            borderRadius: DESIGN.borderRadius.roundButton,
+            background: isLive ? `${DESIGN.colors.danger}E6` : `${DESIGN.colors.card}E6`,
+            color: isLive ? DESIGN.colors.textPrimary : DESIGN.colors.textPrimary,
+            border: `1px solid ${isLive ? `${DESIGN.colors.danger}80` : `${DESIGN.colors.textSecondary}40`}`
+          }}>
             <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" aria-hidden="true"></span>
             {isLive ? 'LIVE NOW' : 'UPCOMING'}
           </span>
@@ -276,24 +380,58 @@ export default function EventDetail() {
       </div>
 
       {/* Main Content */}
-      <main ref={contentRef} className="px-4 -mt-6 relative z-10 pb-24 max-w-app mx-auto">
+      <main 
+        ref={contentRef} 
+        className="relative z-10 pb-24"
+        style={{ 
+          paddingLeft: DESIGN.spacing.app,
+          paddingRight: DESIGN.spacing.app,
+          marginTop: '-24px',
+          background: DESIGN.colors.background
+        }}
+      >
         {/* Title and Tags */}
         <div className="mb-4">
           <div className="flex items-start justify-between gap-3 mb-3">
-            <h1 className="text-xl font-bold leading-snug flex-1">{event.name}</h1>
+            <h1 
+              className="font-bold leading-snug flex-1"
+              style={{ 
+                fontSize: DESIGN.typography.h1,
+                color: DESIGN.colors.textPrimary 
+              }}
+            >
+              {event.name}
+            </h1>
             {event.isFeatured && (
-              <span className="px-2.5 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-semibold rounded-full whitespace-nowrap">
+              <span 
+                className="px-2.5 py-1 text-white text-xs font-semibold rounded-full whitespace-nowrap"
+                style={{
+                  background: 'linear-gradient(135deg, #C4B5FD 0%, #FFB8E6 100%)',
+                  borderRadius: DESIGN.borderRadius.roundButton
+                }}
+              >
                 FEATURED
               </span>
             )}
           </div>
           
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="px-2.5 py-1 bg-card text-xs font-medium rounded-lg border border-border">
+            <span 
+              className="px-2.5 py-1 text-xs font-medium rounded-lg"
+              style={{
+                background: DESIGN.colors.card,
+                color: DESIGN.colors.textPrimary,
+                borderRadius: DESIGN.borderRadius.button,
+                border: `1px solid ${DESIGN.colors.textSecondary}30`
+              }}
+            >
               {event.category}
             </span>
-            <div className="text-sm text-muted-foreground">
-              <span className="font-medium" style={{ color: event.customTheme }}>
+            <div 
+              className="text-sm"
+              style={{ color: DESIGN.colors.textSecondary }}
+            >
+              <span className="font-medium" style={{ color: DESIGN.colors.primary }}>
                 {event.price === 0 ? 'FREE' : `N$${event.price}`}
               </span>
               <span className="mx-1" aria-hidden="true">•</span>
@@ -303,15 +441,26 @@ export default function EventDetail() {
         </div>
 
         {/* Tabs Navigation */}
-        <nav className="flex border-b border-border mb-6" aria-label="Event details tabs">
+        <nav 
+          className="flex border-b mb-6"
+          style={{ 
+            borderBottom: `1px solid ${DESIGN.colors.textSecondary}20`
+          }}
+          aria-label="Event details tabs"
+        >
           <button
             onClick={() => setActiveTab('details')}
             className={cn(
-              'flex-1 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background',
+              'flex-1 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2',
               activeTab === 'details'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
+            style={{
+              borderBottomColor: activeTab === 'details' ? DESIGN.colors.primary : 'transparent',
+              color: activeTab === 'details' ? DESIGN.colors.primary : DESIGN.colors.textSecondary,
+              fontSize: DESIGN.typography.small
+            }}
             aria-current={activeTab === 'details' ? 'page' : undefined}
           >
             Details
@@ -319,11 +468,16 @@ export default function EventDetail() {
           <button
             onClick={() => setActiveTab('photos')}
             className={cn(
-              'flex-1 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background',
+              'flex-1 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2',
               activeTab === 'photos'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
+            style={{
+              borderBottomColor: activeTab === 'photos' ? DESIGN.colors.primary : 'transparent',
+              color: activeTab === 'photos' ? DESIGN.colors.primary : DESIGN.colors.textSecondary,
+              fontSize: DESIGN.typography.small
+            }}
             aria-current={activeTab === 'photos' ? 'page' : undefined}
           >
             <Image className="w-3.5 h-3.5" />
@@ -332,11 +486,16 @@ export default function EventDetail() {
           <button
             onClick={() => setActiveTab('comments')}
             className={cn(
-              'flex-1 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background',
+              'flex-1 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2',
               activeTab === 'comments'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
+            style={{
+              borderBottomColor: activeTab === 'comments' ? DESIGN.colors.primary : 'transparent',
+              color: activeTab === 'comments' ? DESIGN.colors.primary : DESIGN.colors.textSecondary,
+              fontSize: DESIGN.typography.small
+            }}
             aria-current={activeTab === 'comments' ? 'page' : undefined}
           >
             <MessageCircle className="w-3.5 h-3.5" />
@@ -351,45 +510,125 @@ export default function EventDetail() {
             <div className="space-y-6">
               {/* Info Cards */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-card p-3 rounded-xl border border-border">
+                <div 
+                  className="p-3 rounded-xl border"
+                  style={{
+                    background: DESIGN.colors.card,
+                    borderRadius: DESIGN.borderRadius.cardInner,
+                    border: `1px solid ${DESIGN.colors.textSecondary}20`
+                  }}
+                >
                   <div className="flex items-center gap-2 mb-1">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0" aria-hidden="true">
-                      <Calendar className="w-4 h-4 text-primary" />
+                    <div 
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" 
+                      aria-hidden="true"
+                      style={{
+                        background: `${DESIGN.colors.primary}1A`,
+                        borderRadius: DESIGN.borderRadius.button
+                      }}
+                    >
+                      <Calendar className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs text-muted-foreground">Date</p>
-                      <p className="text-sm font-semibold truncate">
+                      <p 
+                        className="text-xs truncate"
+                        style={{ color: DESIGN.colors.textSecondary }}
+                      >
+                        Date
+                      </p>
+                      <p 
+                        className="text-sm font-semibold truncate"
+                        style={{ color: DESIGN.colors.textPrimary }}
+                      >
                         {formattedDate}
                       </p>
                     </div>
                   </div>
                 </div>
                 
-                <div className="bg-card p-3 rounded-xl border border-border">
+                <div 
+                  className="p-3 rounded-xl border"
+                  style={{
+                    background: DESIGN.colors.card,
+                    borderRadius: DESIGN.borderRadius.cardInner,
+                    border: `1px solid ${DESIGN.colors.textSecondary}20`
+                  }}
+                >
                   <div className="flex items-center gap-2 mb-1">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0" aria-hidden="true">
-                      <Clock className="w-4 h-4 text-primary" />
+                    <div 
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" 
+                      aria-hidden="true"
+                      style={{
+                        background: `${DESIGN.colors.primary}1A`,
+                        borderRadius: DESIGN.borderRadius.button
+                      }}
+                    >
+                      <Clock className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs text-muted-foreground">Time</p>
-                      <p className="text-sm font-semibold truncate">{event.time}</p>
+                      <p 
+                        className="text-xs truncate"
+                        style={{ color: DESIGN.colors.textSecondary }}
+                      >
+                        Time
+                      </p>
+                      <p 
+                        className="text-sm font-semibold truncate"
+                        style={{ color: DESIGN.colors.textPrimary }}
+                      >
+                        {event.time}
+                      </p>
                     </div>
                   </div>
                 </div>
                 
-                <div className="bg-card p-3 rounded-xl border border-border col-span-2">
+                <div 
+                  className="p-3 rounded-xl border col-span-2"
+                  style={{
+                    background: DESIGN.colors.card,
+                    borderRadius: DESIGN.borderRadius.cardInner,
+                    border: `1px solid ${DESIGN.colors.textSecondary}20`
+                  }}
+                >
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0" aria-hidden="true">
-                      <MapPin className="w-4 h-4 text-primary" />
+                    <div 
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" 
+                      aria-hidden="true"
+                      style={{
+                        background: `${DESIGN.colors.primary}1A`,
+                        borderRadius: DESIGN.borderRadius.button
+                      }}
+                    >
+                      <MapPin className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
                     </div>
                     <div className="flex-1 min-w-0 mr-2">
-                      <p className="text-xs text-muted-foreground">Location</p>
-                      <p className="text-sm font-semibold truncate">{event.location}</p>
-                      <p className="text-xs text-muted-foreground truncate">{event.address}</p>
+                      <p 
+                        className="text-xs truncate"
+                        style={{ color: DESIGN.colors.textSecondary }}
+                      >
+                        Location
+                      </p>
+                      <p 
+                        className="text-sm font-semibold truncate"
+                        style={{ color: DESIGN.colors.textPrimary }}
+                      >
+                        {event.location}
+                      </p>
+                      <p 
+                        className="text-xs truncate"
+                        style={{ color: DESIGN.colors.textSecondary }}
+                      >
+                        {event.address}
+                      </p>
                     </div>
                     <button 
                       onClick={handleNavigateToMap}
-                      className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary hover:bg-primary/20 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
+                      className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary/20 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
+                      style={{
+                        background: `${DESIGN.colors.primary}1A`,
+                        borderRadius: DESIGN.borderRadius.button,
+                        color: DESIGN.colors.primary
+                      }}
                       aria-label="Open location in maps"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
@@ -400,12 +639,22 @@ export default function EventDetail() {
 
               {/* Description */}
               <section>
-                <h3 className="text-lg font-bold mb-3 flex items-center gap-2">
+                <h3 
+                  className="font-bold mb-3 flex items-center gap-2"
+                  style={{ 
+                    fontSize: DESIGN.typography.h4,
+                    color: DESIGN.colors.textPrimary 
+                  }}
+                >
                   About This Event
                   {descriptionTruncated && (
                     <button 
                       onClick={toggleDescription}
-                      className="text-primary text-xs font-medium hover:underline flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background rounded"
+                      className="text-primary text-xs font-medium hover:underline flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-offset-2 rounded"
+                      style={{
+                        color: DESIGN.colors.primary,
+                        fontSize: DESIGN.typography.caption
+                      }}
                       aria-expanded={showFullDescription}
                     >
                       {showFullDescription ? 'Show less' : 'Read more'}
@@ -414,9 +663,13 @@ export default function EventDetail() {
                   )}
                 </h3>
                 <div className={cn(
-                  'text-muted-foreground leading-relaxed text-sm',
+                  'leading-relaxed',
                   !showFullDescription && descriptionTruncated && 'line-clamp-4'
-                )}>
+                )}
+                style={{
+                  color: DESIGN.colors.textSecondary,
+                  fontSize: DESIGN.typography.body
+                }}>
                   {event.description}
                 </div>
               </section>
@@ -424,12 +677,26 @@ export default function EventDetail() {
               {/* Tags */}
               {event.tags.length > 0 && (
                 <section>
-                  <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Tags</h3>
+                  <h3 
+                    className="font-semibold mb-2"
+                    style={{ 
+                      color: DESIGN.colors.textSecondary,
+                      fontSize: DESIGN.typography.small
+                    }}
+                  >
+                    Tags
+                  </h3>
                   <div className="flex flex-wrap gap-1.5">
                     {event.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="px-2.5 py-1 bg-card text-xs font-medium rounded-lg border border-border"
+                        className="px-2.5 py-1 text-xs font-medium rounded-lg border"
+                        style={{
+                          background: DESIGN.colors.card,
+                          color: DESIGN.colors.textPrimary,
+                          borderRadius: DESIGN.borderRadius.button,
+                          border: `1px solid ${DESIGN.colors.textSecondary}30`
+                        }}
                       >
                         {tag}
                       </span>
@@ -439,14 +706,33 @@ export default function EventDetail() {
               )}
 
               {/* Attendees Preview */}
-              <div className="bg-card p-4 rounded-xl border border-border">
+              <div 
+                className="p-4 rounded-xl border"
+                style={{
+                  background: DESIGN.colors.card,
+                  borderRadius: DESIGN.borderRadius.cardInner,
+                  border: `1px solid ${DESIGN.colors.textSecondary}20`
+                }}
+              >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-primary" aria-hidden="true" />
-                    <span className="font-medium text-sm">{event.attendees} people attending</span>
+                    <Users className="w-4 h-4" style={{ color: DESIGN.colors.primary }} aria-hidden="true" />
+                    <span 
+                      className="font-medium"
+                      style={{ 
+                        color: DESIGN.colors.textPrimary,
+                        fontSize: DESIGN.typography.body 
+                      }}
+                    >
+                      {event.attendees} people attending
+                    </span>
                   </div>
                   <button 
-                    className="text-xs text-primary font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background rounded"
+                    className="text-xs font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 rounded"
+                    style={{
+                      color: DESIGN.colors.primary,
+                      fontSize: DESIGN.typography.caption
+                    }}
                     onClick={() => {/* TODO: Implement see all attendees */}}
                   >
                     See all
@@ -456,7 +742,11 @@ export default function EventDetail() {
                   {[1, 2, 3, 4].map((i) => (
                     <div
                       key={i}
-                      className="w-8 h-8 rounded-full bg-gray-200 border-2 border-background overflow-hidden"
+                      className="w-8 h-8 rounded-full border-2 overflow-hidden"
+                      style={{
+                        background: '#4A4A4A',
+                        borderColor: DESIGN.colors.background
+                      }}
                       aria-hidden="true"
                     >
                       <img
@@ -469,7 +759,11 @@ export default function EventDetail() {
                   ))}
                   {event.attendees > 4 && (
                     <div 
-                      className="w-8 h-8 rounded-full bg-primary flex items-center justify-center border-2 border-background text-xs font-semibold text-white"
+                      className="w-8 h-8 rounded-full flex items-center justify-center border-2 text-xs font-semibold text-white"
+                      style={{
+                        background: DESIGN.colors.primary,
+                        borderColor: DESIGN.colors.background
+                      }}
                       aria-label={`${event.attendees - 4} more attendees`}
                     >
                       +{event.attendees - 4}
@@ -497,24 +791,46 @@ export default function EventDetail() {
       </main>
 
       {/* Sticky Bottom CTA */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-xl border-t border-border p-4 pb-safe z-40">
-        <div className="max-w-app mx-auto">
+      <footer 
+        className="fixed bottom-0 left-0 right-0 backdrop-blur-xl border-t p-4 pb-safe z-40"
+        style={{
+          background: `${DESIGN.colors.background}F2`,
+          borderTop: `1px solid ${DESIGN.colors.textSecondary}20`,
+          padding: DESIGN.spacing.app
+        }}
+      >
+        <div className="mx-auto">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-lg font-bold truncate">
+              <p 
+                className="font-bold truncate"
+                style={{ 
+                  fontSize: DESIGN.typography.h4,
+                  color: DESIGN.colors.textPrimary 
+                }}
+              >
                 {event.price === 0 ? 'FREE ENTRY' : `N$${event.price}`}
               </p>
-              <p className="text-xs text-muted-foreground truncate">
+              <p 
+                className="text-xs truncate"
+                style={{ color: DESIGN.colors.textSecondary }}
+              >
                 {hasTicket ? 'Ticket purchased' : 'Per person'}
               </p>
             </div>
             <Button 
               className={cn(
-                'flex-1 h-12 rounded-xl text-base font-semibold min-w-[120px] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background',
-                hasTicket && isLive 
-                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg' 
-                  : 'bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white'
+                'flex-1 h-12 rounded-xl text-base font-semibold min-w-[120px] focus:outline-none focus:ring-2 focus:ring-offset-2'
               )}
+              style={{
+                borderRadius: DESIGN.borderRadius.cardInner,
+                height: '48px',
+                background: hasTicket && isLive 
+                  ? `linear-gradient(135deg, ${DESIGN.colors.success} 0%, #059669 100%)`
+                  : `linear-gradient(135deg, ${DESIGN.colors.primary} 0%, ${DESIGN.colors.lavenderLight} 100%)`,
+                color: DESIGN.colors.background,
+                boxShadow: '0 4px 20px rgba(196, 181, 253, 0.3)'
+              }}
               size="lg"
               onClick={() => {/* TODO: Implement ticket purchase */}}
             >
