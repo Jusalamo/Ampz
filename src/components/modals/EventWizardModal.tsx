@@ -103,6 +103,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     videoFiles: [] as File[],
     themeColor: '#8B5CF6',
     isFree: true,
+    mediaType: 'carousel' as 'video' | 'carousel' // NEW: Track media type
   });
   const [createdEvent, setCreatedEvent] = useState<Event | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -190,6 +191,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         videoFiles: [],
         themeColor: '#8B5CF6',
         isFree: true,
+        mediaType: 'carousel'
       });
       setImageFiles([]);
       setVideoFile(null);
@@ -975,10 +977,11 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         customTheme: eventData.themeColor,
         coverImage: eventData.images[0] || `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800&auto=format&fit=crop`,
         images: eventData.images,
-        videos: videoUrls, // Now includes the uploaded video URLs
+        videos: videoUrls,
         tags: [eventData.category],
         isFeatured: user?.subscription?.tier === 'max',
-        hasVideo: videoUrls.length > 0
+        hasVideo: videoUrls.length > 0,
+        mediaType: eventData.mediaType // NEW: Store media type
       };
 
       await addEvent(newEvent);
@@ -1429,7 +1432,71 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </p>
                 </div>
 
-                {/* Primary Event Photo */}
+                {/* Media Type Selector - NEW */}
+                <div className="space-y-3">
+                  <label className="text-[13px] font-semibold block uppercase tracking-wider" 
+                         style={{ color: DESIGN.colors.textSecondary }}>
+                    Select Media Type *
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setEventData(prev => ({ ...prev, mediaType: 'carousel' }))}
+                      className={cn(
+                        'p-4 border transition-all text-center',
+                        eventData.mediaType === 'carousel'
+                          ? 'border-primary'
+                          : 'border-border hover:border-primary'
+                      )}
+                      style={{
+                        borderRadius: DESIGN.borderRadius.button,
+                        background: eventData.mediaType === 'carousel' 
+                          ? `${eventData.themeColor}20` 
+                          : 'transparent'
+                      }}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <Image className="w-6 h-6" 
+                               style={{ color: eventData.mediaType === 'carousel' ? eventData.themeColor : DESIGN.colors.textSecondary }} />
+                        <span className="text-sm font-medium"
+                              style={{ color: eventData.mediaType === 'carousel' ? eventData.themeColor : DESIGN.colors.textPrimary }}>
+                          Image Carousel
+                        </span>
+                        <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                          Multiple photos
+                        </p>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setEventData(prev => ({ ...prev, mediaType: 'video' }))}
+                      className={cn(
+                        'p-4 border transition-all text-center',
+                        eventData.mediaType === 'video'
+                          ? 'border-primary'
+                          : 'border-border hover:border-primary'
+                      )}
+                      style={{
+                        borderRadius: DESIGN.borderRadius.button,
+                        background: eventData.mediaType === 'video' 
+                          ? `${eventData.themeColor}20` 
+                          : 'transparent'
+                      }}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <Video className="w-6 h-6" 
+                               style={{ color: eventData.mediaType === 'video' ? eventData.themeColor : DESIGN.colors.textSecondary }} />
+                        <span className="text-sm font-medium"
+                              style={{ color: eventData.mediaType === 'video' ? eventData.themeColor : DESIGN.colors.textPrimary }}>
+                          Video Preview
+                        </span>
+                        <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                          Auto-play video
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Primary Event Photo - Always required */}
                 <div className="space-y-3">
                   <label className="text-[13px] font-semibold block uppercase tracking-wider" 
                          style={{ color: DESIGN.colors.textSecondary }}>
@@ -1570,188 +1637,192 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   />
                 </div>
 
-                {/* Additional Photos */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[13px] font-semibold uppercase tracking-wider" 
-                           style={{ color: DESIGN.colors.textSecondary }}>
-                      Additional Photos (Optional)
-                    </label>
-                    <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                      {imageFiles.length - 1}/4
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-4 gap-2">
-                    {imageFiles.slice(1).map((_, index) => (
-                      <div key={index} className="relative aspect-square overflow-hidden"
-                           style={{ borderRadius: DESIGN.borderRadius.button }}>
-                        <img
-                          src={eventData.images[index + 1]}
-                          alt={`Additional photo ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        <button
-                          onClick={() => removeImage(index + 1)}
-                          className="absolute top-1 right-1 w-6 h-6 text-xs flex items-center justify-center"
+                {/* Additional Photos (Only for carousel) */}
+                {eventData.mediaType === 'carousel' && (
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[13px] font-semibold uppercase tracking-wider" 
+                            style={{ color: DESIGN.colors.textSecondary }}>
+                        Additional Photos (Optional)
+                      </label>
+                      <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                        {imageFiles.length - 1}/4
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      {imageFiles.slice(1).map((_, index) => (
+                        <div key={index} className="relative aspect-square overflow-hidden"
+                            style={{ borderRadius: DESIGN.borderRadius.button }}>
+                          <img
+                            src={eventData.images[index + 1]}
+                            alt={`Additional photo ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            onClick={() => removeImage(index + 1)}
+                            className="absolute top-1 right-1 w-6 h-6 text-xs flex items-center justify-center"
+                            style={{
+                              borderRadius: '50%',
+                              background: '#EF4444',
+                              color: DESIGN.colors.textPrimary
+                            }}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                      {imageFiles.length < 5 && (
+                        <div 
+                          className="aspect-square flex items-center justify-center cursor-pointer"
                           style={{
-                            borderRadius: '50%',
-                            background: '#EF4444',
-                            color: DESIGN.colors.textPrimary
+                            borderRadius: DESIGN.borderRadius.button,
+                            border: `2px dashed ${DESIGN.colors.border}`,
+                            background: `${DESIGN.colors.primary}10`
                           }}
+                          onClick={() => fileInputRef.current?.click()}
                         >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                    {imageFiles.length < 5 && (
-                      <div 
-                        className="aspect-square flex items-center justify-center cursor-pointer"
-                        style={{
-                          borderRadius: DESIGN.borderRadius.button,
-                          border: `2px dashed ${DESIGN.colors.border}`,
-                          background: `${DESIGN.colors.primary}10`
-                        }}
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <Upload className="w-6 h-6" style={{ color: DESIGN.colors.textSecondary }} />
-                      </div>
-                    )}
+                          <Upload className="w-6 h-6" style={{ color: DESIGN.colors.textSecondary }} />
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      disabled={isSubmitting}
+                    />
                   </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    disabled={isSubmitting}
-                  />
-                </div>
+                )}
 
-                {/* Event Video */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[13px] font-semibold uppercase tracking-wider" 
-                           style={{ color: DESIGN.colors.textSecondary }}>
-                      Event Video (Optional)
-                    </label>
-                    <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                      {videoFile ? '1/1' : '0/1'}
-                    </span>
-                  </div>
-                  <div 
-                    className={cn(
-                      "border-2 flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden",
-                      "hover:border-primary",
-                      videoFile ? "border-solid" : "border-dashed"
-                    )}
-                    style={{
-                      borderRadius: DESIGN.borderRadius.card,
-                      borderColor: videoFile ? DESIGN.colors.border : DESIGN.colors.muted,
-                      height: '192px',
-                      background: videoFile ? 'transparent' : `${DESIGN.colors.primary}10`
-                    }}
-                    onClick={() => !videoFile && videoInputRef.current?.click()}
-                  >
-                    {videoFile ? (
-                      <div className="relative w-full h-full group">
-                        <video
-                          ref={videoRef}
-                          src={eventData.videos[0]}
-                          className="w-full h-full object-cover"
-                          style={{ borderRadius: DESIGN.borderRadius.card }}
-                          controls={false}
-                          muted
-                          playsInline
-                          onLoadedMetadata={handleVideoLoaded}
-                          onEnded={() => setIsVideoPlaying(false)}
-                          onPlay={() => setIsVideoPlaying(true)}
-                          onPause={() => setIsVideoPlaying(false)}
-                        />
-                        
-                        {/* Video controls overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="absolute bottom-0 left-0 right-0 p-4">
-                            <div className="flex items-center justify-between">
-                              <button
-                                onClick={toggleVideoPlay}
-                                className="w-10 h-10 rounded-full flex items-center justify-center"
-                                style={{
-                                  background: 'rgba(255, 255, 255, 0.9)',
-                                  color: DESIGN.colors.background
-                                }}
-                              >
-                                {isVideoPlaying ? (
-                                  <Pause className="w-5 h-5 ml-0.5" />
-                                ) : (
-                                  <Play className="w-5 h-5 ml-0.5" />
-                                )}
-                              </button>
-                              <div className="flex-1 mx-4">
-                                <div className="h-1 bg-white/30 rounded-full overflow-hidden">
-                                  <div 
-                                    className="h-full bg-white"
-                                    style={{ width: videoRef.current ? `${(videoRef.current.currentTime / videoRef.current.duration) * 100}%` : '0%' }}
-                                  />
+                {/* Event Video (Only for video type) */}
+                {eventData.mediaType === 'video' && (
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[13px] font-semibold uppercase tracking-wider" 
+                            style={{ color: DESIGN.colors.textSecondary }}>
+                        Event Video *
+                      </label>
+                      <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                        {videoFile ? '1/1' : '0/1'}
+                      </span>
+                    </div>
+                    <div 
+                      className={cn(
+                        "border-2 flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden",
+                        "hover:border-primary",
+                        videoFile ? "border-solid" : "border-dashed"
+                      )}
+                      style={{
+                        borderRadius: DESIGN.borderRadius.card,
+                        borderColor: videoFile ? DESIGN.colors.border : DESIGN.colors.muted,
+                        height: '192px',
+                        background: videoFile ? 'transparent' : `${DESIGN.colors.primary}10`
+                      }}
+                      onClick={() => !videoFile && videoInputRef.current?.click()}
+                    >
+                      {videoFile ? (
+                        <div className="relative w-full h-full group">
+                          <video
+                            ref={videoRef}
+                            src={eventData.videos[0]}
+                            className="w-full h-full object-cover"
+                            style={{ borderRadius: DESIGN.borderRadius.card }}
+                            controls={false}
+                            muted
+                            playsInline
+                            onLoadedMetadata={handleVideoLoaded}
+                            onEnded={() => setIsVideoPlaying(false)}
+                            onPlay={() => setIsVideoPlaying(true)}
+                            onPause={() => setIsVideoPlaying(false)}
+                          />
+                          
+                          {/* Video controls overlay */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="absolute bottom-0 left-0 right-0 p-4">
+                              <div className="flex items-center justify-between">
+                                <button
+                                  onClick={toggleVideoPlay}
+                                  className="w-10 h-10 rounded-full flex items-center justify-center"
+                                  style={{
+                                    background: 'rgba(255, 255, 255, 0.9)',
+                                    color: DESIGN.colors.background
+                                  }}
+                                >
+                                  {isVideoPlaying ? (
+                                    <Pause className="w-5 h-5 ml-0.5" />
+                                  ) : (
+                                    <Play className="w-5 h-5 ml-0.5" />
+                                  )}
+                                </button>
+                                <div className="flex-1 mx-4">
+                                  <div className="h-1 bg-white/30 rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-white"
+                                      style={{ width: videoRef.current ? `${(videoRef.current.currentTime / videoRef.current.duration) * 100}%` : '0%' }}
+                                    />
+                                  </div>
                                 </div>
+                                <span className="text-xs font-medium text-white">
+                                  {videoDuration}
+                                </span>
                               </div>
-                              <span className="text-xs font-medium text-white">
-                                {videoDuration}
-                              </span>
                             </div>
                           </div>
+                          
+                          {/* Video info overlay */}
+                          <div className="absolute top-3 left-3 flex items-center gap-2 px-2 py-1 rounded-full backdrop-blur-sm"
+                              style={{
+                                background: 'rgba(0, 0, 0, 0.6)'
+                              }}>
+                            <Video className="w-3 h-3 text-white" />
+                            <span className="text-xs text-white">
+                              {videoFile.type.split('/')[1].toUpperCase()}
+                            </span>
+                          </div>
+                          
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeVideo();
+                            }}
+                            className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center z-10"
+                            style={{
+                              borderRadius: '50%',
+                              background: '#EF4444',
+                              color: DESIGN.colors.textPrimary
+                            }}
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
-                        
-                        {/* Video info overlay */}
-                        <div className="absolute top-3 left-3 flex items-center gap-2 px-2 py-1 rounded-full backdrop-blur-sm"
-                             style={{
-                               background: 'rgba(0, 0, 0, 0.6)'
-                             }}>
-                          <Video className="w-3 h-3 text-white" />
-                          <span className="text-xs text-white">
-                            {videoFile.type.split('/')[1].toUpperCase()}
-                          </span>
-                        </div>
-                        
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeVideo();
-                          }}
-                          className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center z-10"
-                          style={{
-                            borderRadius: '50%',
-                            background: '#EF4444',
-                            color: DESIGN.colors.textPrimary
-                          }}
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <Video className="w-10 h-10 mb-2" style={{ color: DESIGN.colors.textSecondary }} />
-                        <p className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>Click to upload video</p>
-                        <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>
-                          MP4, WebM, MOV, AVI, OGG • Max 50MB
-                        </p>
-                      </>
-                    )}
+                      ) : (
+                        <>
+                          <Video className="w-10 h-10 mb-2" style={{ color: DESIGN.colors.textSecondary }} />
+                          <p className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>Click to upload video</p>
+                          <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>
+                            MP4, WebM, MOV, AVI, OGG • Max 50MB
+                          </p>
+                        </>
+                      )}
+                    </div>
+                    <input
+                      ref={videoInputRef}
+                      type="file"
+                      accept="video/*"
+                      onChange={handleVideoUpload}
+                      className="hidden"
+                      disabled={isSubmitting}
+                    />
+                    <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                      {videoFile 
+                        ? 'Click play/pause to preview • Video will auto-play muted on event cards' 
+                        : 'Video will auto-play muted on loop in event details'}
+                    </p>
                   </div>
-                  <input
-                    ref={videoInputRef}
-                    type="file"
-                    accept="video/*"
-                    onChange={handleVideoUpload}
-                    className="hidden"
-                    disabled={isSubmitting}
-                  />
-                  <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                    {videoFile 
-                      ? 'Click play/pause to preview • Video will auto-play muted on event cards' 
-                      : 'Video will auto-play muted on loop in event cards'}
-                  </p>
-                </div>
+                )}
 
                 {/* Preview */}
                 <div className="space-y-3">
@@ -1784,7 +1855,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     <div className="overflow-hidden" style={{ borderRadius: DESIGN.borderRadius.button, border: `1px solid ${DESIGN.colors.border}` }}>
                       <div className="h-32 flex items-center justify-center overflow-hidden relative"
                            style={{ background: `linear-gradient(to right, ${eventData.themeColor}10, ${eventData.themeColor}5)` }}>
-                        {videoFile ? (
+                        {eventData.mediaType === 'video' && videoFile ? (
                           <div className="relative w-full h-full">
                             <video
                               src={eventData.videos[0]}
@@ -2273,7 +2344,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       <div className="overflow-hidden" style={{ borderRadius: DESIGN.borderRadius.button, border: `1px solid ${DESIGN.colors.border}` }}>
                         <div className="h-32 flex items-center justify-center relative overflow-hidden"
                              style={{ background: `linear-gradient(to right, ${eventData.themeColor}10, ${eventData.themeColor}5)` }}>
-                          {videoFile ? (
+                          {eventData.mediaType === 'video' && eventData.videos[0] ? (
                             <div className="relative w-full h-full">
                               <video
                                 src={eventData.videos[0]}
@@ -2353,9 +2424,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                           <span style={{ color: DESIGN.colors.textPrimary }}>Check-in radius: {eventData.geofenceRadius}m</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Video className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
+                          {eventData.mediaType === 'video' ? (
+                            <Video className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
+                          ) : (
+                            <Image className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
+                          )}
                           <span style={{ color: DESIGN.colors.textPrimary }}>
-                            {videoFile ? 'Includes video preview' : 'No video uploaded'}
+                            {eventData.mediaType === 'video' 
+                              ? (eventData.videos[0] ? 'Video preview' : 'No video uploaded')
+                              : `${imageFiles.length} photos (carousel)`}
                           </span>
                         </div>
                       </div>
@@ -2398,8 +2475,14 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     <div className="p-4 border-b" style={{ borderBottomColor: DESIGN.colors.border }}>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <Camera className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
-                          <span className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>Media</span>
+                          {eventData.mediaType === 'video' ? (
+                            <Video className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
+                          ) : (
+                            <Image className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
+                          )}
+                          <span className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>
+                            {eventData.mediaType === 'video' ? 'Video' : 'Carousel'}
+                          </span>
                         </div>
                         <button 
                           onClick={() => setStep(2)}
@@ -2411,8 +2494,14 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         </button>
                       </div>
                       <div className="space-y-1 text-sm">
-                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Photos:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{imageFiles.length}</span></p>
-                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Video:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{videoFile ? 'Yes (auto-plays on cards)' : 'No'}</span></p>
+                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Type:</span> <span style={{ color: DESIGN.colors.textPrimary }}>
+                          {eventData.mediaType === 'video' ? 'Video (auto-plays on details)' : 'Image Carousel'}
+                        </span></p>
+                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Content:</span> <span style={{ color: DESIGN.colors.textPrimary }}>
+                          {eventData.mediaType === 'video' 
+                            ? (eventData.videos[0] ? '1 video uploaded' : 'No video')
+                            : `${imageFiles.length} photos`}
+                        </span></p>
                       </div>
                     </div>
                     
@@ -2537,7 +2626,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   disabled={
                     isSubmitting ||
                     (step === 1 && !isStep1Valid) ||
-                    (step === 2 && imageFiles.length === 0) ||
+                    (step === 2 && ((eventData.mediaType === 'video' && !videoFile) || (eventData.mediaType === 'carousel' && imageFiles.length === 0))) ||
                     (step === 3 && !isStep3Valid)
                   }
                   style={{ 
