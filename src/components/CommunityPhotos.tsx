@@ -5,6 +5,34 @@ import { CommunityPhoto } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 
+// Design Constants
+const DESIGN = {
+  colors: {
+    primary: '#C4B5FD',
+    lavenderLight: '#E9D5FF',
+    accentPink: '#FFB8E6',
+    background: '#1A1A1A',
+    card: '#2D2D2D',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#B8B8B8'
+  },
+  borderRadius: {
+    card: '24px',
+    small: '12px',
+    pill: '9999px',
+    image: '16px'
+  },
+  shadows: {
+    card: '0 8px 32px rgba(0, 0, 0, 0.4)',
+    button: '0 4px 16px rgba(0, 0, 0, 0.3)'
+  },
+  spacing: {
+    default: '16px',
+    section: '24px',
+    grid: '8px'
+  }
+};
+
 interface CommunityPhotosProps {
   eventId: string;
   photos: CommunityPhoto[];
@@ -71,53 +99,156 @@ export function CommunityPhotos({ eventId, photos }: CommunityPhotosProps) {
   const remainingCount = photos.length - 6;
 
   return (
-    <div className="mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold">Community Photos</h2>
+    <div className="mb-6" style={{ marginBottom: DESIGN.spacing.section }}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4" style={{ marginBottom: DESIGN.spacing.default }}>
+        <h2 
+          className="text-lg font-bold"
+          style={{ 
+            color: DESIGN.colors.textPrimary,
+            fontSize: '22px',
+            fontWeight: 'bold'
+          }}
+        >
+          Community Photos
+        </h2>
         <button
           onClick={handleAddPhoto}
-          className="flex items-center gap-2 px-3 py-1.5 bg-primary/20 text-primary text-sm font-medium rounded-full hover:bg-primary/30 transition-colors"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 16px',
+            background: `${DESIGN.colors.primary}33`,
+            color: DESIGN.colors.primary,
+            fontSize: '14px',
+            fontWeight: '500',
+            borderRadius: DESIGN.borderRadius.pill,
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'background-color 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = `${DESIGN.colors.primary}4D`}
+          onMouseLeave={(e) => e.currentTarget.style.background = `${DESIGN.colors.primary}33`}
         >
-          <Plus className="w-4 h-4" />
+          <Plus style={{ width: '16px', height: '16px' }} />
           Add Photos
         </button>
       </div>
 
+      {/* Hidden File Input */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        className="hidden"
+        style={{ display: 'none' }}
         onChange={handleFileChange}
       />
 
+      {/* Empty State */}
       {photos.length === 0 ? (
-        <div className="glass-card p-8 text-center">
-          <Camera className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-          <p className="text-muted-foreground">No photos yet. Be the first to share!</p>
+        <div 
+          style={{
+            background: DESIGN.colors.card,
+            padding: '32px',
+            textAlign: 'center',
+            borderRadius: DESIGN.borderRadius.card,
+            boxShadow: DESIGN.shadows.card
+          }}
+        >
+          <Camera 
+            style={{ 
+              width: '48px', 
+              height: '48px',
+              color: DESIGN.colors.textSecondary,
+              margin: '0 auto 12px'
+            }} 
+          />
+          <p style={{ color: DESIGN.colors.textSecondary }}>
+            No photos yet. Be the first to share!
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-2">
+        /* Photo Grid */
+        <div 
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: DESIGN.spacing.grid
+          }}
+        >
           {displayPhotos.map((photo, index) => (
             <button
               key={photo.id}
               onClick={() => openViewer(index)}
-              className="aspect-square rounded-xl overflow-hidden relative group"
+              style={{
+                aspectRatio: '1',
+                borderRadius: DESIGN.borderRadius.small,
+                overflow: 'hidden',
+                position: 'relative',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                background: 'transparent'
+              }}
+              onMouseEnter={(e) => {
+                const img = e.currentTarget.querySelector('img');
+                if (img) img.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                const img = e.currentTarget.querySelector('img');
+                if (img) img.style.transform = 'scale(1)';
+              }}
             >
               <img
                 src={photo.imageUrl}
                 alt=""
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  transition: 'transform 0.3s ease'
+                }}
               />
-              <div className="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+              {/* Watermark Badge */}
+              <div 
+                style={{
+                  position: 'absolute',
+                  bottom: '4px',
+                  right: '4px',
+                  background: 'rgba(0, 0, 0, 0.7)',
+                  color: DESIGN.colors.textPrimary,
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                  padding: '2px 6px',
+                  borderRadius: '4px'
+                }}
+              >
                 AMPS
               </div>
             </button>
           ))}
+          
+          {/* "More" Button */}
           {remainingCount > 0 && (
             <button
               onClick={() => openViewer(6)}
-              className="aspect-square rounded-xl bg-card/80 flex items-center justify-center text-lg font-bold text-muted-foreground hover:text-foreground transition-colors"
+              style={{
+                aspectRatio: '1',
+                borderRadius: DESIGN.borderRadius.small,
+                background: `${DESIGN.colors.card}CC`,
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px',
+                fontWeight: 'bold',
+                color: DESIGN.colors.textSecondary,
+                cursor: 'pointer',
+                transition: 'color 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = DESIGN.colors.textPrimary}
+              onMouseLeave={(e) => e.currentTarget.style.color = DESIGN.colors.textSecondary}
             >
               +{remainingCount} more
             </button>
@@ -127,61 +258,197 @@ export function CommunityPhotos({ eventId, photos }: CommunityPhotosProps) {
 
       {/* Photo Viewer Modal */}
       <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
-        <DialogContent className="bg-black/95 border-none max-w-[95vw] max-h-[95vh] p-0">
+        <DialogContent 
+          style={{
+            background: 'rgba(0, 0, 0, 0.95)',
+            border: 'none',
+            maxWidth: '95vw',
+            maxHeight: '95vh',
+            padding: 0,
+            margin: 0,
+            borderRadius: 0
+          }}
+        >
           {currentPhoto && (
-            <div className="relative flex flex-col items-center justify-center min-h-[60vh]">
+            <div 
+              style={{
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '60vh',
+                padding: DESIGN.spacing.default
+              }}
+            >
+              {/* Close Button */}
               <button
                 onClick={() => setViewerOpen(false)}
-                className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors z-10"
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  zIndex: 10
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
               >
-                <X className="w-5 h-5" />
+                <X style={{ width: '20px', height: '20px', color: DESIGN.colors.textPrimary }} />
               </button>
 
+              {/* Navigation Buttons */}
               {photos.length > 1 && (
                 <>
                   <button
                     onClick={() => navigatePhoto('prev')}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+                    style={{
+                      position: 'absolute',
+                      left: '16px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: 'none',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
                   >
-                    <ChevronLeft className="w-6 h-6" />
+                    <ChevronLeft style={{ width: '24px', height: '24px', color: DESIGN.colors.textPrimary }} />
                   </button>
                   <button
                     onClick={() => navigatePhoto('next')}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+                    style={{
+                      position: 'absolute',
+                      right: '16px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: 'none',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
                   >
-                    <ChevronRight className="w-6 h-6" />
+                    <ChevronRight style={{ width: '24px', height: '24px', color: DESIGN.colors.textPrimary }} />
                   </button>
                 </>
               )}
 
+              {/* Photo */}
               <img
                 src={currentPhoto.imageUrl}
                 alt=""
-                className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '70vh',
+                  objectFit: 'contain',
+                  borderRadius: DESIGN.borderRadius.small
+                }}
               />
 
-              <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              {/* Photo Info */}
+              <div 
+                style={{
+                  position: 'absolute',
+                  bottom: '16px',
+                  left: '16px',
+                  right: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                {/* User Info */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <img
                     src={currentPhoto.userPhoto || 'https://i.pravatar.cc/100'}
                     alt=""
-                    className="w-10 h-10 rounded-full object-cover"
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      objectFit: 'cover'
+                    }}
                   />
                   <div>
-                    <p className="font-medium text-sm">{currentPhoto.userName}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p 
+                      style={{
+                        fontWeight: '500',
+                        fontSize: '14px',
+                        color: DESIGN.colors.textPrimary
+                      }}
+                    >
+                      {currentPhoto.userName}
+                    </p>
+                    <p 
+                      style={{
+                        fontSize: '12px',
+                        color: DESIGN.colors.textSecondary
+                      }}
+                    >
                       {new Date(currentPhoto.timestamp).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
+
+                {/* Like Button */}
                 <button
                   onClick={() => likePhoto(currentPhoto.id)}
-                  className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 16px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    borderRadius: DESIGN.borderRadius.pill,
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
                 >
                   <Heart
-                    className={`w-5 h-5 ${currentPhoto.isLiked ? 'fill-brand-pink text-brand-pink' : ''}`}
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      color: currentPhoto.isLiked ? DESIGN.colors.accentPink : DESIGN.colors.textPrimary,
+                      fill: currentPhoto.isLiked ? DESIGN.colors.accentPink : 'none'
+                    }}
                   />
-                  <span className="text-sm font-medium">{currentPhoto.likes}</span>
+                  <span 
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      color: DESIGN.colors.textPrimary
+                    }}
+                  >
+                    {currentPhoto.likes}
+                  </span>
                 </button>
               </div>
             </div>
@@ -189,20 +456,72 @@ export function CommunityPhotos({ eventId, photos }: CommunityPhotosProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Upgrade Prompt */}
+      {/* Upgrade Prompt Modal */}
       <Dialog open={showUpgradePrompt} onOpenChange={setShowUpgradePrompt}>
-        <DialogContent className="bg-background border-border max-w-[350px] text-center">
-          <div className="py-6">
-            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-              <Lock className="w-8 h-8 text-primary" />
+        <DialogContent 
+          style={{
+            background: DESIGN.colors.background,
+            border: `1px solid ${DESIGN.colors.card}`,
+            maxWidth: '350px',
+            textAlign: 'center',
+            borderRadius: DESIGN.borderRadius.card,
+            padding: 0
+          }}
+        >
+          <div style={{ padding: '24px' }}>
+            {/* Lock Icon */}
+            <div 
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: `${DESIGN.colors.primary}33`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px'
+              }}
+            >
+              <Lock style={{ width: '32px', height: '32px', color: DESIGN.colors.primary }} />
             </div>
-            <h2 className="text-xl font-bold mb-2">Pro Feature</h2>
-            <p className="text-muted-foreground mb-6">
+            
+            {/* Title */}
+            <h2 
+              style={{
+                fontSize: '22px',
+                fontWeight: 'bold',
+                color: DESIGN.colors.textPrimary,
+                marginBottom: '8px'
+              }}
+            >
+              Pro Feature
+            </h2>
+            
+            {/* Description */}
+            <p 
+              style={{
+                color: DESIGN.colors.textSecondary,
+                marginBottom: '24px'
+              }}
+            >
               Upgrade to Pro or Max to upload photos to the community dump.
             </p>
+            
+            {/* Upgrade Button */}
             <button
               onClick={() => setShowUpgradePrompt(false)}
-              className="w-full py-3 rounded-xl gradient-pro font-semibold glow-purple"
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: DESIGN.borderRadius.small,
+                background: DESIGN.colors.primary,
+                color: DESIGN.colors.background,
+                fontWeight: '600',
+                fontSize: '16px',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: `0 0 20px ${DESIGN.colors.primary}80`
+              }}
             >
               Upgrade Now
             </button>
