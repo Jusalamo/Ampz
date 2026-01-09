@@ -10,6 +10,7 @@ export interface User {
   createdEvents: string[];
   likesRemaining: number;
   lastLikeReset: string;
+  isDemo?: boolean;
 }
 
 export interface UserProfile {
@@ -77,6 +78,13 @@ export interface Event {
   videos?: string[];
   tags: string[];
   isFeatured: boolean;
+  isDemo?: boolean;
+  isActive?: boolean;
+  hasVideo?: boolean;
+  mediaType?: 'carousel' | 'video';
+  selectedVideoIndex?: number;
+  notificationsEnabled?: boolean;
+  updatedAt?: string;
 }
 
 export interface ConnectionProfile {
@@ -93,6 +101,7 @@ export interface ConnectionProfile {
   isPublic: boolean;
   occupation?: string;
   gender?: string;
+  isDemo?: boolean;
 }
 
 export interface Match {
@@ -107,6 +116,7 @@ export interface Match {
   online: boolean;
   isPinned?: boolean;
   isMuted?: boolean;
+  isDemo?: boolean;
 }
 
 export interface Friend {
@@ -154,6 +164,7 @@ export interface Ticket {
   quantity: number;
   qrCode: string;
   status: 'active' | 'used' | 'cancelled';
+  isDemo?: boolean;
 }
 
 export interface CommunityPhoto {
@@ -167,6 +178,7 @@ export interface CommunityPhoto {
   likes: number;
   likedBy: string[];
   isLiked?: boolean;
+  isDemo?: boolean;
 }
 
 export interface CommunityComment {
@@ -181,6 +193,7 @@ export interface CommunityComment {
   likedBy: string[];
   isLiked?: boolean;
   replyTo?: string;
+  isDemo?: boolean;
 }
 
 export interface AppNotification {
@@ -190,6 +203,7 @@ export interface AppNotification {
   message: string;
   timestamp: string;
   read: boolean;
+  isDemo?: boolean;
   data?: {
     matchId?: string;
     eventId?: string;
