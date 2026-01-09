@@ -18,38 +18,25 @@ import {
   TrendingUp,
   Send,
   X,
-  Copy,
-  Share2,
-  MapPin,
-  DollarSign,
-  Image as ImageIcon,
-  AlertTriangle,
-  Loader2,
   Film,
   Grid3x3,
   Upload,
-  Link,
   Bell,
-  Mail,
-  Smartphone,
+  AlertTriangle,
   RefreshCw,
   Camera,
   Video as VideoIcon,
-  FileText,
   Zap,
   ExternalLink
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
-import { BottomNav } from '@/components/BottomNav';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { Event, Attendee, Notification } from '@/lib/types';
-import QRCode from 'qrcode';
+import { Event } from '@/lib/types';
 
 // Mock WebSocket service for real-time notifications
 const mockNotificationService = {
   sendNotification: async (eventId: string, title: string, message: string, type: string) => {
-    // In a real app, this would connect to Firebase Cloud Messaging, OneSignal, etc.
     console.log('Sending notification:', { eventId, title, message, type });
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -59,7 +46,6 @@ const mockNotificationService = {
   },
   
   subscribeToEvent: (eventId: string, callback: (data: any) => void) => {
-    // Mock real-time updates
     const interval = setInterval(() => {
       callback({
         type: 'attendee_update',
@@ -89,7 +75,7 @@ const DESIGN = {
   },
   spacing: {
     default: '16px',
-    cardPadding: '16px',
+    cardPadding: '20px',
     buttonGap: '12px',
     modalPadding: '20px',
     modalFooterHeight: '72px'
@@ -271,7 +257,6 @@ function FilePreview({ file, onRemove, isCover }: FilePreviewProps) {
       {!isCover && file.type === 'image' && (
         <button
           onClick={() => {
-            // Set as cover image
             const event = new CustomEvent('setCoverImage', { detail: file.url });
             window.dispatchEvent(event);
           }}
@@ -356,7 +341,6 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
         notificationsEnabled: event.notificationsEnabled
       });
       
-      // Convert existing images to file objects
       const existingFiles = event.images.map((img, index) => ({
         id: `existing-${index}`,
         url: img,
@@ -370,20 +354,15 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
     }
   }, [event]);
 
-  // Prevent background scrolling
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
     }
     return () => {
       document.body.style.overflow = 'unset';
-      document.body.style.position = 'static';
     };
   }, [isOpen]);
 
-  // Listen for set cover image events
   useEffect(() => {
     const handleSetCoverImage = (e: Event) => {
       const customEvent = e as CustomEvent;
@@ -418,7 +397,6 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
     }> = [];
 
     Array.from(files).forEach(file => {
-      // Validate file type
       const isVideo = file.type.startsWith('video/');
       const isImage = file.type.startsWith('image/');
       
@@ -440,7 +418,6 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
         return;
       }
 
-      // Validate file size
       const maxSize = formData.mediaType === 'video' ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
       if (file.size > maxSize) {
         toast({ 
@@ -463,16 +440,13 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
     });
 
     if (newFiles.length > 0) {
-      // If switching media types or replacing, clear old files
       if (formData.mediaType !== event.mediaType || newFiles.length > 0) {
-        // Keep existing files of different type if switching
         const existingFiles = uploadedFiles.filter(f => f.type !== formData.mediaType);
         setUploadedFiles([...existingFiles, ...newFiles]);
       } else {
         setUploadedFiles(prev => [...prev, ...newFiles]);
       }
       
-      // Set first new image as cover if no cover exists
       if (!coverImage && newFiles[0]?.type === 'image') {
         setCoverImage(newFiles[0].url);
       }
@@ -483,7 +457,6 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
       });
     }
 
-    // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -492,7 +465,6 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
   const handleRemoveFile = (id: string) => {
     const fileToRemove = uploadedFiles.find(f => f.id === id);
     if (fileToRemove?.url === coverImage) {
-      // Find another image to set as cover
       const otherImage = uploadedFiles.find(f => f.id !== id && f.type === 'image');
       setCoverImage(otherImage?.url || '');
     }
@@ -503,7 +475,6 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
   const handleMediaTypeChange = (type: 'carousel' | 'video') => {
     if (type === formData.mediaType) return;
     
-    // Warn about losing files if switching types
     if (uploadedFiles.length > 0) {
       const confirm = window.confirm(
         `Switching to ${type} will remove all ${formData.mediaType} files. Continue?`
@@ -524,7 +495,6 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
     
     setIsSaving(true);
     try {
-      // Process new files (in real app, upload to server)
       const imageUrls = uploadedFiles.map(f => f.url);
       
       await onSave({
@@ -1179,7 +1149,6 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving}
             style={{
               flex: 1,
               padding: '12px',
@@ -1189,8 +1158,7 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
               color: DESIGN.colors.background,
               fontSize: '15px',
               fontWeight: '500',
-              opacity: isSaving ? 0.7 : 1,
-              cursor: isSaving ? 'not-allowed' : 'pointer',
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1198,13 +1166,358 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
               transition: 'opacity 0.2s'
             }}
           >
-            {isSaving ? (
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// QR Code Modal
+interface QRCodeModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  event: Event;
+}
+
+function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (isOpen && event) {
+      const generateQR = async () => {
+        try {
+          const qrUrl = `event://checkin/${event.id}`;
+          const canvas = document.createElement('canvas');
+          // Simple QR generation (in production, use a proper QR library)
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            canvas.width = 200;
+            canvas.height = 200;
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, 200, 200);
+            ctx.fillStyle = 'black';
+            ctx.font = '20px Arial';
+            ctx.fillText('Event QR Code', 20, 100);
+            setQrDataUrl(canvas.toDataURL());
+          }
+        } catch (error) {
+          console.error('QR generation error:', error);
+        }
+      };
+      generateQR();
+    }
+  }, [isOpen, event]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0, 0, 0, 0.7)',
+      backdropFilter: 'blur(4px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 9999,
+      padding: '16px'
+    }}>
+      <div style={{
+        background: DESIGN.colors.card,
+        borderRadius: DESIGN.borderRadius.card,
+        width: '100%',
+        maxWidth: '320px',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        border: '1px solid rgba(255, 255, 255, 0.1)'
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: DESIGN.spacing.default,
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: DESIGN.colors.textPrimary }}>
+            Event QR Code
+          </h2>
+          <button 
+            onClick={onClose} 
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: DESIGN.borderRadius.roundButton,
+              background: 'rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            <X className="w-4 h-4" style={{ color: DESIGN.colors.textPrimary }} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+          <div style={{
+            width: '200px',
+            height: '200px',
+            background: 'white',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}>
+            {qrDataUrl ? (
+              <img src={qrDataUrl} alt="QR Code" style={{ width: '100%', height: '100%' }} />
+            ) : (
+              <div style={{ textAlign: 'center' }}>
+                <QrCode className="w-12 h-12" style={{ color: DESIGN.colors.textSecondary, margin: '0 auto' }} />
+                <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '8px' }}>Generating QR...</p>
+              </div>
+            )}
+          </div>
+          
+          <div style={{ textAlign: 'center' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: DESIGN.colors.textPrimary, marginBottom: '4px' }}>
+              {event.name}
+            </h3>
+            <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
+              Scan to check in • Event ID: {event.id.substring(0, 8)}
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: DESIGN.spacing.default,
+          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+          display: 'flex',
+          gap: '12px'
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1,
+              padding: '12px',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: DESIGN.borderRadius.button,
+              background: 'transparent',
+              color: DESIGN.colors.textPrimary,
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer'
+            }}
+          >
+            Close
+          </button>
+          <button
+            onClick={() => {
+              if (qrDataUrl) {
+                const link = document.createElement('a');
+                link.href = qrDataUrl;
+                link.download = `qr-${event.id}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                toast({ title: 'Downloaded!', description: 'QR code saved to device' });
+              }
+            }}
+            style={{
+              flex: 1,
+              padding: '12px',
+              border: 'none',
+              borderRadius: DESIGN.borderRadius.button,
+              background: DESIGN.colors.primary,
+              color: DESIGN.colors.background,
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            <Download className="w-4 h-4" />
+            Download
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Delete Event Modal
+interface DeleteEventModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  event: Event;
+  onConfirm: () => Promise<void>;
+}
+
+function DeleteEventModal({ isOpen, onClose, event, onConfirm }: DeleteEventModalProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await onConfirm();
+      onClose();
+    } catch (error) {
+      console.error('Delete failed:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0, 0, 0, 0.7)',
+      backdropFilter: 'blur(4px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 9999,
+      padding: '16px'
+    }}>
+      <div style={{
+        background: DESIGN.colors.card,
+        borderRadius: DESIGN.borderRadius.card,
+        width: '100%',
+        maxWidth: '400px',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        border: '1px solid rgba(255, 255, 255, 0.1)'
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: DESIGN.spacing.default,
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: DESIGN.borderRadius.roundButton,
+            background: `${DESIGN.colors.danger}20`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <AlertTriangle className="w-5 h-5" style={{ color: DESIGN.colors.danger }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: DESIGN.colors.textPrimary }}>
+              Delete Event
+            </h2>
+            <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
+              This action cannot be undone
+            </p>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div style={{ padding: DESIGN.spacing.default }}>
+          <p style={{ fontSize: '14px', color: DESIGN.colors.textPrimary, marginBottom: '16px' }}>
+            Are you sure you want to delete <strong>"{event.name}"</strong>? This will remove:
+          </p>
+          
+          <div style={{
+            background: DESIGN.colors.background,
+            borderRadius: DESIGN.borderRadius.button,
+            padding: '12px',
+            marginBottom: '16px'
+          }}>
+            <ul style={{ fontSize: '13px', color: DESIGN.colors.textSecondary, paddingLeft: '20px' }}>
+              <li>All event details</li>
+              <li>{event.attendees} attendee records</li>
+              <li>Check-in history</li>
+              <li>All media files</li>
+              <li>Notification history</li>
+            </ul>
+          </div>
+          
+          <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
+            Attendees will be notified that the event has been cancelled.
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: DESIGN.spacing.default,
+          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+          display: 'flex',
+          gap: '12px'
+        }}>
+          <button
+            onClick={onClose}
+            disabled={isDeleting}
+            style={{
+              flex: 1,
+              padding: '12px',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: DESIGN.borderRadius.button,
+              background: 'transparent',
+              color: DESIGN.colors.textPrimary,
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              opacity: isDeleting ? 0.5 : 1
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            style={{
+              flex: 1,
+              padding: '12px',
+              border: 'none',
+              borderRadius: DESIGN.borderRadius.button,
+              background: DESIGN.colors.danger,
+              color: DESIGN.colors.background,
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: isDeleting ? 'not-allowed' : 'pointer',
+              opacity: isDeleting ? 0.7 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            {isDeleting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Saving...
+                Deleting...
               </>
             ) : (
-              'Save Changes'
+              <>
+                <Trash2 className="w-4 h-4" />
+                Delete Event
+              </>
             )}
           </button>
         </div>
@@ -1235,12 +1548,9 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
     }
     return () => {
       document.body.style.overflow = 'unset';
-      document.body.style.position = 'static';
     };
   }, [isOpen]);
 
@@ -1255,8 +1565,7 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
       const event = events.find(e => e.id === selectedEvent);
       const eventName = selectedEvent === 'all' ? 'All Events' : event?.name || 'Event';
       
-      // In a real app, this would call your notification service
-      const result = await mockNotificationService.sendNotification(
+      await mockNotificationService.sendNotification(
         selectedEvent,
         title,
         message,
@@ -1269,12 +1578,10 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
         duration: 5000
       });
 
-      // Reset form
       setTitle('');
       setMessage('');
       setSelectedEvent(selectedEventId || 'all');
       
-      // Close after success
       setTimeout(() => onClose(), 1500);
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to send notification', variant: 'destructive' });
@@ -1358,8 +1665,7 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
               alignItems: 'center',
               justifyContent: 'center',
               border: 'none',
-              cursor: 'pointer',
-              transition: 'background 0.2s'
+              cursor: 'pointer'
             }}
           >
             <X className="w-4 h-4" style={{ color: DESIGN.colors.textPrimary }} />
@@ -1494,102 +1800,6 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
               </p>
             </div>
 
-            {/* Schedule Options */}
-            <div>
-              <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
-                Schedule
-              </label>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                <button
-                  onClick={() => setScheduleFor('now')}
-                  style={{
-                    flex: 1,
-                    padding: '12px',
-                    borderRadius: DESIGN.borderRadius.button,
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    border: '1px solid',
-                    background: scheduleFor === 'now' ? DESIGN.colors.primary : 'transparent',
-                    color: scheduleFor === 'now' ? DESIGN.colors.background : DESIGN.colors.textSecondary,
-                    borderColor: scheduleFor === 'now' ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  <Zap className="w-4 h-4 inline mr-2" />
-                  Send Now
-                </button>
-                <button
-                  onClick={() => setScheduleFor('schedule')}
-                  style={{
-                    flex: 1,
-                    padding: '12px',
-                    borderRadius: DESIGN.borderRadius.button,
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    border: '1px solid',
-                    background: scheduleFor === 'schedule' ? DESIGN.colors.primary : 'transparent',
-                    color: scheduleFor === 'schedule' ? DESIGN.colors.background : DESIGN.colors.textSecondary,
-                    borderColor: scheduleFor === 'schedule' ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  <Calendar className="w-4 h-4 inline mr-2" />
-                  Schedule
-                </button>
-              </div>
-              
-              {scheduleFor === 'schedule' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginBottom: '4px', display: 'block' }}>
-                      Date
-                    </label>
-                    <input 
-                      type="date"
-                      value={scheduledTime.split('T')[0] || ''}
-                      onChange={(e) => {
-                        const time = scheduledTime.split('T')[1] || '12:00';
-                        setScheduledTime(`${e.target.value}T${time}`);
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        background: DESIGN.colors.background,
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: DESIGN.borderRadius.button,
-                        color: DESIGN.colors.textPrimary,
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginBottom: '4px', display: 'block' }}>
-                      Time
-                    </label>
-                    <input 
-                      type="time"
-                      value={scheduledTime.split('T')[1] || ''}
-                      onChange={(e) => {
-                        const date = scheduledTime.split('T')[0] || new Date().toISOString().split('T')[0];
-                        setScheduledTime(`${date}T${e.target.value}`);
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        background: DESIGN.colors.background,
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: DESIGN.borderRadius.button,
-                        color: DESIGN.colors.textPrimary,
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* Title & Message */}
             <div>
               <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
@@ -1645,59 +1855,6 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
                 </span>
               </div>
             </div>
-
-            {/* Quick Templates */}
-            <div>
-              <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
-                Quick Templates
-              </label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {[
-                  { 
-                    title: 'Event Starting Soon!', 
-                    message: 'Get ready! The event starts in 30 minutes. Please proceed to the venue for check-in.' 
-                  },
-                  { 
-                    title: 'Reminder: Check-in Required', 
-                    message: 'Remember to check in using the QR code when you arrive at the venue.' 
-                  },
-                  { 
-                    title: 'Thank You for Attending!', 
-                    message: 'We hope you enjoyed the event. Stay tuned for photos and announcements.' 
-                  },
-                  { 
-                    title: 'Important Update', 
-                    message: 'Please note the schedule has been updated. Check the event page for details.' 
-                  }
-                ].map((template, i) => (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      setTitle(template.title);
-                      setMessage(template.message);
-                    }}
-                    style={{
-                      textAlign: 'left',
-                      padding: '12px',
-                      borderRadius: DESIGN.borderRadius.button,
-                      background: DESIGN.colors.background,
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      fontSize: '13px',
-                      color: DESIGN.colors.textPrimary,
-                      cursor: 'pointer',
-                      transition: 'border-color 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.borderColor = DESIGN.colors.primary}
-                    onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
-                  >
-                    <div style={{ fontWeight: '500', marginBottom: '4px' }}>{template.title}</div>
-                    <div style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
-                      {template.message.substring(0, 80)}...
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
 
@@ -1726,8 +1883,7 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
               color: DESIGN.colors.textPrimary,
               fontSize: '15px',
               fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'background 0.2s'
+              cursor: 'pointer'
             }}
           >
             Cancel
@@ -1749,24 +1905,15 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px',
-              transition: 'opacity 0.2s'
+              gap: '8px'
             }}
           >
             {isSending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Sending...
-              </>
-            ) : scheduleFor === 'now' ? (
+              'Sending...'
+            ) : (
               <>
                 <Send className="w-4 h-4" />
                 Send Now
-              </>
-            ) : (
-              <>
-                <Calendar className="w-4 h-4" />
-                Schedule
               </>
             )}
           </button>
@@ -1775,9 +1922,6 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
     </div>
   );
 }
-
-// Keep existing QRCodeModal and DeleteEventModal implementations (with sticky headers/footers)
-// [QRCodeModal and DeleteEventModal implementations remain similar with sticky headers/footers]
 
 export default function EventManager() {
   const navigate = useNavigate();
@@ -1929,14 +2073,12 @@ export default function EventManager() {
       return;
     }
 
-    // In a real app, this would send to a backend
     toast({ 
       title: 'Announcement Sent!', 
       description: 'Your message has been sent to all attendees',
       duration: 5000
     });
     
-    // Send real-time notification
     if (selectedEvent) {
       mockNotificationService.sendNotification(
         selectedEvent.id,
@@ -1960,7 +2102,6 @@ export default function EventManager() {
     { id: '4', name: 'Alex Kim', photo: 'https://i.pravatar.cc/100?img=15', checkedIn: false, ticketType: 'VIP', email: 'alex@example.com' },
   ];
 
-  // Enhanced messages tab with notification history
   const notificationHistory = [
     { id: '1', title: 'Event Starting Soon!', type: 'reminder', sentAt: '2 hours ago', readCount: 45, totalRecipients: 150 },
     { id: '2', title: 'Check-in Reminder', type: 'announcement', sentAt: 'Yesterday', readCount: 89, totalRecipients: 150 },
@@ -2052,7 +2193,7 @@ export default function EventManager() {
               key={tab.key}
               onClick={() => setActiveTab(tab.key as Tab)}
               style={{
-                padding: '8px 12px',
+                padding: '10px 14px',
                 borderRadius: DESIGN.borderRadius.button,
                 fontSize: '14px',
                 fontWeight: '500',
@@ -2064,7 +2205,8 @@ export default function EventManager() {
                 background: activeTab === tab.key ? DESIGN.colors.primary : DESIGN.colors.card,
                 color: activeTab === tab.key ? DESIGN.colors.background : DESIGN.colors.textSecondary,
                 border: 'none',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                minHeight: '44px'
               }}
             >
               <tab.icon className="w-4 h-4" />
@@ -2074,15 +2216,16 @@ export default function EventManager() {
         </div>
       </div>
 
-      {/* Scrollable Content */}
+      {/* Scrollable Content with proper spacing */}
       <div style={{ 
         flex: 1, 
         overflowY: 'auto',
-        padding: DESIGN.spacing.default 
+        padding: DESIGN.spacing.default,
+        paddingBottom: '24px' // Added bottom padding for better spacing
       }}>
         {/* My Events Tab */}
         {activeTab === 'events' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}> {/* Increased gap */}
             {userEvents.length > 0 ? (
               userEvents.map(event => {
                 const status = getEventStatus(event);
@@ -2094,135 +2237,157 @@ export default function EventManager() {
                       borderRadius: DESIGN.borderRadius.card,
                       border: `1px solid ${selectedEventId === event.id ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)'}`,
                       overflow: 'hidden',
-                      transition: 'border-color 0.2s'
+                      transition: 'border-color 0.2s',
+                      minHeight: '120px' // Increased card size
                     }}
                   >
-                    <div style={{ display: 'flex' }}>
+                    <div style={{ display: 'flex', height: '100%' }}>
                       <img 
                         src={event.coverImage} 
                         alt={event.name}
-                        style={{ width: '96px', height: '96px', objectFit: 'cover' }}
+                        style={{ width: '120px', height: '120px', objectFit: 'cover' }} // Increased image size
                       />
-                      <div style={{ flex: 1, padding: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-                          <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: DESIGN.colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {event.name}
-                          </h3>
-                          <span style={{
-                            padding: '2px 8px',
-                            fontSize: '12px',
-                            borderRadius: DESIGN.borderRadius.roundButton,
-                            fontWeight: '500',
-                            background: status === 'live' ? `${DESIGN.colors.success}20` : 
-                                      status === 'upcoming' ? `${DESIGN.colors.primary}20` : 
-                                      `${DESIGN.colors.textSecondary}20`,
-                            color: status === 'live' ? DESIGN.colors.success : 
-                                  status === 'upcoming' ? DESIGN.colors.primary : 
-                                  DESIGN.colors.textSecondary
-                          }}>
-                            {status === 'live' ? '🔴 Live' : status === 'upcoming' ? 'Upcoming' : 'Past'}
-                          </span>
+                      <div style={{ flex: 1, padding: DESIGN.spacing.cardPadding, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
+                            <h3 style={{ 
+                              fontSize: '16px', // Increased font size
+                              fontWeight: 'bold', 
+                              color: DESIGN.colors.textPrimary, 
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              flex: 1
+                            }}>
+                              {event.name}
+                            </h3>
+                            <span style={{
+                              padding: '4px 10px', // Increased padding
+                              fontSize: '12px',
+                              borderRadius: DESIGN.borderRadius.roundButton,
+                              fontWeight: '500',
+                              background: status === 'live' ? `${DESIGN.colors.success}20` : 
+                                        status === 'upcoming' ? `${DESIGN.colors.primary}20` : 
+                                        `${DESIGN.colors.textSecondary}20`,
+                              color: status === 'live' ? DESIGN.colors.success : 
+                                    status === 'upcoming' ? DESIGN.colors.primary : 
+                                    DESIGN.colors.textSecondary
+                            }}>
+                              {status === 'live' ? '🔴 Live' : status === 'upcoming' ? 'Upcoming' : 'Past'}
+                            </span>
+                          </div>
+                          <p style={{ fontSize: '13px', color: DESIGN.colors.textSecondary, marginBottom: '8px' }}> {/* Increased font size */}
+                            {event.date} • {event.attendees} attendees
+                          </p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}> {/* Increased gap */}
+                            {event.mediaType === 'video' ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}> {/* Increased gap */}
+                                <Film className="w-4 h-4" style={{ color: DESIGN.colors.primary }} /> {/* Increased icon size */}
+                                <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>Video</span> {/* Increased font size */}
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}> {/* Increased gap */}
+                                <Grid3x3 className="w-4 h-4" style={{ color: DESIGN.colors.primary }} /> {/* Increased icon size */}
+                                <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>
+                                  {event.images?.length || 0} photos
+                                </span> {/* Increased font size */}
+                              </div>
+                            )}
+                            <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>•</span> {/* Increased font size */}
+                            <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>
+                              Radius: {event.geofenceRadius}m
+                            </span> {/* Increased font size */}
+                          </div>
                         </div>
-                        <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>
-                          {event.date} • {event.attendees} attendees
-                        </p>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                          {event.mediaType === 'video' ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Film className="w-3 h-3" style={{ color: DESIGN.colors.primary }} />
-                              <span style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>Video</span>
-                            </div>
-                          ) : (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Grid3x3 className="w-3 h-3" style={{ color: DESIGN.colors.primary }} />
-                              <span style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
-                                {event.images?.length || 0} photos
-                              </span>
-                            </div>
-                          )}
-                          <span style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>•</span>
-                          <span style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
-                            Radius: {event.geofenceRadius}m
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                        <div style={{ display: 'flex', gap: '8px' }}>
                           <button
                             onClick={() => navigate(`/event/${event.id}`)}
                             style={{
-                              height: '28px',
-                              padding: '0 12px',
+                              height: '36px', // Increased button height
+                              padding: '0 16px', // Increased padding
                               border: '1px solid rgba(255, 255, 255, 0.2)',
                               borderRadius: DESIGN.borderRadius.button,
                               background: 'transparent',
                               color: DESIGN.colors.textPrimary,
-                              fontSize: '12px',
+                              fontSize: '13px', // Increased font size
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '4px',
+                              gap: '6px', // Increased gap
                               cursor: 'pointer',
                               transition: 'background 0.2s'
                             }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                           >
-                            <Eye className="w-3 h-3" />
+                            <Eye className="w-4 h-4" /> {/* Increased icon size */}
                             View
                           </button>
                           <button
                             onClick={() => handleEditEvent(event)}
                             style={{
-                              height: '28px',
-                              padding: '0 12px',
+                              height: '36px', // Increased button height
+                              padding: '0 16px', // Increased padding
                               border: '1px solid rgba(255, 255, 255, 0.2)',
                               borderRadius: DESIGN.borderRadius.button,
                               background: 'transparent',
                               color: DESIGN.colors.textPrimary,
-                              fontSize: '12px',
+                              fontSize: '13px', // Increased font size
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '4px',
+                              gap: '6px', // Increased gap
                               cursor: 'pointer',
                               transition: 'background 0.2s'
                             }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                           >
-                            <Edit className="w-3 h-3" />
+                            <Edit className="w-4 h-4" /> {/* Increased icon size */}
                             Edit
                           </button>
                           <button
                             onClick={() => handleQRCode(event)}
                             style={{
-                              height: '28px',
-                              padding: '0 12px',
+                              height: '36px', // Increased button height
+                              padding: '0 16px', // Increased padding
                               border: '1px solid rgba(255, 255, 255, 0.2)',
                               borderRadius: DESIGN.borderRadius.button,
                               background: 'transparent',
                               color: DESIGN.colors.textPrimary,
-                              fontSize: '12px',
+                              fontSize: '13px', // Increased font size
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '4px',
+                              gap: '6px', // Increased gap
                               cursor: 'pointer',
                               transition: 'background 0.2s'
                             }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                           >
-                            <QrCode className="w-3 h-3" />
+                            <QrCode className="w-4 h-4" /> {/* Increased icon size */}
                             QR
                           </button>
                           <button
-                            onClick={() => handleDeleteEvent(event)}
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent event bubbling
+                              handleDeleteEvent(event);
+                            }}
                             style={{
-                              height: '28px',
-                              width: '28px',
+                              height: '36px', // Increased button height
+                              width: '36px', // Increased width
                               borderRadius: DESIGN.borderRadius.button,
                               background: 'transparent',
                               color: DESIGN.colors.danger,
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              border: 'none',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
                               cursor: 'pointer',
                               transition: 'background 0.2s'
                             }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-4 h-4" /> {/* Increased icon size */}
                           </button>
                         </div>
                       </div>
@@ -2304,12 +2469,12 @@ export default function EventManager() {
                       color: selectedEventId === event.id ? DESIGN.colors.background : DESIGN.colors.textSecondary,
                       borderColor: selectedEventId === event.id ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)',
                       cursor: 'pointer'
-                    }}
-                  >
-                    {event.name}
-                  </button>
-                ))}
-              </div>
+                  }}
+                >
+                  {event.name}
+                </button>
+              ))}
+            </div>
             )}
 
             {/* Live Stats */}
@@ -2388,7 +2553,6 @@ export default function EventManager() {
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
                 onClick={() => {
-                  // Export functionality
                   const csvContent = 'data:text/csv;charset=utf-8,' + 
                     'Name,Email,Ticket Type,Checked In\n' +
                     mockAttendees.map(a => 
@@ -2615,7 +2779,7 @@ export default function EventManager() {
           </div>
         )}
 
-        {/* Messages Tab - Enhanced with Real-time Notifications */}
+        {/* Messages Tab */}
         {activeTab === 'messages' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Quick Send Card */}
@@ -2881,7 +3045,18 @@ export default function EventManager() {
             onSave={handleSaveEvent}
           />
           
-          {/* Add QRCodeModal and DeleteEventModal here with sticky headers/footers */}
+          <QRCodeModal
+            isOpen={qrModalOpen}
+            onClose={() => { setQrModalOpen(false); setActionEvent(null); }}
+            event={actionEvent}
+          />
+          
+          <DeleteEventModal
+            isOpen={deleteModalOpen}
+            onClose={() => { setDeleteModalOpen(false); setActionEvent(null); }}
+            event={actionEvent}
+            onConfirm={handleConfirmDelete}
+          />
           
           <SendNotificationModal
             isOpen={notificationModalOpen}
@@ -2891,8 +3066,6 @@ export default function EventManager() {
           />
         </>
       )}
-
-      <BottomNav />
 
       {/* Add CSS animations for live updates */}
       <style>{`
