@@ -2225,7 +2225,7 @@ export default function EventManager() {
       }}>
         {/* My Events Tab */}
         {activeTab === 'events' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}> {/* Increased gap */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {userEvents.length > 0 ? (
               userEvents.map(event => {
                 const status = getEventStatus(event);
@@ -2238,159 +2238,206 @@ export default function EventManager() {
                       border: `1px solid ${selectedEventId === event.id ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)'}`,
                       overflow: 'hidden',
                       transition: 'border-color 0.2s',
-                      minHeight: '120px' // Increased card size
+                      padding: DESIGN.spacing.cardPadding
                     }}
                   >
-                    <div style={{ display: 'flex', height: '100%' }}>
+                    {/* Centered Image at Top */}
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'center',
+                      marginBottom: '16px'
+                    }}>
                       <img 
                         src={event.coverImage} 
                         alt={event.name}
-                        style={{ width: '120px', height: '120px', objectFit: 'cover' }} // Increased image size
+                        style={{ 
+                          width: '100%',
+                          maxWidth: '320px',
+                          height: '160px',
+                          objectFit: 'cover',
+                          borderRadius: DESIGN.borderRadius.cardInner
+                        }}
                       />
-                      <div style={{ flex: 1, padding: DESIGN.spacing.cardPadding, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
-                            <h3 style={{ 
-                              fontSize: '16px', // Increased font size
-                              fontWeight: 'bold', 
-                              color: DESIGN.colors.textPrimary, 
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              flex: 1
-                            }}>
-                              {event.name}
-                            </h3>
-                            <span style={{
-                              padding: '4px 10px', // Increased padding
-                              fontSize: '12px',
-                              borderRadius: DESIGN.borderRadius.roundButton,
-                              fontWeight: '500',
-                              background: status === 'live' ? `${DESIGN.colors.success}20` : 
-                                        status === 'upcoming' ? `${DESIGN.colors.primary}20` : 
-                                        `${DESIGN.colors.textSecondary}20`,
-                              color: status === 'live' ? DESIGN.colors.success : 
-                                    status === 'upcoming' ? DESIGN.colors.primary : 
-                                    DESIGN.colors.textSecondary
-                            }}>
-                              {status === 'live' ? '🔴 Live' : status === 'upcoming' ? 'Upcoming' : 'Past'}
-                            </span>
-                          </div>
-                          <p style={{ fontSize: '13px', color: DESIGN.colors.textSecondary, marginBottom: '8px' }}> {/* Increased font size */}
-                            {event.date} • {event.attendees} attendees
-                          </p>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}> {/* Increased gap */}
-                            {event.mediaType === 'video' ? (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}> {/* Increased gap */}
-                                <Film className="w-4 h-4" style={{ color: DESIGN.colors.primary }} /> {/* Increased icon size */}
-                                <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>Video</span> {/* Increased font size */}
-                              </div>
-                            ) : (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}> {/* Increased gap */}
-                                <Grid3x3 className="w-4 h-4" style={{ color: DESIGN.colors.primary }} /> {/* Increased icon size */}
-                                <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>
-                                  {event.images?.length || 0} photos
-                                </span> {/* Increased font size */}
-                              </div>
-                            )}
-                            <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>•</span> {/* Increased font size */}
-                            <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>
-                              Radius: {event.geofenceRadius}m
-                            </span> {/* Increased font size */}
-                          </div>
+                    </div>
+
+                    {/* Event Header */}
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'flex-start', 
+                      justifyContent: 'space-between',
+                      gap: '8px',
+                      marginBottom: '12px'
+                    }}>
+                      <h3 style={{ 
+                        fontSize: '16px',
+                        fontWeight: 'bold', 
+                        color: DESIGN.colors.textPrimary, 
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        flex: 1
+                      }}>
+                        {event.name}
+                      </h3>
+                      <span style={{
+                        padding: '4px 10px',
+                        fontSize: '12px',
+                        borderRadius: DESIGN.borderRadius.roundButton,
+                        fontWeight: '500',
+                        background: status === 'live' ? `${DESIGN.colors.success}20` : 
+                                  status === 'upcoming' ? `${DESIGN.colors.primary}20` : 
+                                  `${DESIGN.colors.textSecondary}20`,
+                        color: status === 'live' ? DESIGN.colors.success : 
+                              status === 'upcoming' ? DESIGN.colors.primary : 
+                              DESIGN.colors.textSecondary
+                      }}>
+                        {status === 'live' ? '🔴 Live' : status === 'upcoming' ? 'Upcoming' : 'Past'}
+                      </span>
+                    </div>
+
+                    {/* Event Details */}
+                    <p style={{ 
+                      fontSize: '14px', 
+                      color: DESIGN.colors.textSecondary,
+                      marginBottom: '12px'
+                    }}>
+                      {event.date} • {event.attendees} attendees
+                    </p>
+
+                    {/* Media and Radius Info */}
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '12px',
+                      marginBottom: '20px',
+                      flexWrap: 'wrap'
+                    }}>
+                      {event.mediaType === 'video' ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Film className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
+                          <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>Video</span>
                         </div>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button
-                            onClick={() => navigate(`/event/${event.id}`)}
-                            style={{
-                              height: '36px', // Increased button height
-                              padding: '0 16px', // Increased padding
-                              border: '1px solid rgba(255, 255, 255, 0.2)',
-                              borderRadius: DESIGN.borderRadius.button,
-                              background: 'transparent',
-                              color: DESIGN.colors.textPrimary,
-                              fontSize: '13px', // Increased font size
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px', // Increased gap
-                              cursor: 'pointer',
-                              transition: 'background 0.2s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                          >
-                            <Eye className="w-4 h-4" /> {/* Increased icon size */}
-                            View
-                          </button>
-                          <button
-                            onClick={() => handleEditEvent(event)}
-                            style={{
-                              height: '36px', // Increased button height
-                              padding: '0 16px', // Increased padding
-                              border: '1px solid rgba(255, 255, 255, 0.2)',
-                              borderRadius: DESIGN.borderRadius.button,
-                              background: 'transparent',
-                              color: DESIGN.colors.textPrimary,
-                              fontSize: '13px', // Increased font size
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px', // Increased gap
-                              cursor: 'pointer',
-                              transition: 'background 0.2s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                          >
-                            <Edit className="w-4 h-4" /> {/* Increased icon size */}
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleQRCode(event)}
-                            style={{
-                              height: '36px', // Increased button height
-                              padding: '0 16px', // Increased padding
-                              border: '1px solid rgba(255, 255, 255, 0.2)',
-                              borderRadius: DESIGN.borderRadius.button,
-                              background: 'transparent',
-                              color: DESIGN.colors.textPrimary,
-                              fontSize: '13px', // Increased font size
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px', // Increased gap
-                              cursor: 'pointer',
-                              transition: 'background 0.2s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                          >
-                            <QrCode className="w-4 h-4" /> {/* Increased icon size */}
-                            QR
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent event bubbling
-                              handleDeleteEvent(event);
-                            }}
-                            style={{
-                              height: '36px', // Increased button height
-                              width: '36px', // Increased width
-                              borderRadius: DESIGN.borderRadius.button,
-                              background: 'transparent',
-                              color: DESIGN.colors.danger,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              border: '1px solid rgba(239, 68, 68, 0.3)',
-                              cursor: 'pointer',
-                              transition: 'background 0.2s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                          >
-                            <Trash2 className="w-4 h-4" /> {/* Increased icon size */}
-                          </button>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Grid3x3 className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
+                          <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>
+                            {event.images?.length || 0} photos
+                          </span>
                         </div>
-                      </div>
+                      )}
+                      <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>•</span>
+                      <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>
+                        Radius: {event.geofenceRadius}m
+                      </span>
+                    </div>
+
+                    {/* Action Buttons - Optimized for Mobile */}
+                    <div style={{ 
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(4, 1fr)',
+                      gap: '8px'
+                    }}>
+                      <button
+                        onClick={() => navigate(`/event/${event.id}`)}
+                        style={{
+                          height: '40px',
+                          padding: '0 8px',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          borderRadius: DESIGN.borderRadius.button,
+                          background: 'transparent',
+                          color: DESIGN.colors.textPrimary,
+                          fontSize: '12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <Eye className="w-4 h-4" />
+                        <span>View</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => handleEditEvent(event)}
+                        style={{
+                          height: '40px',
+                          padding: '0 8px',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          borderRadius: DESIGN.borderRadius.button,
+                          background: 'transparent',
+                          color: DESIGN.colors.textPrimary,
+                          fontSize: '12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <Edit className="w-4 h-4" />
+                        <span>Edit</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => handleQRCode(event)}
+                        style={{
+                          height: '40px',
+                          padding: '0 8px',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          borderRadius: DESIGN.borderRadius.button,
+                          background: 'transparent',
+                          color: DESIGN.colors.textPrimary,
+                          fontSize: '12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <QrCode className="w-4 h-4" />
+                        <span>QR</span>
+                      </button>
+                      
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteEvent(event);
+                        }}
+                        style={{
+                          height: '40px',
+                          padding: '0 8px',
+                          borderRadius: DESIGN.borderRadius.button,
+                          background: 'transparent',
+                          color: DESIGN.colors.danger,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Delete</span>
+                      </button>
                     </div>
                   </div>
                 );
