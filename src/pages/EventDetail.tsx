@@ -53,28 +53,8 @@ const DESIGN = {
   }
 };
 
-// Add missing interface for event
-interface EventType {
-  id: string;
-  name: string;
-  description: string;
-  coverImage: string;
-  date: string;
-  time: string;
-  location: string;
-  address: string;
-  category: string;
-  price: number;
-  attendees: number;
-  isFeatured: boolean;
-  tags: string[];
-  customTheme?: string;
-  images: string[];
-  videos: string[];
-  hasVideo: boolean;
-  mediaType: 'video' | 'carousel';
-  selectedVideoIndex: number;
-}
+// Import Event type from lib
+import { Event as EventType } from '@/lib/types';
 
 export default function EventDetail() {
   const { id } = useParams<{ id: string }>();
@@ -104,9 +84,9 @@ export default function EventDetail() {
 
   // Memoize event find for better performance
   const event = useMemo(() => 
-    events.find((e: EventType) => e.id === id), 
+    events.find((e) => e.id === id), 
     [events, id]
-  ) as EventType | undefined;
+  );
 
   const isBookmarked = useMemo(() => 
     user?.bookmarkedEvents.includes(id ?? ''), 

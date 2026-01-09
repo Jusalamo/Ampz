@@ -32,7 +32,10 @@ import {
 import { useApp } from '@/contexts/AppContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { Event } from '@/lib/types';
+import { Event as EventType } from '@/lib/types';
+
+// Type alias to avoid conflict with DOM Event
+type AppEvent = EventType;
 
 // Mock WebSocket service for real-time notifications
 const mockNotificationService = {
@@ -287,8 +290,8 @@ function FilePreview({ file, onRemove, isCover }: FilePreviewProps) {
 interface EditEventModalProps {
   isOpen: boolean;
   onClose: () => void;
-  event: Event;
-  onSave: (updatedEvent: Partial<Event>) => Promise<void>;
+  event: AppEvent;
+  onSave: (updatedEvent: Partial<AppEvent>) => Promise<void>;
 }
 
 function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps) {
@@ -1178,7 +1181,7 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
 interface QRCodeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  event: Event;
+  event: AppEvent;
 }
 
 function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
@@ -1363,7 +1366,7 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
 interface DeleteEventModalProps {
   isOpen: boolean;
   onClose: () => void;
-  event: Event;
+  event: AppEvent | null;
   onConfirm: () => Promise<void>;
 }
 
@@ -1530,7 +1533,7 @@ function DeleteEventModal({ isOpen, onClose, event, onConfirm }: DeleteEventModa
 interface SendNotificationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  events: Event[];
+  events: AppEvent[];
   selectedEventId?: string;
 }
 
@@ -1937,7 +1940,7 @@ export default function EventManager() {
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [notificationModalOpen, setNotificationModalOpen] = useState(false);
-  const [actionEvent, setActionEvent] = useState<Event | null>(null);
+  const [actionEvent, setActionEvent] = useState<AppEvent | null>(null);
 
   const userEvents = events.filter(e => e.organizerId === user?.id);
   const selectedEvent = selectedEventId ? events.find(e => e.id === selectedEventId) : null;
@@ -2029,22 +2032,22 @@ export default function EventManager() {
     return 'upcoming';
   };
 
-  const handleEditEvent = (event: Event) => {
+  const handleEditEvent = (event: AppEvent) => {
     setActionEvent(event);
     setEditModalOpen(true);
   };
 
-  const handleQRCode = (event: Event) => {
+  const handleQRCode = (event: AppEvent) => {
     setActionEvent(event);
     setQrModalOpen(true);
   };
 
-  const handleDeleteEvent = (event: Event) => {
+  const handleDeleteEvent = (event: AppEvent) => {
     setActionEvent(event);
     setDeleteModalOpen(true);
   };
 
-  const handleSaveEvent = async (updatedData: Partial<Event>) => {
+  const handleSaveEvent = async (updatedData: Partial<AppEvent>) => {
     if (actionEvent && updateEvent) {
       await updateEvent(actionEvent.id, updatedData);
       toast({ 
