@@ -157,13 +157,10 @@ export default function EventDetail() {
       
       // Start new interval (rotate every 5 seconds)
       carouselIntervalRef.current = setInterval(() => {
-        setCurrentImageIndex((prev) => {
-          if (!event.images) return prev;
-          return (prev + 1) % event.images.length;
-        });
+        setCurrentImageIndex((prev) => (prev + 1) % event.images.length);
       }, 5000);
     }
-  }, [event?.mediaType, event?.images?.length]);
+  }, [event?.mediaType, event?.images?.length, event?.images]);
 
   // Stop carousel rotation
   const stopCarouselRotation = useCallback(() => {
@@ -174,7 +171,10 @@ export default function EventDetail() {
   }, []);
 
   // Handle carousel navigation with manual control pause
-  const nextImage = useCallback(() => {
+  const nextImage = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (event?.images && event.images.length > 0) {
       // Stop auto-rotation temporarily when user manually navigates
       stopCarouselRotation();
@@ -185,9 +185,12 @@ export default function EventDetail() {
         startCarouselRotation();
       }, 3000);
     }
-  }, [event?.images?.length, startCarouselRotation, stopCarouselRotation]);
+  }, [event?.images, stopCarouselRotation, startCarouselRotation]);
 
-  const prevImage = useCallback(() => {
+  const prevImage = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (event?.images && event.images.length > 0) {
       // Stop auto-rotation temporarily when user manually navigates
       stopCarouselRotation();
@@ -198,10 +201,13 @@ export default function EventDetail() {
         startCarouselRotation();
       }, 3000);
     }
-  }, [event?.images?.length, startCarouselRotation, stopCarouselRotation]);
+  }, [event?.images, stopCarouselRotation, startCarouselRotation]);
 
   // Handle video playback
-  const toggleVideoPlay = useCallback(() => {
+  const toggleVideoPlay = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (videoRef.current) {
       if (videoRef.current.paused) {
         videoRef.current.play();
@@ -216,7 +222,10 @@ export default function EventDetail() {
     }
   }, []);
 
-  const toggleVideoMute = useCallback(() => {
+  const toggleVideoMute = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (videoRef.current) {
       const newMutedState = !videoRef.current.muted;
       videoRef.current.muted = newMutedState;
@@ -226,7 +235,10 @@ export default function EventDetail() {
   }, []);
 
   // Handle fullscreen video controls
-  const toggleFullscreenVideoPlay = useCallback(() => {
+  const toggleFullscreenVideoPlay = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (fullscreenVideoRef.current) {
       if (fullscreenVideoRef.current.paused) {
         fullscreenVideoRef.current.play();
@@ -238,7 +250,10 @@ export default function EventDetail() {
     }
   }, []);
 
-  const toggleFullscreenVideoMute = useCallback(() => {
+  const toggleFullscreenVideoMute = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (fullscreenVideoRef.current) {
       const newMutedState = !fullscreenVideoRef.current.muted;
       fullscreenVideoRef.current.muted = newMutedState;
@@ -246,7 +261,10 @@ export default function EventDetail() {
     }
   }, []);
 
-  const openVideoModal = useCallback(() => {
+  const openVideoModal = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     // Save current video state before opening modal
     if (videoRef.current) {
       videoPlaybackStateRef.current.currentTime = videoRef.current.currentTime;
@@ -331,40 +349,25 @@ export default function EventDetail() {
         videoElement.currentTime = videoPlaybackStateRef.current.currentTime;
       }
       
-      // Force autoplay - try multiple times if needed
-      const attemptPlay = () => {
+      // Try to autoplay with saved state
+      if (videoPlaybackStateRef.current.isPlaying) {
         const playPromise = videoElement.play();
         if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              console.log('Video playing successfully');
-              setIsVideoPlaying(true);
-              videoPlaybackStateRef.current.isPlaying = true;
-            })
-            .catch(error => {
-              console.log('Autoplay prevented, retrying...', error);
-              // Retry after a short delay
-              setTimeout(() => {
-                videoElement.play().catch(e => console.log('Retry failed:', e));
-              }, 500);
-            });
+          playPromise.catch(error => {
+            console.log('Autoplay prevented, will retry:', error);
+            // Store that we need to try again when page becomes visible
+            videoPlaybackStateRef.current.isPlaying = true;
+          });
         }
-      };
-
-      // Attempt to play immediately
-      attemptPlay();
-      
-      // Also attempt when video loads
-      videoElement.addEventListener('loadeddata', attemptPlay);
+      }
 
       return () => {
         videoElement.removeEventListener('play', handlePlay);
         videoElement.removeEventListener('pause', handlePause);
         videoElement.removeEventListener('ended', handleEnded);
-        videoElement.removeEventListener('loadeddata', attemptPlay);
       };
     }
-  }, [event?.mediaType, event?.videos, handleVideoPlay, handleVideoPause, handleVideoEnded]);
+  }, [event?.mediaType, event?.videos?.length, handleVideoPlay, handleVideoPause, handleVideoEnded]);
 
   // Setup fullscreen video when modal opens
   const setupFullscreenVideo = useCallback(() => {
@@ -398,7 +401,7 @@ export default function EventDetail() {
         fullscreenVideoElement.removeEventListener('ended', handleEnded);
       };
     }
-  }, [isVideoModalOpen, event?.mediaType, event?.videos, isFullscreenVideoMuted, handleFullscreenVideoPlay, handleFullscreenVideoPause, handleFullscreenVideoEnded]);
+  }, [isVideoModalOpen, event?.mediaType, event?.videos?.length, isFullscreenVideoMuted, handleFullscreenVideoPlay, handleFullscreenVideoPause, handleFullscreenVideoEnded]);
 
   // Handle page visibility for persistent video playback
   useEffect(() => {
@@ -409,30 +412,15 @@ export default function EventDetail() {
           videoPlaybackStateRef.current.currentTime = videoRef.current.currentTime;
           videoPlaybackStateRef.current.isPlaying = !videoRef.current.paused;
         } else {
-          // Page is visible again, force restore playback
-          setTimeout(() => {
-            if (videoRef.current) {
-              videoRef.current.currentTime = videoPlaybackStateRef.current.currentTime;
-              videoRef.current.muted = videoPlaybackStateRef.current.isMuted;
-              
-              // Always try to play when page becomes visible
-              videoRef.current.play()
-                .then(() => {
-                  console.log('Video resumed on page visible');
-                  setIsVideoPlaying(true);
-                  videoPlaybackStateRef.current.isPlaying = true;
-                })
-                .catch(e => {
-                  console.log('Resume playback failed:', e);
-                  // Try again after a short delay
-                  setTimeout(() => {
-                    if (videoRef.current) {
-                      videoRef.current.play().catch(err => console.log('Second retry failed:', err));
-                    }
-                  }, 300);
-                });
-            }
-          }, 100);
+          // Page is visible again, restore playback
+          if (videoPlaybackStateRef.current.isPlaying) {
+            videoRef.current.currentTime = videoPlaybackStateRef.current.currentTime;
+            videoRef.current.muted = videoPlaybackStateRef.current.isMuted;
+            videoRef.current.play().catch(e => {
+              console.log('Resume playback failed:', e);
+            });
+            setIsVideoPlaying(true);
+          }
         }
       }
     };
@@ -442,55 +430,27 @@ export default function EventDetail() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [event?.mediaType]);
+  }, [event?.mediaType, event?.id]);
 
   // Setup main video and carousel on mount and when event changes
   useEffect(() => {
     if (event?.mediaType === 'video') {
-      // Add a small delay to ensure video element is ready
-      const timer = setTimeout(() => {
-        const cleanup = setupMainVideo();
-        return cleanup;
-      }, 100);
-      
-      return () => {
-        clearTimeout(timer);
-      };
+      setupMainVideo();
     } else if (event?.mediaType === 'carousel') {
       startCarouselRotation();
-      return () => {
-        stopCarouselRotation();
-      };
     }
-  }, [event?.mediaType, event?.id, setupMainVideo, startCarouselRotation, stopCarouselRotation]);
-
-  // Additional effect to ensure video plays on mount
-  useEffect(() => {
-    if (event?.mediaType === 'video' && videoRef.current) {
-      const videoElement = videoRef.current;
-      
-      // Try to play after component mounts
-      const playTimer = setTimeout(() => {
-        videoElement.play()
-          .then(() => {
-            console.log('Video started on mount');
-            setIsVideoPlaying(true);
-          })
-          .catch(e => {
-            console.log('Initial play failed:', e);
-          });
-      }, 200);
-
-      return () => clearTimeout(playTimer);
-    }
-  }, [event?.mediaType, event?.id]);
+    
+    return () => {
+      stopCarouselRotation();
+    };
+  }, [event?.mediaType, event?.id, event?.videos?.length, event?.images?.length, setupMainVideo, startCarouselRotation, stopCarouselRotation]);
 
   // Setup fullscreen video when modal opens
   useEffect(() => {
     if (isVideoModalOpen && event?.mediaType === 'video') {
       setupFullscreenVideo();
     }
-  }, [isVideoModalOpen, event?.mediaType, setupFullscreenVideo]);
+  }, [isVideoModalOpen, event?.mediaType, event?.id, setupFullscreenVideo]);
 
   // Handle Escape key to close modal
   useEffect(() => {
@@ -738,17 +698,14 @@ export default function EventDetail() {
         {event.mediaType === 'video' && event.videos && event.videos.length > 0 ? (
           /* Video Player */
           <div className="relative w-full h-full group">
-            {/* Video Element - Lower z-index */}
             <video
               ref={videoRef}
               src={event.videos[0]}
-              className="w-full h-full object-cover absolute inset-0"
-              style={{ zIndex: 1 }}
+              className="w-full h-full object-cover"
               muted={isVideoMuted}
               loop
               playsInline
               preload="auto"
-              autoPlay
               onTimeUpdate={() => {
                 if (videoRef.current) {
                   videoPlaybackStateRef.current.currentTime = videoRef.current.currentTime;
@@ -756,91 +713,66 @@ export default function EventDetail() {
               }}
             />
             
-            {/* Video Controls Overlay - Higher z-index and pointer-events */}
-            <div 
-              className="absolute inset-0 pointer-events-none"
-              style={{ zIndex: 10 }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
-                <div className="absolute bottom-0 left-0 right-0 p-4 pointer-events-auto">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          toggleVideoPlay();
-                        }}
-                        className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer"
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.9)',
-                          color: DESIGN.colors.background,
-                          zIndex: 20
-                        }}
-                        aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
-                      >
-                        {isVideoPlaying ? (
-                          <Pause className="w-5 h-5" />
-                        ) : (
-                          <Play className="w-5 h-5 ml-0.5" />
-                        )}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          toggleVideoMute();
-                        }}
-                        className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer"
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.9)',
-                          color: DESIGN.colors.background,
-                          zIndex: 20
-                        }}
-                        aria-label={isVideoMuted ? 'Unmute video' : 'Mute video'}
-                      >
-                        {isVideoMuted ? (
-                          <VolumeX className="w-5 h-5" />
-                        ) : (
-                          <Volume2 className="w-5 h-5" />
-                        )}
-                      </button>
-                    </div>
+            {/* Video Controls Overlay - Always visible on mobile, hover only on desktop */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
+              <div className="absolute bottom-0 left-0 right-0 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        openVideoModal();
-                      }}
-                      className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+                      onClick={toggleVideoPlay}
+                      className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95"
                       style={{
                         background: 'rgba(255, 255, 255, 0.9)',
-                        color: DESIGN.colors.background,
-                        zIndex: 20
+                        color: DESIGN.colors.background
                       }}
-                      aria-label="Open video in fullscreen"
+                      aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
                     >
-                      <Maximize2 className="w-5 h-5" />
+                      {isVideoPlaying ? (
+                        <Pause className="w-5 h-5" />
+                      ) : (
+                        <Play className="w-5 h-5 ml-0.5" />
+                      )}
+                    </button>
+                    <button
+                      onClick={toggleVideoMute}
+                      className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        color: DESIGN.colors.background
+                      }}
+                      aria-label={isVideoMuted ? 'Unmute video' : 'Mute video'}
+                    >
+                      {isVideoMuted ? (
+                        <VolumeX className="w-5 h-5" />
+                      ) : (
+                        <Volume2 className="w-5 h-5" />
+                      )}
                     </button>
                   </div>
+                  <button
+                    onClick={openVideoModal}
+                    className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.9)',
+                      color: DESIGN.colors.background
+                    }}
+                    aria-label="Open video in fullscreen"
+                  >
+                    <Maximize2 className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
             </div>
             
-            {/* Play overlay when video ended - Higher z-index */}
+            {/* Play overlay when video ended */}
             {isVideoEnded && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-auto" style={{ zIndex: 15 }}>
+              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                 <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleVideoPlay();
-                  }}
-                  className="w-16 h-16 rounded-full flex items-center justify-center cursor-pointer"
+                  onClick={toggleVideoPlay}
+                  className="w-16 h-16 rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
                   style={{
                     background: 'rgba(255, 255, 255, 0.9)',
-                    color: DESIGN.colors.background,
-                    zIndex: 20
+                    color: DESIGN.colors.background
                   }}
                   aria-label="Replay video"
                 >
@@ -849,14 +781,11 @@ export default function EventDetail() {
               </div>
             )}
             
-            {/* Video Indicator - Higher z-index */}
-            <div 
-              className="absolute top-3 left-3 px-2 py-1 rounded-full backdrop-blur-sm"
-              style={{
-                background: 'rgba(0, 0, 0, 0.6)',
-                zIndex: 5
-              }}
-            >
+            {/* Video Indicator */}
+            <div className="absolute top-3 left-3 px-2 py-1 rounded-full backdrop-blur-sm"
+                 style={{
+                   background: 'rgba(0, 0, 0, 0.6)'
+                 }}>
               <div className="flex items-center gap-1">
                 <Film className="w-3 h-3 text-white" />
                 <span className="text-xs text-white">Video</span>
@@ -883,11 +812,7 @@ export default function EventDetail() {
                 {event.images.length > 1 && (
                   <>
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        prevImage();
-                      }}
+                      onClick={prevImage}
                       className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 z-10"
                       style={{
                         background: 'rgba(0, 0, 0, 0.6)',
@@ -898,11 +823,7 @@ export default function EventDetail() {
                       <ChevronLeft className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        nextImage();
-                      }}
+                      onClick={nextImage}
                       className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 z-10"
                       style={{
                         background: 'rgba(0, 0, 0, 0.6)',
@@ -1035,7 +956,7 @@ export default function EventDetail() {
               style={{ color: DESIGN.colors.textSecondary }}
             >
               <span className="font-medium" style={{ color: DESIGN.colors.primary }}>
-                {event.price === 0 ? 'FREE' : `N${event.price}`}
+                {event.price === 0 ? 'FREE' : `N$${event.price}`}
               </span>
               <span className="mx-1" aria-hidden="true">•</span>
               <span>{event.attendees} attending</span>
@@ -1412,7 +1333,7 @@ export default function EventDetail() {
                   color: DESIGN.colors.textPrimary 
                 }}
               >
-                {event.price === 0 ? 'FREE ENTRY' : `N${event.price}`}
+                {event.price === 0 ? 'FREE ENTRY' : `N$${event.price}`}
               </p>
               <p 
                 className="text-xs truncate"
@@ -1468,7 +1389,7 @@ export default function EventDetail() {
                 <div className="flex items-center gap-4">
                   <button
                     onClick={toggleFullscreenVideoPlay}
-                    className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all"
+                    className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all active:scale-95"
                     aria-label={isFullscreenVideoPlaying ? 'Pause video' : 'Play video'}
                   >
                     {isFullscreenVideoPlaying ? (
@@ -1479,7 +1400,7 @@ export default function EventDetail() {
                   </button>
                   <button
                     onClick={toggleFullscreenVideoMute}
-                    className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all"
+                    className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all active:scale-95"
                     aria-label={isFullscreenVideoMuted ? 'Unmute video' : 'Mute video'}
                   >
                     {isFullscreenVideoMuted ? (
@@ -1495,7 +1416,7 @@ export default function EventDetail() {
             {/* Close Button */}
             <button
               onClick={closeVideoModal}
-              className="absolute top-6 right-6 w-12 h-12 rounded-full flex items-center justify-center bg-black/60 backdrop-blur-sm hover:bg-black/80 transition-all"
+              className="absolute top-6 right-6 w-12 h-12 rounded-full flex items-center justify-center bg-black/60 backdrop-blur-sm hover:bg-black/80 transition-all active:scale-95"
               aria-label="Close video"
             >
               <X className="w-6 h-6 text-white" />
