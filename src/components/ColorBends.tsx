@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import * as THREE from 'three';
 
 const MAX_COLORS = 8;
@@ -92,6 +92,19 @@ void main() {
 }
 `;
 
+// Check if WebGL is available
+function isWebGLAvailable(): boolean {
+  try {
+    const canvas = document.createElement('canvas');
+    return !!(
+      window.WebGLRenderingContext &&
+      (canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
+    );
+  } catch (e) {
+    return false;
+  }
+}
+
 interface ColorBendsProps {
   className?: string;
   style?: React.CSSProperties;
@@ -106,6 +119,40 @@ interface ColorBendsProps {
   mouseInfluence?: number;
   parallax?: number;
   noise?: number;
+}
+
+// CSS-based fallback gradient animation
+function ColorBendsFallback({
+  className = '',
+  style,
+  colors = [],
+}: {
+  className?: string;
+  style?: React.CSSProperties;
+  colors?: string[];
+}) {
+  const defaultColors = ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef'];
+  const gradientColors = colors.length > 0 ? colors : defaultColors;
+  
+  return (
+    <div
+      className={`absolute inset-0 overflow-hidden ${className}`}
+      style={{
+        ...style,
+        background: `linear-gradient(135deg, ${gradientColors.join(', ')})`,
+        backgroundSize: '400% 400%',
+        animation: 'colorBendsGradient 15s ease infinite',
+      }}
+    >
+      <style>{`
+        @keyframes colorBendsGradient {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+      `}</style>
+    </div>
+  );
 }
 
 export default function ColorBends({
@@ -131,6 +178,12 @@ export default function ColorBends({
   const autoRotateRef = useRef(autoRotate);
   const pointerTargetRef = useRef(new THREE.Vector2(0, 0));
   const pointerCurrentRef = useRef(new THREE.Vector2(0, 0));
+  const [webGLAvailable, setWebGLAvailable] = useState<boolean | null>(null);
+
+  // Check WebGL availability on mount
+  useEffect(() => {
+    setWebGLAvailable(isWebGLAvailable());
+  }, []);
 
   const handlePointerMove = useCallback((e: MouseEvent) => {
     const container = containerRef.current;
@@ -142,103 +195,114 @@ export default function ColorBends({
   }, []);
 
   useEffect(() => {
+    // Don't initialize Three.js if WebGL is not available
+    if (webGLAvailable !== true) return;
+
     const container = containerRef.current;
     if (!container) return;
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    const geometry = new THREE.PlaneGeometry(2, 2);
-    const uColorsArray = Array.from({ length: MAX_COLORS }, () => new THREE.Vector3(0, 0, 0));
+    let renderer: THREE.WebGLRenderer;
     
-    const material = new THREE.ShaderMaterial({
-      vertexShader: vert,
-      fragmentShader: frag,
-      uniforms: {
-        uCanvas: { value: new THREE.Vector2(1, 1) },
-        uTime: { value: 0 },
-        uSpeed: { value: speed },
-        uRot: { value: new THREE.Vector2(1, 0) },
-        uColorCount: { value: 0 },
-        uColors: { value: uColorsArray },
-        uTransparent: { value: transparent ? 1 : 0 },
-        uScale: { value: scale },
-        uFrequency: { value: frequency },
-        uWarpStrength: { value: warpStrength },
-        uPointer: { value: new THREE.Vector2(0, 0) },
-        uMouseInfluence: { value: mouseInfluence },
-        uParallax: { value: parallax },
-        uNoise: { value: noise },
-      },
-      premultipliedAlpha: true,
-      transparent: true,
-    });
-    materialRef.current = material;
+    try {
+      const scene = new THREE.Scene();
+      const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+      const geometry = new THREE.PlaneGeometry(2, 2);
+      const uColorsArray = Array.from({ length: MAX_COLORS }, () => new THREE.Vector3(0, 0, 0));
+      
+      const material = new THREE.ShaderMaterial({
+        vertexShader: vert,
+        fragmentShader: frag,
+        uniforms: {
+          uCanvas: { value: new THREE.Vector2(1, 1) },
+          uTime: { value: 0 },
+          uSpeed: { value: speed },
+          uRot: { value: new THREE.Vector2(1, 0) },
+          uColorCount: { value: 0 },
+          uColors: { value: uColorsArray },
+          uTransparent: { value: transparent ? 1 : 0 },
+          uScale: { value: scale },
+          uFrequency: { value: frequency },
+          uWarpStrength: { value: warpStrength },
+          uPointer: { value: new THREE.Vector2(0, 0) },
+          uMouseInfluence: { value: mouseInfluence },
+          uParallax: { value: parallax },
+          uNoise: { value: noise },
+        },
+        premultipliedAlpha: true,
+        transparent: true,
+      });
+      materialRef.current = material;
 
-    const mesh = new THREE.Mesh(geometry, material);
-    scene.add(mesh);
+      const mesh = new THREE.Mesh(geometry, material);
+      scene.add(mesh);
 
-    const renderer = new THREE.WebGLRenderer({
-      antialias: false,
-      powerPreference: 'high-performance',
-      alpha: true,
-    });
-    rendererRef.current = renderer;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setClearColor(0x000000, transparent ? 0 : 1);
-    renderer.domElement.style.width = '100%';
-    renderer.domElement.style.height = '100%';
-    renderer.domElement.style.display = 'block';
-    container.appendChild(renderer.domElement);
+      renderer = new THREE.WebGLRenderer({
+        antialias: false,
+        powerPreference: 'high-performance',
+        alpha: true,
+      });
+      rendererRef.current = renderer;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setClearColor(0x000000, transparent ? 0 : 1);
+      renderer.domElement.style.width = '100%';
+      renderer.domElement.style.height = '100%';
+      renderer.domElement.style.display = 'block';
+      container.appendChild(renderer.domElement);
 
-    const clock = new THREE.Clock();
+      const clock = new THREE.Clock();
 
-    const handleResize = () => {
-      const w = container.clientWidth || 1;
-      const h = container.clientHeight || 1;
-      renderer.setSize(w, h, false);
-      material.uniforms.uCanvas.value.set(w, h);
-    };
-    handleResize();
+      const handleResize = () => {
+        const w = container.clientWidth || 1;
+        const h = container.clientHeight || 1;
+        renderer.setSize(w, h, false);
+        material.uniforms.uCanvas.value.set(w, h);
+      };
+      handleResize();
 
-    const resizeObserver = new ResizeObserver(handleResize);
-    resizeObserver.observe(container);
+      const resizeObserver = new ResizeObserver(handleResize);
+      resizeObserver.observe(container);
 
-    const loop = () => {
-      const dt = clock.getDelta();
-      const elapsed = clock.elapsedTime;
-      material.uniforms.uTime.value = elapsed;
-      const deg = (rotationRef.current % 360) + autoRotateRef.current * elapsed;
-      const rad = (deg * Math.PI) / 180;
-      const c = Math.cos(rad);
-      const s = Math.sin(rad);
-      material.uniforms.uRot.value.set(c, s);
+      const loop = () => {
+        const dt = clock.getDelta();
+        const elapsed = clock.elapsedTime;
+        material.uniforms.uTime.value = elapsed;
+        const deg = (rotationRef.current % 360) + autoRotateRef.current * elapsed;
+        const rad = (deg * Math.PI) / 180;
+        const c = Math.cos(rad);
+        const s = Math.sin(rad);
+        material.uniforms.uRot.value.set(c, s);
 
-      const cur = pointerCurrentRef.current;
-      const tgt = pointerTargetRef.current;
-      const amt = Math.min(1, dt * 8);
-      cur.lerp(tgt, amt);
-      material.uniforms.uPointer.value.copy(cur);
+        const cur = pointerCurrentRef.current;
+        const tgt = pointerTargetRef.current;
+        const amt = Math.min(1, dt * 8);
+        cur.lerp(tgt, amt);
+        material.uniforms.uPointer.value.copy(cur);
 
-      renderer.render(scene, camera);
+        renderer.render(scene, camera);
+        rafRef.current = requestAnimationFrame(loop);
+      };
       rafRef.current = requestAnimationFrame(loop);
-    };
-    rafRef.current = requestAnimationFrame(loop);
 
-    container.addEventListener('mousemove', handlePointerMove);
+      container.addEventListener('mousemove', handlePointerMove);
 
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      resizeObserver.disconnect();
-      container.removeEventListener('mousemove', handlePointerMove);
-      geometry.dispose();
-      material.dispose();
-      renderer.dispose();
-      if (renderer.domElement && renderer.domElement.parentElement === container) {
-        container.removeChild(renderer.domElement);
-      }
-    };
-  }, [frequency, mouseInfluence, noise, parallax, scale, speed, transparent, warpStrength, handlePointerMove]);
+      return () => {
+        if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+        resizeObserver.disconnect();
+        container.removeEventListener('mousemove', handlePointerMove);
+        geometry.dispose();
+        material.dispose();
+        renderer.dispose();
+        if (renderer.domElement && renderer.domElement.parentElement === container) {
+          container.removeChild(renderer.domElement);
+        }
+      };
+    } catch (error) {
+      console.warn('WebGL initialization failed, using fallback:', error);
+      setWebGLAvailable(false);
+      return;
+    }
+  }, [webGLAvailable, frequency, mouseInfluence, noise, parallax, scale, speed, transparent, warpStrength, handlePointerMove]);
 
   useEffect(() => {
     const material = materialRef.current;
@@ -273,6 +337,16 @@ export default function ColorBends({
     material.uniforms.uTransparent.value = transparent ? 1 : 0;
     if (renderer) renderer.setClearColor(0x000000, transparent ? 0 : 1);
   }, [rotation, autoRotate, speed, scale, frequency, warpStrength, mouseInfluence, parallax, noise, colors, transparent]);
+
+  // Show nothing while checking WebGL availability
+  if (webGLAvailable === null) {
+    return <div className={`absolute inset-0 overflow-hidden ${className}`} style={style} />;
+  }
+
+  // Use CSS fallback if WebGL is not available
+  if (webGLAvailable === false) {
+    return <ColorBendsFallback className={className} style={style} colors={colors} />;
+  }
 
   return (
     <div
