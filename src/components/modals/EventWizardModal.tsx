@@ -319,6 +319,13 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   }, [step, isOpen, eventData.coordinates]);
 
+  // Update geofence circle when radius changes
+  useEffect(() => {
+    if (step === 4 && map2.current && mapsInitialized.current.map2) {
+      updateGeofenceCircle(map2.current);
+    }
+  }, [step, eventData.geofenceRadius]);
+
   useEffect(() => {
     if (isOpen) {
       // Small delay to ensure DOM is ready
@@ -407,7 +414,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   ...prev, 
                   coordinates: { lat: lngLat.lat, lng: lngLat.lng } 
                 }));
-                reverseGeocode(lngLat.lng, lngLat.lat);
               }
             });
 
@@ -422,7 +428,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   .setLngLat([lng, lat])
                   .addTo(mapInstance);
               }
-              reverseGeocode(lng, lat);
             });
           } else {
             map2.current = mapInstance;
@@ -454,7 +459,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               ...prev,
               coordinates: { lat: latitude, lng: longitude }
             }));
-            reverseGeocode(longitude, latitude);
           });
           
           mapInstance.addControl(geolocateControl, 'top-right');
@@ -553,63 +557,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   }, [eventData.geofenceRadius, eventData.coordinates, eventData.themeColor]);
 
-  const reverseGeocode = async (lng: number, lat: number) => {
-    setIsReverseGeocoding(true);
-    try {
-      const response = await fetch(
-        `https://api.mapbox.com/search/geocode/v6/reverse?` +
-        `longitude=${lng}&latitude=${lat}&` +
-        `access_token=${MAPBOX_TOKEN}&` +
-        `language=en&` +
-        `limit=1`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`Reverse geocoding API error: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      if (data.features && data.features.length > 0) {
-        const place = data.features[0];
-        const properties = place.properties || {};
-        const context = properties.context || {};
-        
-        // Extract address components from v6 API structure
-        const street = properties.name || properties.full_address || '';
-        const locality = context.place?.name || '';
-        const region = context.region?.name || '';
-        const country = context.country?.name || '';
-        
-        // Build full address
-        const fullAddress = [
-          street,
-          locality,
-          region,
-          country
-        ].filter(Boolean).join(', ');
-        
-        setEventData(prev => ({
-          ...prev,
-          location: properties.name || locality || '',
-          address: fullAddress || properties.full_address || '',
-          streetName: street || properties.name || '',
-        }));
-        
-        setSelectedVenueDetails({
-          name: properties.name || locality || 'Selected Location',
-          address: fullAddress || properties.full_address || '',
-        });
-      }
-    } catch (error) {
-      console.error('Reverse geocoding error:', error);
-      toast({
-        title: 'Location Error',
-        description: 'Could not get address for this location.',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsReverseGeocoding(false);
-    }
+  const handleGeofenceRadiusChange = (value: number[]) => {
+    const newRadius = value[0];
+    setEventData(prev => ({ ...prev, geofenceRadius: newRadius }));
   };
 
   const searchLocation = useCallback(
@@ -756,7 +706,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               ...prev, 
               coordinates: { lat: lngLat.lat, lng: lngLat.lng } 
             }));
-            reverseGeocode(lngLat.lng, lngLat.lat);
           }
         });
       }
@@ -1045,7 +994,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   };
 
   const isStep1Valid = eventData.name.trim() && eventData.category && eventData.date && eventData.time;
-  const isStep3Valid = eventData.coordinates.lat !== 0 && eventData.location.trim();
+  const isStep3Valid = eventData.coordinates.lat !== 0 && eventData.location.trim() && eventData.address.trim();
 
   if (!isOpen) return null;
 
@@ -2107,47 +2056,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                                borderColor: DESIGN.colors.border,
                                color: DESIGN.colors.textPrimary
                              }}>
-                          {isReverseGeocoding ? (
-                            <div className="flex items-center gap-1">
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                              Getting address...
-                            </div>
-                          ) : (
-                            "Click or drag marker to set location"
-                          )}
+                          Click or drag marker to set location
                         </div>
                       </>
                     )}
                   </div>
                 </div>
-
-                {/* Selected Location Display */}
-                {selectedVenueDetails && (
-                  <div className="space-y-3">
-                    <label className="text-[13px] font-semibold uppercase tracking-wider" 
-                           style={{ color: DESIGN.colors.textSecondary }}>
-                      Selected Location
-                    </label>
-                    <div className="p-4"
-                         style={{
-                           borderRadius: DESIGN.borderRadius.card,
-                           border: `1px solid ${DESIGN.colors.border}`,
-                           background: DESIGN.colors.card
-                         }}>
-                      <div className="flex items-start gap-3">
-                        <MapPin className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: eventData.themeColor }} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate" style={{ color: DESIGN.colors.textPrimary }}>
-                            {selectedVenueDetails.name}
-                          </p>
-                          <p className="text-xs truncate" style={{ color: DESIGN.colors.textSecondary }}>
-                            {selectedVenueDetails.address}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -2253,7 +2167,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </div>
                 </div>
 
-                {/* Radius Slider */}
+                {/* Radius Slider - Fixed */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <label className="text-[13px] font-semibold uppercase tracking-wider" 
@@ -2269,16 +2183,16 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </div>
                   <Slider
                     value={[eventData.geofenceRadius]}
-                    onValueChange={(value) => setEventData({ ...eventData, geofenceRadius: value[0] })}
+                    onValueChange={handleGeofenceRadiusChange}
                     min={10}
                     max={300}
-                    step={10}
+                    step={1}
                     className="w-full"
                     disabled={isSubmitting}
                   />
                   <div className="flex justify-between text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                     <span>10m</span>
-                    <span>150m</span>
+                    <span>155m</span>
                     <span>300m</span>
                   </div>
                 </div>
