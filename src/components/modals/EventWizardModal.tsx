@@ -83,8 +83,14 @@ const presetColors = [
   '#10B981', '#F59E0B', '#EF4444', '#6366F1', '#06B6D4'
 ];
 
+// Function to generate QR code URL (fallback if context doesn't provide it)
+const generateQRCodeUrl = (data: string): string => {
+  // Using a public QR code generation service as fallback
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data)}&format=png&bgcolor=ffffff&color=000000&qzone=1`;
+};
+
 export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
-  const { addEvent, user, generateQRCode } = useApp();
+  const { addEvent, user } = useApp(); // Removed generateQRCode from destructuring
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [mediaType, setMediaType] = useState<'video' | 'carousel'>('carousel');
@@ -168,9 +174,20 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
   // Cleanup URLs when component unmounts or images/videos change
   useEffect(() => {
+    const currentImages = eventData.images;
+    const currentVideos = eventData.videos;
+    
     return () => {
-      eventData.images.forEach(url => URL.revokeObjectURL(url));
-      eventData.videos.forEach(url => URL.revokeObjectURL(url));
+      currentImages.forEach(url => {
+        if (url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+      currentVideos.forEach(url => {
+        if (url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
     };
   }, []);
 
@@ -562,210 +579,111 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     setEventData(prev => ({ ...prev, geofenceRadius: newRadius }));
   };
 
-  const searchLocation = useCallback(
-    debounce(async (query: string) => {
-      if (!query.trim() || query.length < 2) {
-        setLocationSuggestions([]);
-        setShowSuggestions(false);
-        return;
-      }
-      
-      setIsSearching(true);
-      
-      try {
-        const response = await fetch(
-          `https://api.mapbox.com/search/geocode/v6/forward?` +
-          `q=${encodeURIComponent(query)}&` +
-          `access_token=${MAPBOX_TOKEN}&` +
-          `country=NA&` +
-          `bbox=11.7,-28.97,25.27,-16.96&` +
-          `proximity=${userLocation.lng},${userLocation.lat}&` +
-          `language=en&` +
-          `types=address,place,poi&` +
-          `limit=10`
-        );
-        
-        if (!response.ok) {
-          throw new Error(`Search API error: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.features && data.features.length > 0) {
-          const namibianResults = data.features
-            .filter((feature: any) => {
-              const countryCode = feature.properties?.context?.country?.iso_3166_1_alpha_2;
-              return countryCode === 'NA';
-            })
-            .slice(0, 8);
-          
-          setLocationSuggestions(namibianResults);
-          setShowSuggestions(namibianResults.length > 0);
-        } else {
-          setLocationSuggestions([]);
-          setShowSuggestions(false);
-        }
-      } catch (error) {
-        console.error('Search error:', error);
-        setLocationSuggestions([]);
-        setShowSuggestions(false);
-        toast({
-          title: 'Search Error',
-          description: 'Could not search for locations. Please try again.',
-          variant: 'destructive'
-        });
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300),
-    [userLocation, toast]
-  );
-
-  const getSuggestionIcon = (placeType: string[], category?: string) => {
-    if (placeType.includes('poi')) {
-      if (category?.includes('restaurant') || category?.includes('food')) return <Utensils className="w-4 h-4" />;
-      if (category?.includes('cafe') || category?.includes('coffee')) return <Coffee className="w-4 h-4" />;
-      if (category?.includes('bar') || category?.includes('pub')) return <Beer className="w-4 h-4" />;
-      if (category?.includes('hotel') || category?.includes('lodging')) return <Hotel className="w-4 h-4" />;
-      if (category?.includes('shop') || category?.includes('store')) return <ShoppingBag className="w-4 h-4" />;
-      if (category?.includes('park') || category?.includes('garden')) return <Trees className="w-4 h-4" />;
-      if (category?.includes('school') || category?.includes('university')) return <School className="w-4 h-4" />;
-      if (category?.includes('hospital') || category?.includes('clinic')) return <Hospital className="w-4 h-4" />;
-      if (category?.includes('government')) return <Building className="w-4 h-4" />;
-      return <Landmark className="w-4 h-4" />;
-    }
-    if (placeType.includes('address')) return <Home className="w-4 h-4" />;
-    if (placeType.includes('place') || placeType.includes('locality')) return <MapPin className="w-4 h-4" />;
-    if (placeType.includes('neighborhood')) return <Navigation className="w-4 h-4" />;
-    if (placeType.includes('region') || placeType.includes('district')) return <Map className="w-4 h-4" />;
-    return <MapPin className="w-4 h-4" />;
-  };
-
-  const formatSuggestion = (feature: any) => {
-    const properties = feature.properties || {};
-    const primaryText = properties.name || feature.text || '';
-    const secondaryText = properties.full_address || properties.place_formatted || '';
-    
-    const placeTypes = properties.type ? [properties.type] : feature.place_type || [];
-    const icon = getSuggestionIcon(placeTypes, properties.category);
-    
-    return {
-      icon,
-      primary: primaryText,
-      secondary: secondaryText,
-      coordinates: feature.geometry?.coordinates || [],
-      fullData: feature
-    };
-  };
-
-  const handleLocationSelect = (selectedFeature: any) => {
-    const coordinates = selectedFeature.geometry?.coordinates || selectedFeature.center;
-    const [lng, lat] = coordinates;
-    const properties = selectedFeature.properties || {};
-    const venueName = properties.name || selectedFeature.text || '';
-    const address = properties.full_address || properties.place_formatted || '';
-    
-    setEventData(prev => ({
-      ...prev,
-      coordinates: { lat, lng },
-      location: venueName,
-      address: address,
-      streetName: properties.name || venueName,
-    }));
-    
-    setSelectedVenueDetails({
-      name: venueName,
-      address: address,
-    });
-    
-    setLocationSuggestions([]);
-    setShowSuggestions(false);
-    
-    // Update both maps if they exist and fly to location
-    if (map1.current) {
-      map1.current.flyTo({
-        center: [lng, lat],
-        zoom: 15,
-        duration: 1500,
-        essential: true
-      });
-      if (marker1.current) {
-        marker1.current.setLngLat([lng, lat]);
-      } else {
-        marker1.current = new mapboxgl.Marker({ 
-          color: eventData.themeColor,
-          draggable: true 
-        })
-          .setLngLat([lng, lat])
-          .addTo(map1.current);
-          
-        marker1.current.on('dragend', () => {
-          if (marker1.current) {
-            const lngLat = marker1.current.getLngLat();
-            setEventData(prev => ({ 
-              ...prev, 
-              coordinates: { lat: lngLat.lat, lng: lngLat.lng } 
-            }));
-          }
-        });
-      }
-    }
-    
-    if (map2.current) {
-      map2.current.flyTo({
-        center: [lng, lat],
-        zoom: 15,
-        duration: 1500,
-        essential: true
-      });
-      if (marker2.current) {
-        marker2.current.setLngLat([lng, lat]);
-      } else {
-        marker2.current = new mapboxgl.Marker({ 
-          color: eventData.themeColor 
-        })
-          .setLngLat([lng, lat])
-          .addTo(map2.current);
-      }
-      updateGeofenceCircle(map2.current);
-    }
-  };
-
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files) {
-      const newImages = Array.from(files).slice(0, 5 - imageFiles.length);
-      setImageFiles(prev => [...prev, ...newImages]);
+    if (!files || files.length === 0) return;
+
+    const newImages = Array.from(files).slice(0, 5 - imageFiles.length);
+    
+    // Validate file types and sizes
+    const validImages = newImages.filter(file => {
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      const maxSize = 10 * 1024 * 1024; // 10MB
       
-      // Create preview URLs
-      const imageUrls = newImages.map(file => URL.createObjectURL(file));
-      setEventData(prev => ({
-        ...prev,
-        images: [...prev.images, ...imageUrls]
-      }));
+      if (!validTypes.includes(file.type)) {
+        toast({
+          title: 'Invalid file type',
+          description: `${file.name} is not a valid image file. Please upload JPG, PNG, WEBP, or GIF files only.`,
+          variant: 'destructive'
+        });
+        return false;
+      }
       
-      // Reset file input
+      if (file.size > maxSize) {
+        toast({
+          title: 'File too large',
+          description: `${file.name} exceeds 10MB limit.`,
+          variant: 'destructive'
+        });
+        return false;
+      }
+      
+      return true;
+    });
+    
+    if (validImages.length === 0) {
       e.target.value = '';
+      return;
     }
+    
+    setImageFiles(prev => [...prev, ...validImages]);
+    
+    // Create preview URLs
+    const imageUrls = validImages.map(file => URL.createObjectURL(file));
+    setEventData(prev => ({
+      ...prev,
+      images: [...prev.images, ...imageUrls]
+    }));
+    
+    // Reset file input
+    e.target.value = '';
   };
 
   const handlePrimaryPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files[0]) {
-      // If this is the first photo, treat as primary
-      if (imageFiles.length === 0) {
-        const newFile = files[0];
-        setImageFiles([newFile]);
-        setEventData(prev => ({
-          ...prev,
-          images: [URL.createObjectURL(newFile)]
-        }));
-        // Reset position and zoom for new image
-        setImagePosition({ x: 50, y: 50 });
-        setImageZoom(100);
-      }
+    if (!files || files.length === 0) return;
+
+    const newFile = files[0];
+    
+    // Validate file type and size
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    
+    if (!validTypes.includes(newFile.type)) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please upload JPG, PNG, WEBP, or GIF files only.',
+        variant: 'destructive'
+      });
       e.target.value = '';
+      return;
     }
+    
+    if (newFile.size > maxSize) {
+      toast({
+        title: 'File too large',
+        description: 'Image must be under 10MB.',
+        variant: 'destructive'
+      });
+      e.target.value = '';
+      return;
+    }
+    
+    // Clear any existing primary image
+    if (imageFiles.length > 0 && eventData.images[0]) {
+      URL.revokeObjectURL(eventData.images[0]);
+    }
+    
+    // If this is the first photo, treat as primary
+    if (imageFiles.length === 0) {
+      setImageFiles([newFile]);
+      setEventData(prev => ({
+        ...prev,
+        images: [URL.createObjectURL(newFile)]
+      }));
+    } else {
+      // Replace the primary image
+      setImageFiles(prev => [newFile, ...prev.slice(1)]);
+      setEventData(prev => ({
+        ...prev,
+        images: [URL.createObjectURL(newFile), ...prev.images.slice(1)]
+      }));
+    }
+    
+    // Reset position and zoom for new image
+    setImagePosition({ x: 50, y: 50 });
+    setImageZoom(100);
+    e.target.value = '';
   };
 
   const handleImagePositionChange = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -811,16 +729,23 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       return;
     }
     
+    // Clear any existing video
+    if (videoFile && eventData.videos[0]) {
+      URL.revokeObjectURL(eventData.videos[0]);
+    }
+    
     // Create preview URL
     const videoUrl = URL.createObjectURL(newVideoFile);
     
     setEventData(prev => ({
       ...prev,
       videos: [videoUrl],
-      videoFiles: [newVideoFile]
+      videoFiles: [newVideoFile],
+      mediaType: 'video'
     }));
     
     setVideoFile(newVideoFile);
+    setMediaType('video');
     e.target.value = '';
   };
 
@@ -847,13 +772,21 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
   const removeImage = (index: number) => {
     // Revoke the object URL to prevent memory leaks
-    URL.revokeObjectURL(eventData.images[index]);
+    if (eventData.images[index]) {
+      URL.revokeObjectURL(eventData.images[index]);
+    }
     
     setEventData(prev => ({
       ...prev,
       images: prev.images.filter((_, i) => i !== index)
     }));
     setImageFiles(prev => prev.filter((_, i) => i !== index));
+    
+    // Reset position if removing primary image
+    if (index === 0 && imageFiles.length > 1) {
+      setImagePosition({ x: 50, y: 50 });
+      setImageZoom(100);
+    }
   };
 
   const removeVideo = () => {
@@ -865,9 +798,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       ...prev,
       videos: [],
       videoFiles: [],
-      mediaType: 'carousel' // Reset to carousel if video is removed
+      mediaType: 'carousel'
     }));
     setVideoFile(null);
+    setMediaType('carousel');
     setIsVideoPlaying(false);
     setVideoDuration('0:00');
     
@@ -877,11 +811,54 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   };
 
+  const validateEventData = (): string[] => {
+    const errors: string[] = [];
+    
+    if (!eventData.name.trim()) errors.push('Event name is required');
+    if (!eventData.category) errors.push('Category is required');
+    if (!eventData.date) errors.push('Date is required');
+    if (!eventData.time) errors.push('Time is required');
+    if (!eventData.location.trim()) errors.push('Location name is required');
+    if (!eventData.address.trim()) errors.push('Address is required');
+    if (imageFiles.length === 0) errors.push('Primary photo is required');
+    
+    // Validate media type specific requirements
+    if (eventData.mediaType === 'video' && !videoFile) {
+      errors.push('Video is required for video type');
+    }
+    
+    // Validate price if not free
+    if (!eventData.isFree) {
+      const price = parseFloat(eventData.price);
+      if (isNaN(price) || price < 0) {
+        errors.push('Valid price is required for paid events');
+      }
+    }
+    
+    // Validate coordinates
+    if (!eventData.coordinates || typeof eventData.coordinates.lat !== 'number' || typeof eventData.coordinates.lng !== 'number') {
+      errors.push('Valid map coordinates are required');
+    }
+    
+    return errors;
+  };
+
   const handlePublish = async () => {
     if (!user) {
       toast({
         title: 'Error',
         description: 'You must be logged in to create an event',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Validate all required fields
+    const validationErrors = validateEventData();
+    if (validationErrors.length > 0) {
+      toast({
+        title: 'Validation Error',
+        description: `Please fix the following issues:\n${validationErrors.join('\n')}`,
         variant: 'destructive'
       });
       return;
@@ -899,9 +876,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       const hasVideo = eventData.videos.length > 0;
       const mediaType = hasVideo ? 'video' : 'carousel';
       
-      // Generate QR code URL (in a real app, you would generate this on the server)
-      const qrCodeUrl = await generateQRCode(qrCode);
+      // Generate QR code URL using fallback function
+      const qrCodeUrl = generateQRCodeUrl(qrCode);
       
+      // Create event data
       const newEvent: Event = {
         id: crypto.randomUUID(),
         name: eventData.name,
@@ -934,7 +912,13 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         updatedAt: new Date().toISOString()
       };
 
-      await addEvent(newEvent);
+      // Add the event
+      if (addEvent) {
+        await addEvent(newEvent);
+      } else {
+        throw new Error('addEvent function not available');
+      }
+      
       setCreatedEvent(newEvent);
       setStep(6);
       
@@ -946,7 +930,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       console.error('Error creating event:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create event. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to create event. Please try again.',
         variant: 'destructive'
       });
     } finally {
@@ -973,7 +957,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${createdEvent.name}-qr-code.png`;
+      a.download = `${createdEvent.name.replace(/\s+/g, '-')}-qr-code.png`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -994,6 +978,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   };
 
   const isStep1Valid = eventData.name.trim() && eventData.category && eventData.date && eventData.time;
+  const isStep2Valid = imageFiles.length > 0 && (eventData.mediaType === 'carousel' || (eventData.mediaType === 'video' && videoFile));
   const isStep3Valid = eventData.coordinates.lat !== 0 && eventData.location.trim() && eventData.address.trim();
 
   if (!isOpen) return null;
@@ -1593,8 +1578,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                           onClick={(e) => {
                             e.stopPropagation();
                             removeImage(0);
-                            setImagePosition({ x: 50, y: 50 });
-                            setImageZoom(100);
                           }}
                           className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center"
                           style={{
@@ -1620,7 +1603,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         <p className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>Click to upload</p>
                         <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>or drag & drop</p>
                         <p className="text-xs mt-3" style={{ color: DESIGN.colors.textSecondary }}>
-                          JPG, PNG, WEBP • Max 10MB
+                          JPG, PNG, WEBP, GIF • Max 10MB
                         </p>
                       </>
                     )}
@@ -1633,7 +1616,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   <input
                     ref={primaryPhotoRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
                     onChange={handlePrimaryPhotoUpload}
                     className="hidden"
                     disabled={isSubmitting}
@@ -1692,7 +1675,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
                       multiple
                       onChange={handleImageUpload}
                       className="hidden"
@@ -1813,7 +1796,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     <input
                       ref={videoInputRef}
                       type="file"
-                      accept="video/*"
+                      accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,video/ogg"
                       onChange={handleVideoUpload}
                       className="hidden"
                       disabled={isSubmitting}
@@ -1825,85 +1808,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     </p>
                   </div>
                 )}
-
-                {/* Preview */}
-                <div className="space-y-3">
-                  <label className="text-[13px] font-semibold block uppercase tracking-wider" 
-                         style={{ color: DESIGN.colors.textSecondary }}>
-                    Preview
-                  </label>
-                  <div className="p-4"
-                       style={{
-                         borderRadius: DESIGN.borderRadius.card,
-                         border: `1px solid ${DESIGN.colors.border}`,
-                         background: DESIGN.colors.card
-                       }}>
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-12 h-12 rounded-lg flex items-center justify-center"
-                           style={{
-                             background: `linear-gradient(to bottom right, ${eventData.themeColor}30, ${eventData.themeColor}10`
-                           }}>
-                        <Eye className="w-6 h-6" style={{ color: eventData.themeColor }} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>
-                          {eventData.mediaType === 'video' ? 'Video Preview' : 'Carousel Preview'}
-                        </p>
-                        <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                          Shows how your media appears on event details
-                        </p>
-                      </div>
-                    </div>
-                    <div className="overflow-hidden" style={{ borderRadius: DESIGN.borderRadius.button, border: `1px solid ${DESIGN.colors.border}` }}>
-                      <div className="h-32 flex items-center justify-center overflow-hidden relative"
-                           style={{ background: `linear-gradient(to right, ${eventData.themeColor}10, ${eventData.themeColor}5)` }}>
-                        {eventData.mediaType === 'video' && videoFile ? (
-                          <div className="relative w-full h-full">
-                            <video
-                              src={eventData.videos[0]}
-                              className="w-full h-full object-cover"
-                              muted
-                              playsInline
-                              loop
-                              autoPlay
-                            />
-                            <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                              Video
-                            </div>
-                          </div>
-                        ) : imageFiles.length > 0 ? (
-                          <>
-                            <img
-                              src={eventData.images[0]}
-                              alt="Preview"
-                              className="w-full h-full object-cover"
-                              style={{
-                                objectPosition: `${imagePosition.x}% ${imagePosition.y}%`,
-                                transform: `scale(${imageZoom / 100})`
-                              }}
-                            />
-                            {imageFiles.length > 1 && (
-                              <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                                {imageFiles.length} images
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <Image className="w-12 h-12" style={{ color: DESIGN.colors.textSecondary }} />
-                        )}
-                      </div>
-                      <div className="p-3">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1">
-                            <div className="h-4 mb-2" style={{ borderRadius: '4px', background: DESIGN.colors.muted, width: '75%' }}></div>
-                            <div className="h-3" style={{ borderRadius: '4px', background: DESIGN.colors.muted, width: '50%' }}></div>
-                          </div>
-                          <div className="w-10 h-5" style={{ borderRadius: DESIGN.borderRadius.smallPill, background: DESIGN.colors.muted }}></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
 
@@ -2541,8 +2445,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   disabled={
                     isSubmitting ||
                     (step === 1 && !isStep1Valid) ||
-                    (step === 2 && imageFiles.length === 0) ||
-                    (step === 2 && eventData.mediaType === 'video' && !videoFile) ||
+                    (step === 2 && !isStep2Valid) ||
                     (step === 3 && !isStep3Valid)
                   }
                   style={{ 
