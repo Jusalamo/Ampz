@@ -3,13 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Zap, Mail, Lock, User, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useAuth } from '@/hooks/useAuth';
+import { useApp } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Auth() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { login, signup, loginWithGoogle, loginDemo, isLoading, error: authError, isAuthenticated } = useAuth();
+  const { login, signup, loginWithGoogle, loginDemo, isLoading, isAuthenticated } = useApp();
   const { toast } = useToast();
 
   const [mode, setMode] = useState<'login' | 'signup'>(
@@ -21,13 +21,16 @@ export default function Auth() {
     password: '',
   });
   const [localError, setLocalError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const redirectTo = searchParams.get('redirect') || '/home';
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/home');
+    if (isAuthenticated && !isLoading) {
+      navigate(redirectTo, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isLoading, navigate, redirectTo]);
 
   const validateForm = (): boolean => {
     if (!formData.email || !formData.password) {
@@ -61,62 +64,53 @@ export default function Auth() {
 
     if (!validateForm()) return;
 
+    setSubmitting(true);
     try {
-      let result;
+      let success;
       if (mode === 'login') {
-        result = await login(formData.email, formData.password);
+        success = await login(formData.email, formData.password);
       } else {
-        result = await signup(formData.email, formData.password, formData.name, 25);
+        success = await signup(formData.email, formData.password, formData.name, 25);
       }
 
-      if (result.success) {
+      if (success) {
         toast({
           title: mode === 'login' ? 'Welcome back!' : 'Account created!',
           description: "Let's find some amazing events",
         });
-        navigate('/home');
+        // Navigation handled by useEffect
       } else {
-        setLocalError(result.error || 'Authentication failed');
-        toast({
-          title: 'Error',
-          description: result.error || 'Please check your credentials',
-          variant: 'destructive',
-        });
+        setLocalError('Authentication failed. Please check your credentials.');
       }
     } catch (error: any) {
       setLocalError(error?.message || 'Something went wrong');
-      toast({
-        title: 'Error',
-        description: 'Something went wrong',
-        variant: 'destructive',
-      });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleGoogleLogin = async () => {
     setLocalError('');
-    const result = await loginWithGoogle();
-    if (!result.success) {
-      setLocalError(result.error || 'Google login failed');
-    }
+    await loginWithGoogle();
   };
 
   const handleDemo = async () => {
     setLocalError('');
-    const result = await loginDemo();
+    setSubmitting(true);
+    const success = await loginDemo();
     
-    if (result.success) {
+    if (success) {
       toast({
         title: 'Demo Mode Active',
         description: 'Explore all features with sample data',
       });
-      navigate('/home');
     } else {
-      setLocalError(result.error || 'Demo login failed');
+      setLocalError('Demo login failed');
     }
+    setSubmitting(false);
   };
 
-  const displayError = localError || authError;
+  const displayError = localError;
 
   return (
     <div className="app-container min-h-screen bg-background relative overflow-hidden">
@@ -225,10 +219,10 @@ export default function Auth() {
 
           <Button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || submitting}
             className="w-full h-14 text-lg font-semibold gradient-amps hover:opacity-90 transition-all"
           >
-            {isLoading ? (
+            {(isLoading || submitting) ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : mode === 'login' ? (
               'Sign In'
