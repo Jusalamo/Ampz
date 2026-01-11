@@ -6,7 +6,7 @@ import {
   Brush, Globe, Camera, Map as MapIcon, Radio, Eye, Utensils,
   Coffee, Beer, Hotel, ShoppingBag, Trees, School, Hospital,
   Building, Navigation, Home, Landmark, Play, Pause,
-  Film, Grid3x3
+  Film, Grid3x3, Link as LinkIcon, Ticket
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Input } from '@/components/ui/input';
@@ -84,10 +84,10 @@ const presetColors = [
 ];
 
 export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
-  const { addEvent, user } = useApp();
+  const { addEvent, user, generateQRCode } = useApp();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
-  const [mediaType, setMediaType] = useState<'video' | 'carousel'>('carousel'); // Add this state
+  const [mediaType, setMediaType] = useState<'video' | 'carousel'>('carousel');
   const [eventData, setEventData] = useState({
     name: '',
     description: '',
@@ -105,8 +105,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     videoFiles: [] as File[],
     themeColor: '#8B5CF6',
     isFree: true,
-    mediaType: 'carousel' as 'video' | 'carousel', // Track media type
-    selectedVideoIndex: 0, // For video selection if multiple
+    mediaType: 'carousel' as 'video' | 'carousel',
+    selectedVideoIndex: 0,
+    webTicketsLink: '',
+    qrCodeUrl: '',
   });
   const [createdEvent, setCreatedEvent] = useState<Event | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -138,7 +140,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const primaryPhotoRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mapsInitialized = useRef({ map1: false, map2: false });
 
@@ -197,6 +198,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         isFree: true,
         mediaType: 'carousel',
         selectedVideoIndex: 0,
+        webTicketsLink: '',
+        qrCodeUrl: '',
       });
       setImageFiles([]);
       setVideoFile(null);
@@ -596,11 +599,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           name: properties.name || locality || 'Selected Location',
           address: fullAddress || properties.full_address || '',
         });
-        
-        // Update search input
-        if (searchInputRef.current) {
-          searchInputRef.current.value = fullAddress || properties.name || '';
-        }
       }
     } catch (error) {
       console.error('Reverse geocoding error:', error);
@@ -614,7 +612,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   };
 
-  // Debounced search function for location autocomplete - Namibia focused
   const searchLocation = useCallback(
     debounce(async (query: string) => {
       if (!query.trim() || query.length < 2) {
@@ -626,16 +623,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       setIsSearching(true);
       
       try {
-        // Correct Geocoding v6 API endpoint and parameters
         const response = await fetch(
           `https://api.mapbox.com/search/geocode/v6/forward?` +
           `q=${encodeURIComponent(query)}&` +
           `access_token=${MAPBOX_TOKEN}&` +
-          `country=NA&` + // Restrict to Namibia
-          `bbox=11.7,-28.97,25.27,-16.96&` + // Namibia bounding box
+          `country=NA&` +
+          `bbox=11.7,-28.97,25.27,-16.96&` +
           `proximity=${userLocation.lng},${userLocation.lat}&` +
           `language=en&` +
-          `types=address,place,poi&` + // Filter for relevant features
+          `types=address,place,poi&` +
           `limit=10`
         );
         
@@ -646,10 +642,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         const data = await response.json();
         
         if (data.features && data.features.length > 0) {
-          // For v6 API, check if results are from Namibia
           const namibianResults = data.features
             .filter((feature: any) => {
-              // In v6, country info might be in properties.context.country
               const countryCode = feature.properties?.context?.country?.iso_3166_1_alpha_2;
               return countryCode === 'NA';
             })
@@ -702,7 +696,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     const primaryText = properties.name || feature.text || '';
     const secondaryText = properties.full_address || properties.place_formatted || '';
     
-    // For v6 API, use properties.type instead of place_type
     const placeTypes = properties.type ? [properties.type] : feature.place_type || [];
     const icon = getSuggestionIcon(placeTypes, properties.category);
     
@@ -737,11 +730,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     
     setLocationSuggestions([]);
     setShowSuggestions(false);
-    
-    // Update search input
-    if (searchInputRef.current) {
-      searchInputRef.current.value = address;
-    }
     
     // Update both maps if they exist and fly to location
     if (map1.current) {
@@ -962,9 +950,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       const hasVideo = eventData.videos.length > 0;
       const mediaType = hasVideo ? 'video' : 'carousel';
       
-      // In a real app, you would upload files to a server/storage service
-      // For demo purposes, we'll keep the object URLs
-      const videoUrls = eventData.videos;
+      // Generate QR code URL (in a real app, you would generate this on the server)
+      const qrCodeUrl = await generateQRCode(qrCode);
       
       const newEvent: Event = {
         id: crypto.randomUUID(),
@@ -986,12 +973,16 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         customTheme: eventData.themeColor,
         coverImage: eventData.images[0] || `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800&auto=format&fit=crop`,
         images: eventData.images,
-        videos: videoUrls,
+        videos: eventData.videos,
         tags: [eventData.category],
         isFeatured: user?.subscription?.tier === 'max',
-        hasVideo: videoUrls.length > 0,
-        mediaType: mediaType, // Store the media type
-        selectedVideoIndex: 0
+        hasVideo: eventData.videos.length > 0,
+        mediaType: mediaType,
+        selectedVideoIndex: 0,
+        webTicketsLink: eventData.webTicketsLink,
+        qrCodeUrl: qrCodeUrl,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
 
       await addEvent(newEvent);
@@ -1024,11 +1015,33 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   };
 
-  const handleDownloadQR = () => {
-    toast({
-      title: 'QR Code Download',
-      description: 'This feature would generate and download a QR code image.',
-    });
+  const handleDownloadQR = async () => {
+    if (!createdEvent?.qrCodeUrl) return;
+    
+    try {
+      const response = await fetch(createdEvent.qrCodeUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${createdEvent.name}-qr-code.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: 'QR Code Downloaded',
+        description: 'QR code saved to your device.',
+      });
+    } catch (error) {
+      console.error('Error downloading QR code:', error);
+      toast({
+        title: 'Download Failed',
+        description: 'Could not download QR code. Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const isStep1Valid = eventData.name.trim() && eventData.category && eventData.date && eventData.time;
@@ -1055,7 +1068,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           border: `1px solid ${DESIGN.colors.border}`
         }}
       >
-        {/* Header - Redesigned to be compact */}
+        {/* Header */}
         <div style={{ borderBottom: `1px solid ${DESIGN.colors.border}`, flexShrink: 0 }}>
           {/* Row 1: Title and Close */}
           <div className="flex items-center justify-between px-6 h-14">
@@ -1271,6 +1284,35 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     </div>
                   </div>
 
+                  {/* WebTickets Link Field */}
+                  <div>
+                    <label className="text-[13px] font-semibold mb-2 block uppercase tracking-wider" 
+                           style={{ color: DESIGN.colors.textSecondary }}>
+                      WebTickets Link (Optional)
+                    </label>
+                    <div className="relative">
+                      <Ticket className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" 
+                              style={{ color: DESIGN.colors.textSecondary }} />
+                      <Input
+                        value={eventData.webTicketsLink}
+                        onChange={(e) => setEventData({ ...eventData, webTicketsLink: e.target.value })}
+                        placeholder="https://webtickets.com.na/your-event"
+                        className="h-11 pl-10"
+                        style={{
+                          borderRadius: DESIGN.borderRadius.input,
+                          borderColor: DESIGN.colors.border,
+                          background: DESIGN.colors.card,
+                          color: DESIGN.colors.textPrimary
+                        }}
+                        disabled={isSubmitting}
+                        type="url"
+                      />
+                    </div>
+                    <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>
+                      Add a link for ticket sales (optional)
+                    </p>
+                  </div>
+
                   {/* Theme Color Section */}
                   <div>
                     <label className="text-[13px] font-semibold mb-3 block uppercase tracking-wider" 
@@ -1320,7 +1362,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                            style={{
                              borderRadius: DESIGN.borderRadius.input,
                              border: `1px solid ${DESIGN.colors.border}`,
-                             background: `linear-gradient(to right, ${eventData.themeColor}10, ${eventData.themeColor}20)`
+                             background: `linear-gradient(to right, ${eventData.themeColor}10, ${eventData.themeColor}20`
                            }}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -1354,7 +1396,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     )}
                   </div>
 
-                  {/* Ticket Price - Fixed empty state */}
+                  {/* Ticket Price */}
                   <div>
                     <label className="text-[13px] font-semibold mb-2 block uppercase tracking-wider" 
                            style={{ color: DESIGN.colors.textSecondary }}>
@@ -1928,44 +1970,18 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </p>
                 </div>
 
-                {/* Search Input with Autocomplete */}
-                <div className="relative">
-                  <label className="text-[13px] font-semibold mb-2 block uppercase tracking-wider" 
-                         style={{ color: DESIGN.colors.textSecondary }}>
-                    Search venue or address *
-                  </label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" 
-                           style={{ color: DESIGN.colors.textSecondary }} />
+                {/* Simplified Location Input Fields */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[13px] font-semibold mb-2 block uppercase tracking-wider" 
+                           style={{ color: DESIGN.colors.textSecondary }}>
+                      Location Name *
+                    </label>
                     <Input
-                      ref={searchInputRef}
-                      defaultValue={eventData.address || eventData.location}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setEventData(prev => ({ ...prev, location: value }));
-                        searchLocation(value);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          if (locationSuggestions.length > 0) {
-                            handleLocationSelect(locationSuggestions[0]);
-                          }
-                        }
-                      }}
-                      onFocus={() => {
-                        const value = searchInputRef.current?.value || '';
-                        if (value.length >= 2) {
-                          searchLocation(value);
-                          setShowSuggestions(true);
-                        }
-                      }}
-                      onBlur={() => {
-                        // Delay hiding suggestions to allow click
-                        setTimeout(() => setShowSuggestions(false), 200);
-                      }}
-                      placeholder="Search for a location, street, or venue..."
-                      className="h-11 pl-10"
+                      value={eventData.location}
+                      onChange={(e) => setEventData(prev => ({ ...prev, location: e.target.value }))}
+                      placeholder="e.g., Warehouse Theatre, Joe's Beerhouse, etc."
+                      className="h-11"
                       style={{
                         borderRadius: DESIGN.borderRadius.input,
                         borderColor: DESIGN.colors.border,
@@ -1974,58 +1990,33 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       }}
                       disabled={isSubmitting}
                     />
-                    {isSearching && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <Loader2 className="w-4 h-4 animate-spin" 
-                                style={{ color: DESIGN.colors.textSecondary }} />
-                      </div>
-                    )}
+                    <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>
+                      This name will appear on event cards
+                    </p>
                   </div>
-                  <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>
-                    Press Enter to select first result
-                  </p>
-                  
-                  {/* Autocomplete Dropdown */}
-                  {showSuggestions && locationSuggestions.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 overflow-hidden"
-                         style={{
-                           borderRadius: DESIGN.borderRadius.button,
-                           border: `1px solid ${DESIGN.colors.border}`,
-                           background: DESIGN.colors.card,
-                           boxShadow: DESIGN.shadows.card
-                         }}>
-                      {locationSuggestions.map((place, index) => {
-                        const formatted = formatSuggestion(place);
-                        return (
-                          <button
-                            key={place.id || index}
-                            onClick={() => handleLocationSelect(place)}
-                            className={cn(
-                              "w-full px-4 py-3 flex items-start gap-3 transition-colors text-left",
-                              index < locationSuggestions.length - 1 && "border-b",
-                              "hover:bg-primary/5"
-                            )}
-                            style={{ 
-                              borderBottomColor: `${DESIGN.colors.border}50`,
-                              color: DESIGN.colors.textPrimary
-                            }}
-                          >
-                            <span className="mt-0.5 flex-shrink-0" style={{ color: DESIGN.colors.textSecondary }}>
-                              {formatted.icon}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">
-                                {formatted.primary}
-                              </div>
-                              <div className="text-sm truncate" style={{ color: DESIGN.colors.textSecondary }}>
-                                {formatted.secondary}
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+
+                  <div>
+                    <label className="text-[13px] font-semibold mb-2 block uppercase tracking-wider" 
+                           style={{ color: DESIGN.colors.textSecondary }}>
+                      Street Address *
+                    </label>
+                    <Input
+                      value={eventData.address}
+                      onChange={(e) => setEventData(prev => ({ ...prev, address: e.target.value }))}
+                      placeholder="e.g., 123 Independence Ave, Windhoek, Namibia"
+                      className="h-11"
+                      style={{
+                        borderRadius: DESIGN.borderRadius.input,
+                        borderColor: DESIGN.colors.border,
+                        background: DESIGN.colors.card,
+                        color: DESIGN.colors.textPrimary
+                      }}
+                      disabled={isSubmitting}
+                    />
+                    <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>
+                      This will be shown on event details page
+                    </p>
+                  </div>
                 </div>
 
                 {/* Map - Now with error handling */}
@@ -2033,7 +2024,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   <div className="flex justify-between items-center">
                     <label className="text-[13px] font-semibold uppercase tracking-wider" 
                            style={{ color: DESIGN.colors.textSecondary }}>
-                      Map View
+                      Pin Location on Map *
                     </label>
                     <div className="flex gap-2">
                       <button 
@@ -2122,7 +2113,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                               Getting address...
                             </div>
                           ) : (
-                            "Drag marker to adjust location"
+                            "Click or drag marker to set location"
                           )}
                         </div>
                       </>
@@ -2130,12 +2121,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </div>
                 </div>
 
-                {/* Venue Details */}
+                {/* Selected Location Display */}
                 {selectedVenueDetails && (
                   <div className="space-y-3">
                     <label className="text-[13px] font-semibold uppercase tracking-wider" 
                            style={{ color: DESIGN.colors.textSecondary }}>
-                      Venue Details
+                      Selected Location
                     </label>
                     <div className="p-4"
                          style={{
@@ -2153,16 +2144,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             {selectedVenueDetails.address}
                           </p>
                         </div>
-                        <button 
-                          className="text-xs hover:underline"
-                          style={{ color: eventData.themeColor }}
-                          onClick={() => {
-                            searchInputRef.current?.focus();
-                            setShowSuggestions(true);
-                          }}
-                        >
-                          Change
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -2418,7 +2399,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         </div>
                         <div className="flex items-center gap-2">
                           <MapPin className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
-                          <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.location}</span>
+                          <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.address}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <DollarSign className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
@@ -2436,6 +2417,20 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                               : `Carousel with ${imageFiles.length} image${imageFiles.length !== 1 ? 's' : ''}`}
                           </span>
                         </div>
+                        {eventData.webTicketsLink && (
+                          <div className="flex items-center gap-2">
+                            <Ticket className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
+                            <a 
+                              href={eventData.webTicketsLink} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                              style={{ color: eventData.themeColor }}
+                            >
+                              Buy Tickets on WebTickets
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2469,6 +2464,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         <p><span style={{ color: DESIGN.colors.textSecondary }}>Category:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.category}</span></p>
                         <p><span style={{ color: DESIGN.colors.textSecondary }}>Date:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.date} at {eventData.time}</span></p>
                         <p><span style={{ color: DESIGN.colors.textSecondary }}>Price:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.isFree ? 'Free' : `N$${eventData.price}`}</span></p>
+                        {eventData.webTicketsLink && (
+                          <p><span style={{ color: DESIGN.colors.textSecondary }}>WebTickets:</span> <span style={{ color: eventData.themeColor }}>Link added</span></p>
+                        )}
                       </div>
                     </div>
                     
@@ -2516,7 +2514,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         </button>
                       </div>
                       <div className="space-y-1 text-sm">
-                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Venue:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.location}</span></p>
+                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Location Name:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.location}</span></p>
+                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Address:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.address}</span></p>
                         <p><span style={{ color: DESIGN.colors.textSecondary }}>Check-in radius:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.geofenceRadius}m</span></p>
                       </div>
                     </div>
@@ -2538,7 +2537,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   Event Created Successfully!
                 </h3>
                 <p className="text-center mb-8 max-w-md" style={{ color: DESIGN.colors.textSecondary }}>
-                  Your event "<span className="font-semibold" style={{ color: DESIGN.colors.textPrimary }}>{createdEvent.name}</span>" is now live! Share the code below so attendees can check in.
+                  Your event "<span className="font-semibold" style={{ color: DESIGN.colors.textPrimary }}>{createdEvent.name}</span>" is now live! Share the QR code below for attendees to check in.
                 </p>
 
                 <div className="w-full max-w-sm flex flex-col items-center justify-center mb-6 border-2 p-6"
@@ -2565,10 +2564,18 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                          borderColor: DESIGN.colors.border,
                          background: DESIGN.colors.textPrimary
                        }}>
-                    <div className="w-full h-full rounded-lg flex items-center justify-center"
-                         style={{ background: `${DESIGN.colors.textSecondary}10` }}>
-                      <QrCode className="w-44 h-44" style={{ color: DESIGN.colors.background }} />
-                    </div>
+                    {createdEvent.qrCodeUrl ? (
+                      <img
+                        src={createdEvent.qrCodeUrl}
+                        alt="QR Code"
+                        className="w-full h-full"
+                      />
+                    ) : (
+                      <div className="w-full h-full rounded-lg flex items-center justify-center"
+                           style={{ background: `${DESIGN.colors.textSecondary}10` }}>
+                        <QrCode className="w-44 h-44" style={{ color: DESIGN.colors.background }} />
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2597,7 +2604,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           </div>
         </div>
 
-        {/* Footer - Redesigned to be compact */}
+        {/* Footer */}
         {step < 6 && (
           <div className="border-t p-4 flex-shrink-0" style={{ borderTopColor: DESIGN.colors.border, background: DESIGN.colors.background }}>
             <div className="flex gap-3">
