@@ -59,7 +59,7 @@ import { Event as EventType } from '@/lib/types';
 export default function EventDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { events, user, bookmarkEvent, communityPhotos, communityComments, tickets } = useApp();
+  const { events, user, bookmarkEvent, communityPhotos, communityComments, tickets, checkInToEvent } = useApp();
   const { toast } = useToast();
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -302,7 +302,7 @@ export default function EventDetail() {
       videoElement.addEventListener('ended', handleVideoEnded);
       
       // Set initial state for persistent playback
-      videoElement.muted = videoPlaybackStateRef.current.isMuted;
+      videoElement.muted = true; // Always muted by default
       videoElement.loop = true;
       videoElement.preload = "auto";
       
@@ -311,7 +311,7 @@ export default function EventDetail() {
         videoElement.currentTime = videoPlaybackStateRef.current.currentTime;
       }
       
-      // Try to autoplay
+      // Try to autoplay with muted state (browsers allow this)
       const playPromise = videoElement.play();
       if (playPromise !== undefined) {
         playPromise
@@ -380,11 +380,12 @@ export default function EventDetail() {
           // Page is visible again, restore playback if it was playing
           if (videoPlaybackStateRef.current.isPlaying) {
             videoRef.current.currentTime = videoPlaybackStateRef.current.currentTime;
-            videoRef.current.muted = videoPlaybackStateRef.current.isMuted;
+            videoRef.current.muted = true; // Always muted when restoring
             videoRef.current.play().catch(e => {
               console.log('Resume playback failed:', e);
             });
             setIsVideoPlaying(true);
+            setIsVideoMuted(true);
           }
         }
       }
@@ -507,6 +508,42 @@ export default function EventDetail() {
   const toggleDescription = useCallback(() => {
     setShowFullDescription(prev => !prev);
   }, []);
+
+  // Handle CTA button click
+  const handleCTAClick = useCallback(() => {
+    if (!event) return;
+    
+    if (!user) {
+      // Redirect to login/signup
+      navigate('/auth');
+      return;
+    }
+    
+    if (hasTicket && isLive) {
+      // Check in to event
+      checkInToEvent(event.id);
+      toast({
+        title: 'Checked in!',
+        description: 'You have successfully checked in to the event.',
+      });
+    } else if (hasTicket) {
+      // View ticket
+      navigate(`/ticket/${event.id}`);
+    } else {
+      // Buy ticket/register
+      if (event.price === 0) {
+        // Free event - register immediately
+        // TODO: Implement free registration
+        toast({
+          title: 'Registered!',
+          description: 'You have successfully registered for the event.',
+        });
+      } else {
+        // Paid event - redirect to payment
+        navigate(`/checkout/${event.id}`);
+      }
+    }
+  }, [event, user, hasTicket, isLive, navigate, checkInToEvent, toast]);
 
   if (!event) {
     return (
@@ -658,7 +695,7 @@ export default function EventDetail() {
         </div>
       </header>
 
-      {/* Hero Media Section */}
+      {/* Hero Media Section - Fixed height and positioning */}
       <div className="relative h-64 overflow-hidden">
         {event.mediaType === 'video' && event.videos && event.videos.length > 0 ? (
           /* Video Player */
@@ -668,7 +705,7 @@ export default function EventDetail() {
               ref={videoRef}
               src={event.videos[0]}
               className="w-full h-full object-cover"
-              muted={isVideoMuted}
+              muted={true} // Always muted by default for autoplay
               loop
               playsInline
               preload="auto"
@@ -680,59 +717,21 @@ export default function EventDetail() {
               }}
             />
             
-            {/* Video Controls Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-100 transition-opacity duration-300" style={{ zIndex: 2 }}>
-              <div className="absolute bottom-0 left-0 right-0 p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        toggleVideoPlay();
-                      }}
-                      className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer relative"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.9)',
-                        color: DESIGN.colors.background,
-                        zIndex: 100
-                      }}
-                      aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
-                      type="button"
-                    >
-                      {isVideoPlaying ? (
-                        <Pause className="w-5 h-5" />
-                      ) : (
-                        <Play className="w-5 h-5 ml-0.5" />
-                      )}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        toggleVideoMute();
-                      }}
-                      className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer relative"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.9)',
-                        color: DESIGN.colors.background,
-                        zIndex: 100
-                      }}
-                      aria-label={isVideoMuted ? 'Unmute video' : 'Mute video'}
-                      type="button"
-                    >
-                      {isVideoMuted ? (
-                        <VolumeX className="w-5 h-5" />
-                      ) : (
-                        <Volume2 className="w-5 h-5" />
-                      )}
-                    </button>
-                  </div>
+            {/* Video Controls Overlay - Fixed positioning not to clip */}
+            <div 
+              className="absolute bottom-0 left-0 right-0 p-4 z-20"
+              style={{
+                background: 'linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 100%)',
+                paddingBottom: '24px' // Extra padding to avoid clipping
+              }}
+            >
+              <div className="flex items-center justify-between max-w-2xl mx-auto">
+                <div className="flex items-center gap-2">
                   <button
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      openVideoModal();
+                      toggleVideoPlay();
                     }}
                     className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer relative"
                     style={{
@@ -740,18 +739,60 @@ export default function EventDetail() {
                       color: DESIGN.colors.background,
                       zIndex: 100
                     }}
-                    aria-label="Open video in fullscreen"
+                    aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
                     type="button"
                   >
-                    <Maximize2 className="w-5 h-5" />
+                    {isVideoPlaying ? (
+                      <Pause className="w-5 h-5" />
+                    ) : (
+                      <Play className="w-5 h-5 ml-0.5" />
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleVideoMute();
+                    }}
+                    className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer relative"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.9)',
+                      color: DESIGN.colors.background,
+                      zIndex: 100
+                    }}
+                    aria-label={isVideoMuted ? 'Unmute video' : 'Mute video'}
+                    type="button"
+                  >
+                    {isVideoMuted ? (
+                      <VolumeX className="w-5 h-5" />
+                    ) : (
+                      <Volume2 className="w-5 h-5" />
+                    )}
                   </button>
                 </div>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openVideoModal();
+                  }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer relative"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    color: DESIGN.colors.background,
+                    zIndex: 100
+                  }}
+                  aria-label="Open video in fullscreen"
+                  type="button"
+                >
+                  <Maximize2 className="w-5 h-5" />
+                </button>
               </div>
             </div>
             
             {/* Play overlay when video ended */}
             {isVideoEnded && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center" style={{ zIndex: 3 }}>
+              <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-30">
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -773,10 +814,9 @@ export default function EventDetail() {
             
             {/* Video Indicator */}
             <div 
-              className="absolute top-3 left-3 px-2 py-1 rounded-full backdrop-blur-sm"
+              className="absolute top-3 left-3 px-2 py-1 rounded-full backdrop-blur-sm z-20"
               style={{
-                background: 'rgba(0, 0, 0, 0.6)',
-                zIndex: 2
+                background: 'rgba(0, 0, 0, 0.6)'
               }}
             >
               <div className="flex items-center gap-1">
@@ -859,7 +899,7 @@ export default function EventDetail() {
                     </div>
                     
                     {/* Image Counter */}
-                    <div className="absolute top-3 left-3 px-2 py-1 rounded-full backdrop-blur-sm"
+                    <div className="absolute top-3 left-3 px-2 py-1 rounded-full backdrop-blur-sm z-10"
                          style={{
                            background: 'rgba(0, 0, 0, 0.6)'
                          }}>
@@ -882,10 +922,16 @@ export default function EventDetail() {
           </div>
         )}
         
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
+        {/* Gradient overlay - Fixed to not interfere with controls */}
+        <div 
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: 'linear-gradient(to top, rgba(26, 26, 26, 0.8) 0%, rgba(26, 26, 26, 0.4) 50%, transparent 100%)'
+          }}
+        />
         
         {/* Status Badge */}
-        <div className="absolute top-16 left-4">
+        <div className="absolute top-16 left-4 z-10">
           <span className={cn(
             'px-3 py-1.5 text-xs font-semibold rounded-full flex items-center gap-1.5 backdrop-blur-sm',
             isLive 
@@ -1357,7 +1403,7 @@ export default function EventDetail() {
                 boxShadow: '0 4px 20px rgba(196, 181, 253, 0.3)'
               }}
               size="lg"
-              onClick={() => {/* TODO: Implement ticket purchase */}}
+              onClick={handleCTAClick}
             >
               <Ticket className="w-4 h-4 mr-2" />
               {getCTAText()}
