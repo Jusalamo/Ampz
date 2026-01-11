@@ -1047,6 +1047,12 @@ export default function EventManager() {
   const navigate = useNavigate();
   const { user, events, updateEvent, deleteEvent, checkIns, communityComments } = useApp();
   const { toast } = useToast();
+  
+  // Add defensive checks immediately
+  const safeEvents = events || [];
+  const safeCheckIns = checkIns || [];
+  const safeCommunityComments = communityComments || [];
+  
   const [activeTab, setActiveTab] = useState<Tab>('events');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1059,8 +1065,8 @@ export default function EventManager() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [actionEvent, setActionEvent] = useState<AppEvent | null>(null);
 
-  const userEvents = events.filter(e => e.organizerId === user?.id);
-  const selectedEvent = selectedEventId ? events.find(e => e.id === selectedEventId) : null;
+  const userEvents = safeEvents.filter(e => e.organizerId === user?.id);
+  const selectedEvent = selectedEventId ? safeEvents.find(e => e.id === selectedEventId) : null;
 
   const isPro = user?.subscription.tier === 'pro' || user?.subscription.tier === 'max';
 
@@ -1103,7 +1109,7 @@ export default function EventManager() {
     
     // For production accounts, get real attendees from check-ins
     if (selectedEventId) {
-      const eventCheckIns = checkIns.filter(checkIn => checkIn.eventId === selectedEventId);
+      const eventCheckIns = safeCheckIns.filter(checkIn => checkIn.eventId === selectedEventId);
       return eventCheckIns.map(checkIn => ({
         id: checkIn.id,
         name: checkIn.userName || 'Anonymous',
@@ -1115,7 +1121,7 @@ export default function EventManager() {
     }
     
     // For all events, get all check-ins
-    const allCheckIns = checkIns.filter(checkIn => 
+    const allCheckIns = safeCheckIns.filter(checkIn => 
       userEvents.some(event => event.id === checkIn.eventId)
     );
     return allCheckIns.map(checkIn => ({
@@ -1143,8 +1149,8 @@ export default function EventManager() {
     
     // Get messages/engagement from community comments
     const eventMessages = selectedEventId 
-      ? communityComments.filter(c => c.eventId === selectedEventId)
-      : communityComments.filter(c => userEvents.some(e => e.id === c.eventId));
+      ? safeCommunityComments.filter(c => c.eventId === selectedEventId)
+      : safeCommunityComments.filter(c => userEvents.some(e => e.id === c.eventId));
     
     return {
       totalAttendees,
@@ -1219,7 +1225,7 @@ export default function EventManager() {
     );
   }
 
-  const getEventStatus = (event: typeof events[0]) => {
+  const getEventStatus = (event: typeof safeEvents[0]) => {
     const eventDate = new Date(event.date);
     const now = new Date();
     if (eventDate < now) return 'past';
@@ -1934,7 +1940,7 @@ export default function EventManager() {
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
-                {communityComments
+                {safeCommunityComments
                   .filter(comment => 
                     selectedEventId 
                       ? comment.eventId === selectedEventId
@@ -2367,4 +2373,4 @@ export default function EventManager() {
       `}</style>
     </div>
   );
-}88
+}
