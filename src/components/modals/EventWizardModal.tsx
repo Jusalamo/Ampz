@@ -83,14 +83,15 @@ const presetColors = [
   '#10B981', '#F59E0B', '#EF4444', '#6366F1', '#06B6D4'
 ];
 
-// Function to generate QR code URL (fallback if context doesn't provide it)
-const generateQRCodeUrl = (data: string): string => {
-  // Using a public QR code generation service as fallback
-  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data)}&format=png&bgcolor=ffffff&color=000000&qzone=1`;
+// Function to generate QR code URL that links to event details
+const generateQRCodeUrl = (eventId: string, qrCode: string): string => {
+  const eventDetailsUrl = `${window.location.origin}/event/${eventId}`;
+  // Use a QR code generation service that encodes the event details URL
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(eventDetailsUrl)}&format=png&bgcolor=ffffff&color=000000&qzone=1&margin=10&ecc=H`;
 };
 
 export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
-  const { addEvent, user } = useApp(); // Removed generateQRCode from destructuring
+  const { addEvent, user } = useApp();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [mediaType, setMediaType] = useState<'video' | 'carousel'>('carousel');
@@ -153,7 +154,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const [userLocation, setUserLocation] = useState({ lat: -22.5609, lng: 17.0658 });
 
   useEffect(() => {
-    // Try to get user's current location for better search results
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -164,7 +164,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         },
         (error) => {
           console.log('Geolocation error:', error);
-          // Default to Windhoek, Namibia
           setUserLocation({ lat: -22.5609, lng: 17.0658 });
         },
         { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
@@ -264,7 +263,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       cleanupMap(map1, marker1);
       cleanupMap(map2, marker2);
       
-      // Reset initialization flags
       mapsInitialized.current = { map1: false, map2: false };
     }
   }, [isOpen]);
@@ -284,7 +282,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       
       initMap();
     } else if (step === 3 && map1.current && mapsInitialized.current.map1) {
-      // Map already exists, just update it
       setTimeout(() => {
         if (map1.current) {
           try {
@@ -317,7 +314,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       
       initMap();
     } else if (step === 4 && map2.current && mapsInitialized.current.map2) {
-      // Map already exists, just update it
       setTimeout(() => {
         if (map2.current) {
           try {
@@ -345,13 +341,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
   useEffect(() => {
     if (isOpen) {
-      // Small delay to ensure DOM is ready
       const timer = setTimeout(() => {
-        // Resize maps based on current step
         if (step === 3 && map1.current && mapsInitialized.current.map1) {
           try {
             map1.current.resize();
-            // Trigger a re-render
             const center = map1.current.getCenter();
             map1.current.jumpTo({ center, zoom: map1.current.getZoom() });
           } catch (error) {
@@ -382,10 +375,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
     
     try {
-      // Clear any existing error
       setMapError(null);
       
-      // Set a minimum height for the container to prevent black screen
       container.style.minHeight = '320px';
       
       const mapInstance = new mapboxgl.Map({
@@ -401,13 +392,11 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         preserveDrawingBuffer: true,
       });
 
-      // Add error handler
       mapInstance.on('error', (e) => {
         console.error('Mapbox error:', e);
         setMapError('Map failed to load. Please refresh the page.');
       });
 
-      // Wait for map to load
       await new Promise<void>((resolve) => {
         mapInstance.on('load', () => {
           console.log(`Map ${mapNumber} loaded successfully`);
@@ -415,7 +404,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           if (mapNumber === 1) {
             map1.current = mapInstance;
             
-            // Add marker for map 1
             marker1.current = new mapboxgl.Marker({ 
               color: eventData.themeColor,
               draggable: true 
@@ -423,7 +411,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               .setLngLat([eventData.coordinates.lng, eventData.coordinates.lat])
               .addTo(mapInstance);
 
-            // Handle marker drag
             marker1.current.on('dragend', () => {
               if (marker1.current) {
                 const lngLat = marker1.current.getLngLat();
@@ -434,7 +421,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               }
             });
 
-            // Click to set location
             mapInstance.on('click', (e) => {
               const { lng, lat } = e.lngLat;
               setEventData(prev => ({ ...prev, coordinates: { lat, lng } }));
@@ -449,21 +435,17 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           } else {
             map2.current = mapInstance;
             
-            // Add marker for map 2
             marker2.current = new mapboxgl.Marker({ 
               color: eventData.themeColor 
             })
               .setLngLat([eventData.coordinates.lng, eventData.coordinates.lat])
               .addTo(mapInstance);
 
-            // Add geofence circle
             updateGeofenceCircle(mapInstance);
           }
 
-          // Add navigation controls
           mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
           
-          // Add geolocate control
           const geolocateControl = new mapboxgl.GeolocateControl({
             positionOptions: { enableHighAccuracy: true },
             trackUserLocation: true,
@@ -480,7 +462,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           
           mapInstance.addControl(geolocateControl, 'top-right');
           
-          // Force a resize to ensure proper rendering
           setTimeout(() => {
             mapInstance.resize();
           }, 100);
@@ -488,7 +469,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           resolve();
         });
 
-        // Set a timeout in case map fails to load
         setTimeout(() => {
           resolve();
         }, 5000);
@@ -501,14 +481,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   }, [eventData.themeColor, eventData.coordinates]);
 
-  // Update geofence circle when radius changes
   const updateGeofenceCircle = useCallback((mapInstance: mapboxgl.Map) => {
     if (!mapInstance.loaded()) return;
 
     const { lat, lng } = eventData.coordinates;
     const radiusInKm = eventData.geofenceRadius / 1000;
     
-    // Generate circle coordinates
     const points = 64;
     const coords: [number, number][] = [];
     for (let i = 0; i < points; i++) {
@@ -517,7 +495,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       const dy = radiusInKm * Math.sin(angle) / (111.32 * Math.cos(lat * Math.PI / 180));
       coords.push([lng + dy, lat + dx]);
     }
-    coords.push(coords[0]); // Close the circle
+    coords.push(coords[0]);
 
     const sourceId = 'geofence-circle';
     const fillLayerId = 'geofence-fill';
@@ -562,7 +540,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         });
       }
 
-      // Update layer colors if theme changes
       if (mapInstance.getLayer(fillLayerId)) {
         mapInstance.setPaintProperty(fillLayerId, 'fill-color', eventData.themeColor);
       }
@@ -585,10 +562,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
     const newImages = Array.from(files).slice(0, 5 - imageFiles.length);
     
-    // Validate file types and sizes
     const validImages = newImages.filter(file => {
       const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-      const maxSize = 10 * 1024 * 1024; // 10MB
+      const maxSize = 10 * 1024 * 1024;
       
       if (!validTypes.includes(file.type)) {
         toast({
@@ -618,14 +594,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     
     setImageFiles(prev => [...prev, ...validImages]);
     
-    // Create preview URLs
     const imageUrls = validImages.map(file => URL.createObjectURL(file));
     setEventData(prev => ({
       ...prev,
       images: [...prev.images, ...imageUrls]
     }));
     
-    // Reset file input
     e.target.value = '';
   };
 
@@ -635,9 +609,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
     const newFile = files[0];
     
-    // Validate file type and size
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 10 * 1024 * 1024;
     
     if (!validTypes.includes(newFile.type)) {
       toast({
@@ -659,12 +632,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       return;
     }
     
-    // Clear any existing primary image
     if (imageFiles.length > 0 && eventData.images[0]) {
       URL.revokeObjectURL(eventData.images[0]);
     }
     
-    // If this is the first photo, treat as primary
     if (imageFiles.length === 0) {
       setImageFiles([newFile]);
       setEventData(prev => ({
@@ -672,7 +643,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         images: [URL.createObjectURL(newFile)]
       }));
     } else {
-      // Replace the primary image
       setImageFiles(prev => [newFile, ...prev.slice(1)]);
       setEventData(prev => ({
         ...prev,
@@ -680,7 +650,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       }));
     }
     
-    // Reset position and zoom for new image
     setImagePosition({ x: 50, y: 50 });
     setImageZoom(100);
     e.target.value = '';
@@ -705,9 +674,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
     const newVideoFile = files[0];
     
-    // Validate video file
     const validTypes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo', 'video/ogg'];
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const maxSize = 50 * 1024 * 1024;
     
     if (!validTypes.includes(newVideoFile.type)) {
       toast({
@@ -729,12 +697,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       return;
     }
     
-    // Clear any existing video
     if (videoFile && eventData.videos[0]) {
       URL.revokeObjectURL(eventData.videos[0]);
     }
     
-    // Create preview URL
     const videoUrl = URL.createObjectURL(newVideoFile);
     
     setEventData(prev => ({
@@ -771,7 +737,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   };
 
   const removeImage = (index: number) => {
-    // Revoke the object URL to prevent memory leaks
     if (eventData.images[index]) {
       URL.revokeObjectURL(eventData.images[index]);
     }
@@ -782,7 +747,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }));
     setImageFiles(prev => prev.filter((_, i) => i !== index));
     
-    // Reset position if removing primary image
     if (index === 0 && imageFiles.length > 1) {
       setImagePosition({ x: 50, y: 50 });
       setImageZoom(100);
@@ -822,12 +786,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     if (!eventData.address.trim()) errors.push('Address is required');
     if (imageFiles.length === 0) errors.push('Primary photo is required');
     
-    // Validate media type specific requirements
     if (eventData.mediaType === 'video' && !videoFile) {
       errors.push('Video is required for video type');
     }
     
-    // Validate price if not free
     if (!eventData.isFree) {
       const price = parseFloat(eventData.price);
       if (isNaN(price) || price < 0) {
@@ -835,7 +797,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       }
     }
     
-    // Validate coordinates
     if (!eventData.coordinates || typeof eventData.coordinates.lat !== 'number' || typeof eventData.coordinates.lng !== 'number') {
       errors.push('Valid map coordinates are required');
     }
@@ -853,7 +814,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       return;
     }
 
-    // Validate all required fields
     const validationErrors = validateEventData();
     if (validationErrors.length > 0) {
       toast({
@@ -867,21 +827,20 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     setIsSubmitting(true);
     
     try {
+      const eventId = crypto.randomUUID();
       const qrCode = `${eventData.name.replace(/\s+/g, '-').toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
       
-      // Parse price - ensure it's a number
       const price = eventData.isFree ? 0 : parseFloat(eventData.price) || 0;
       
-      // Determine media type
       const hasVideo = eventData.videos.length > 0;
       const mediaType = hasVideo ? 'video' : 'carousel';
       
-      // Generate QR code URL using fallback function
-      const qrCodeUrl = generateQRCodeUrl(qrCode);
+      // Generate QR code that links to the event details page
+      const qrCodeUrl = generateQRCodeUrl(eventId, qrCode);
       
       // Create event data
       const newEvent: Event = {
-        id: crypto.randomUUID(),
+        id: eventId,
         name: eventData.name,
         description: eventData.description,
         category: eventData.category,
@@ -895,7 +854,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         maxAttendees: 500,
         attendees: 0,
         organizerId: user.id,
-        qrCode,
+        qrCode: qrCode, // This is the check-in code
+        qrCodeUrl: qrCodeUrl, // This is the actual QR code image URL
         geofenceRadius: eventData.geofenceRadius,
         customTheme: eventData.themeColor,
         coverImage: eventData.images[0] || `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800&auto=format&fit=crop`,
@@ -907,12 +867,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         mediaType: mediaType,
         selectedVideoIndex: 0,
         webTicketsLink: eventData.webTicketsLink,
-        qrCodeUrl: qrCodeUrl,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      // Add the event
       if (addEvent) {
         await addEvent(newEvent);
       } else {
@@ -983,7 +941,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
 
   if (!isOpen) return null;
 
-  // Get current date for date input min
   const today = new Date().toISOString().split('T')[0];
 
   return (
@@ -1004,7 +961,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       >
         {/* Header */}
         <div style={{ borderBottom: `1px solid ${DESIGN.colors.border}`, flexShrink: 0 }}>
-          {/* Row 1: Title and Close */}
           <div className="flex items-center justify-between px-6 h-14">
             <h2 className="text-[28px] font-bold" style={{ color: DESIGN.colors.textPrimary }}>
               Create Event
@@ -1022,7 +978,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             </button>
           </div>
           
-          {/* Row 2: Progress Dots */}
           {step < 6 && (
             <div className="flex justify-center items-center h-10">
               <div className="flex gap-3">
@@ -1053,7 +1008,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
             </div>
           )}
           
-          {/* Row 3: Current Step Title */}
           {step < 6 && (
             <div className="flex justify-center items-center h-8 pb-2">
               <span className="text-[14px]" style={{ color: DESIGN.colors.textSecondary }}>
@@ -1063,7 +1017,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
           )}
         </div>
 
-        {/* Content - Scrollable area */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6">
             {/* Step 1: Basic Info */}
@@ -1218,7 +1171,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     </div>
                   </div>
 
-                  {/* WebTickets Link Field */}
                   <div>
                     <label className="text-[13px] font-semibold mb-2 block uppercase tracking-wider" 
                            style={{ color: DESIGN.colors.textSecondary }}>
@@ -1247,7 +1199,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     </p>
                   </div>
 
-                  {/* Theme Color Section */}
                   <div>
                     <label className="text-[13px] font-semibold mb-3 block uppercase tracking-wider" 
                            style={{ color: DESIGN.colors.textSecondary }}>
@@ -1330,7 +1281,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     )}
                   </div>
 
-                  {/* Ticket Price */}
                   <div>
                     <label className="text-[13px] font-semibold mb-2 block uppercase tracking-wider" 
                            style={{ color: DESIGN.colors.textSecondary }}>
@@ -1418,7 +1368,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </p>
                 </div>
 
-                {/* Media Type Selector */}
                 <div className="space-y-3">
                   <label className="text-[13px] font-semibold block uppercase tracking-wider" 
                          style={{ color: DESIGN.colors.textSecondary }}>
@@ -1484,7 +1433,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </div>
                 </div>
 
-                {/* Primary Event Photo (ALWAYS REQUIRED FOR EVENT CARD) */}
                 <div className="space-y-3">
                   <label className="text-[13px] font-semibold block uppercase tracking-wider" 
                          style={{ color: DESIGN.colors.textSecondary }}>
@@ -1623,9 +1571,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   />
                 </div>
 
-                {/* Conditional Content Based on Media Type */}
                 {eventData.mediaType === 'carousel' ? (
-                  /* Additional Photos for Carousel */
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <label className="text-[13px] font-semibold uppercase tracking-wider" 
@@ -1683,7 +1629,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     />
                   </div>
                 ) : (
-                  /* Video Upload for Video Type */
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <label className="text-[13px] font-semibold uppercase tracking-wider" 
@@ -1718,13 +1663,13 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             controls={false}
                             muted
                             playsInline
+                            loop
                             onLoadedMetadata={handleVideoLoaded}
                             onEnded={() => setIsVideoPlaying(false)}
                             onPlay={() => setIsVideoPlaying(true)}
                             onPause={() => setIsVideoPlaying(false)}
                           />
                           
-                          {/* Video controls overlay */}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                             <div className="absolute bottom-0 left-0 right-0 p-4">
                               <div className="flex items-center justify-between">
@@ -1757,7 +1702,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             </div>
                           </div>
                           
-                          {/* Video info overlay */}
                           <div className="absolute top-3 left-3 flex items-center gap-2 px-2 py-1 rounded-full backdrop-blur-sm"
                                style={{
                                  background: 'rgba(0, 0, 0, 0.6)'
@@ -1823,7 +1767,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </p>
                 </div>
 
-                {/* Simplified Location Input Fields */}
                 <div className="space-y-4">
                   <div>
                     <label className="text-[13px] font-semibold mb-2 block uppercase tracking-wider" 
@@ -1872,7 +1815,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </div>
                 </div>
 
-                {/* Map - Now with error handling */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-[13px] font-semibold uppercase tracking-wider" 
@@ -1981,7 +1923,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </p>
                 </div>
 
-                {/* Map with Radius */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <label className="text-[13px] font-semibold uppercase tracking-wider" 
@@ -2071,7 +2012,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </div>
                 </div>
 
-                {/* Radius Slider - Fixed */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <label className="text-[13px] font-semibold uppercase tracking-wider" 
@@ -2101,7 +2041,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </div>
                 </div>
 
-                {/* Helper Text */}
                 <div className="p-4"
                      style={{
                        borderRadius: DESIGN.borderRadius.card,
@@ -2141,7 +2080,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </p>
                 </div>
 
-                {/* Event Preview */}
                 <div className="space-y-3">
                   <label className="text-[13px] font-semibold uppercase tracking-wider" 
                          style={{ color: DESIGN.colors.textSecondary }}>
@@ -2153,7 +2091,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                          border: `1px solid ${DESIGN.colors.border}`,
                          background: DESIGN.colors.card
                        }}>
-                    {/* Event Card Preview */}
                     <div className="p-4 border-b" style={{ borderBottomColor: DESIGN.colors.border }}>
                       <p className="text-sm font-medium mb-2" style={{ color: DESIGN.colors.textPrimary }}>
                         Event Card
@@ -2161,7 +2098,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       <div className="overflow-hidden" style={{ borderRadius: DESIGN.borderRadius.button, border: `1px solid ${DESIGN.colors.border}` }}>
                         <div className="h-32 flex items-center justify-center relative overflow-hidden"
                              style={{ background: `linear-gradient(to right, ${eventData.themeColor}10, ${eventData.themeColor}5)` }}>
-                          {/* Always show the primary image on event card */}
                           {imageFiles.length > 0 ? (
                             <img
                               src={eventData.images[0]}
@@ -2205,7 +2141,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       </div>
                     </div>
                     
-                    {/* Event Details Preview */}
                     <div className="p-4">
                       <p className="text-sm font-medium mb-2" style={{ color: DESIGN.colors.textPrimary }}>
                         Event Details Page
@@ -2254,14 +2189,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   </div>
                 </div>
 
-                {/* Edit Sections */}
                 <div className="space-y-3">
                   <label className="text-[13px] font-semibold uppercase tracking-wider" 
                          style={{ color: DESIGN.colors.textSecondary }}>
                     Event Information
                   </label>
                   <div className="overflow-hidden" style={{ borderRadius: DESIGN.borderRadius.card, border: `1px solid ${DESIGN.colors.border}` }}>
-                    {/* Basic Info */}
                     <div className="p-4 border-b" style={{ borderBottomColor: DESIGN.colors.border }}>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -2288,7 +2221,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       </div>
                     </div>
                     
-                    {/* Media */}
                     <div className="p-4 border-b" style={{ borderBottomColor: DESIGN.colors.border }}>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -2315,7 +2247,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       </div>
                     </div>
                     
-                    {/* Location */}
                     <div className="p-4">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -2375,6 +2306,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                        }}>
                       {createdEvent.qrCode}
                     </p>
+                    <p className="text-xs mt-2" style={{ color: DESIGN.colors.textSecondary }}>
+                      Scan QR code or enter this code to access event
+                    </p>
                   </div>
                   <div className="w-56 h-56 p-4 border rounded-xl flex items-center justify-center"
                        style={{
@@ -2395,6 +2329,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       </div>
                     )}
                   </div>
+                  <p className="text-xs mt-3 text-center" style={{ color: DESIGN.colors.textSecondary }}>
+                    QR code links to: {window.location.origin}/event/{createdEvent.id}
+                  </p>
                 </div>
 
                 <div className="flex gap-3 w-full max-w-sm">
@@ -2506,5 +2443,5 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         )}
       </div>
     </div>
-  );      
+  );
 }
