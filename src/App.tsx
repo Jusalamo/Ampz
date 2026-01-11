@@ -18,17 +18,36 @@ import PrivacySettings from "./pages/PrivacySettings";
 import Social from "./pages/Social";
 import Activity from "./pages/Activity";
 import EventManager from "./pages/EventManager";
+import EventCheckIn from "./pages/EventCheckIn";
 import NotFound from "./pages/NotFound";
+import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useApp();
+  const { isAuthenticated, isLoading } = useApp();
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
   return isAuthenticated ? <>{children}</> : <Navigate to="/auth" replace />;
 }
 
 function AppRoutes() {
-  const { isAuthenticated } = useApp();
+  const { isAuthenticated, isLoading } = useApp();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <Routes>
@@ -36,6 +55,9 @@ function AppRoutes() {
       <Route path="/" element={isAuthenticated ? <Navigate to="/home" replace /> : <Landing />} />
       <Route path="/landing" element={<Landing />} />
       <Route path="/auth" element={isAuthenticated ? <Navigate to="/home" replace /> : <Auth />} />
+      
+      {/* Check-in Route - accessible without auth but shows different UI */}
+      <Route path="/event/:id/checkin" element={<EventCheckIn />} />
       
       {/* Protected Routes */}
       <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />

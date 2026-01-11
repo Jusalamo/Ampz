@@ -85,6 +85,8 @@ export interface Event {
   selectedVideoIndex?: number;
   notificationsEnabled?: boolean;
   updatedAt?: string;
+  ticketLink?: string;
+  accessCode?: string;
 }
 
 export interface ConnectionProfile {

@@ -220,6 +220,7 @@ export type Database = {
           price: number | null
           qr_code: string
           tags: string[] | null
+          ticket_link: string | null
           time: string
           timezone: string | null
           updated_at: string | null
@@ -254,6 +255,7 @@ export type Database = {
           price?: number | null
           qr_code: string
           tags?: string[] | null
+          ticket_link?: string | null
           time: string
           timezone?: string | null
           updated_at?: string | null
@@ -288,6 +290,7 @@ export type Database = {
           price?: number | null
           qr_code?: string
           tags?: string[] | null
+          ticket_link?: string | null
           time?: string
           timezone?: string | null
           updated_at?: string | null
