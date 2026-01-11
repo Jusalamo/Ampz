@@ -6,6 +6,7 @@ import {
   Calendar, 
   Users, 
   BarChart3, 
+  MessageSquare, 
   Settings, 
   Edit, 
   Trash2,
@@ -27,16 +28,16 @@ import {
   Video as VideoIcon,
   Zap,
   ExternalLink,
-  MessageSquare,
   Mail,
-  Ticket,
   UserCheck,
-  UserX
+  UserX,
+  Filter,
+  Search
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { Event as EventType, Attendee } from '@/lib/types';
+import { Event as EventType, Attendee, Notification } from '@/lib/types';
 
 // Type alias to avoid conflict with DOM Event
 type AppEvent = EventType;
@@ -79,7 +80,7 @@ const DESIGN = {
   }
 };
 
-type Tab = 'events' | 'attendees' | 'analytics' | 'settings';
+type Tab = 'events' | 'attendees' | 'analytics';
 
 // Toggle Switch Component
 interface ToggleSwitchProps {
@@ -289,7 +290,7 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
     mediaType: event.mediaType,
     category: event.category,
     tags: event.tags.join(', '),
-    notificationsEnabled: event.notificationsEnabled,
+    notificationsEnabled: event.notificationsEnabled || true,
     webTicketsLink: event.webTicketsLink || ''
   });
   
@@ -302,7 +303,6 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
     isNew: boolean;
   }>>([]);
   
-  const [activeTab, setActiveTab] = useState<'details' | 'media'>('details');
   const [isSaving, setIsSaving] = useState(false);
   const [coverImage, setCoverImage] = useState<string>(event.coverImage);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -323,7 +323,7 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
         mediaType: event.mediaType,
         category: event.category,
         tags: event.tags.join(', '),
-        notificationsEnabled: event.notificationsEnabled,
+        notificationsEnabled: event.notificationsEnabled || true,
         webTicketsLink: event.webTicketsLink || ''
       });
       
@@ -565,35 +565,6 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
           </button>
         </div>
 
-        {/* Tabs */}
-        <div style={{
-          display: 'flex',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-          position: 'sticky',
-          top: '64px',
-          background: DESIGN.colors.card,
-          zIndex: 9,
-          flexShrink: 0
-        }}>
-          <button
-            onClick={() => setActiveTab('details')}
-            style={{
-              flex: 1,
-              padding: '12px',
-              fontSize: '14px',
-              fontWeight: '500',
-              background: activeTab === 'details' ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-              color: DESIGN.colors.textPrimary,
-              border: 'none',
-              cursor: 'pointer',
-              textTransform: 'capitalize',
-              transition: 'background 0.2s'
-            }}
-          >
-            Event Details
-          </button>
-        </div>
-
         {/* Scrollable Content */}
         <div style={{
           flex: 1,
@@ -725,16 +696,15 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
                 }}
               />
             </div>
-            
+
             <div>
               <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
-                WebTickets Link
+                WebTickets Link (Optional)
               </label>
               <input 
                 value={formData.webTicketsLink}
                 onChange={(e) => setFormData({ ...formData, webTicketsLink: e.target.value })}
-                placeholder="https://webtickets.com.na/event-name"
-                type="url"
+                placeholder="https://webtickets.com.na/your-event"
                 style={{
                   width: '100%',
                   padding: '12px',
@@ -745,9 +715,6 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
                   fontSize: '15px'
                 }}
               />
-              <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>
-                Optional link for ticket purchases
-              </p>
             </div>
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -869,11 +836,14 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
               />
             </div>
 
+            {/* Media & Files Section */}
             <div>
-              <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
-                Media Type *
+              <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '12px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                Media & Files
               </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              
+              {/* Media Type Selection */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
                 <button
                   onClick={() => handleMediaTypeChange('carousel')}
                   type="button"
@@ -892,7 +862,7 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
                   }}
                 >
                   <Grid3x3 className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
-                  <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>Carousel</span>
+                  <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>Image Carousel</span>
                 </button>
                 <button
                   onClick={() => handleMediaTypeChange('video')}
@@ -915,131 +885,168 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
                   <span style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>Video</span>
                 </button>
               </div>
-              <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>
-                Display type on event details page
-              </p>
-            </div>
 
-            {/* Media Upload Section (now in details tab) */}
-            <div>
-              <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
-                {formData.mediaType === 'video' ? 'Upload Video' : 'Upload Images'}
-              </label>
-              <div
-                onClick={handleFileSelect}
-                style={{
-                  width: '100%',
-                  padding: '32px 24px',
-                  border: '2px dashed rgba(255, 255, 255, 0.2)',
-                  borderRadius: DESIGN.borderRadius.button,
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '12px',
-                  cursor: 'pointer',
-                  transition: 'border-color 0.2s, background 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = DESIGN.colors.primary;
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                }}
-              >
-                <Upload className="w-10 h-10" style={{ color: DESIGN.colors.textSecondary }} />
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ fontSize: '14px', color: DESIGN.colors.textPrimary, marginBottom: '4px' }}>
-                    Click to upload or drag and drop
-                  </p>
-                  <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
-                    {formData.mediaType === 'video' 
-                      ? 'MP4, MOV, AVI up to 100MB' 
-                      : 'JPG, PNG, WebP up to 10MB each'
-                    }
-                  </p>
-                </div>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept={formData.mediaType === 'video' ? 'video/*' : 'image/*'}
-                multiple={formData.mediaType !== 'video'}
-                onChange={handleFileChange}
-                style={{ display: 'none' }}
-              />
-            </div>
-
-            {/* File List */}
-            {uploadedFiles.length > 0 && (
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <label style={{ fontSize: '14px', fontWeight: '500', color: DESIGN.colors.textPrimary }}>
-                    {formData.mediaType === 'video' ? 'Video' : 'Images'} ({uploadedFiles.length})
+              {/* Cover Image Preview */}
+              {coverImage && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
+                    Cover Image Preview
                   </label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      onClick={() => {
-                        const confirm = window.confirm(`Remove all ${uploadedFiles.length} files?`);
-                        if (confirm) {
-                          setUploadedFiles([]);
-                          setCoverImage('');
-                        }
+                  <div style={{
+                    width: '100%',
+                    height: '160px',
+                    borderRadius: DESIGN.borderRadius.cardInner,
+                    overflow: 'hidden',
+                    position: 'relative',
+                    border: '2px solid rgba(255, 255, 255, 0.2)'
+                  }}>
+                    <img 
+                      src={coverImage} 
+                      alt="Cover" 
+                      style={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        objectFit: 'cover' 
                       }}
-                      type="button"
-                      style={{
-                        padding: '6px 12px',
-                        fontSize: '12px',
-                        color: DESIGN.colors.danger,
-                        background: 'transparent',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: DESIGN.borderRadius.button,
-                        cursor: 'pointer',
-                        transition: 'background 0.2s'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                    >
-                      Clear All
-                    </button>
-                    {formData.mediaType === 'carousel' && (
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      top: '8px',
+                      right: '8px',
+                      padding: '4px 8px',
+                      background: 'rgba(0, 0, 0, 0.7)',
+                      color: 'white',
+                      fontSize: '12px',
+                      borderRadius: DESIGN.borderRadius.smallPill,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      <Camera className="w-3 h-3" />
+                      Cover Image
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Upload Area */}
+              <div style={{ marginBottom: '16px' }}>
+                <div
+                  onClick={handleFileSelect}
+                  style={{
+                    width: '100%',
+                    padding: '32px 24px',
+                    border: '2px dashed rgba(255, 255, 255, 0.2)',
+                    borderRadius: DESIGN.borderRadius.button,
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.2s, background 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = DESIGN.colors.primary;
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                  }}
+                >
+                  <Upload className="w-10 h-10" style={{ color: DESIGN.colors.textSecondary }} />
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '14px', color: DESIGN.colors.textPrimary, marginBottom: '4px' }}>
+                      Click to upload or drag and drop
+                    </p>
+                    <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
+                      {formData.mediaType === 'video' 
+                        ? 'MP4, MOV, AVI up to 100MB' 
+                        : 'JPG, PNG, WebP up to 10MB each'
+                      }
+                    </p>
+                  </div>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={formData.mediaType === 'video' ? 'video/*' : 'image/*'}
+                  multiple={formData.mediaType !== 'video'}
+                  onChange={handleFileChange}
+                  style={{ display: 'none' }}
+                />
+              </div>
+
+              {/* File List */}
+              {uploadedFiles.length > 0 && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <label style={{ fontSize: '14px', fontWeight: '500', color: DESIGN.colors.textPrimary }}>
+                      {formData.mediaType === 'video' ? 'Video' : 'Images'} ({uploadedFiles.length})
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
                       <button
-                        onClick={handleFileSelect}
+                        onClick={() => {
+                          const confirm = window.confirm(`Remove all ${uploadedFiles.length} files?`);
+                          if (confirm) {
+                            setUploadedFiles([]);
+                            setCoverImage('');
+                          }
+                        }}
                         type="button"
                         style={{
                           padding: '6px 12px',
                           fontSize: '12px',
-                          color: DESIGN.colors.primary,
-                          background: `${DESIGN.colors.primary}20`,
-                          border: 'none',
+                          color: DESIGN.colors.danger,
+                          background: 'transparent',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
                           borderRadius: DESIGN.borderRadius.button,
                           cursor: 'pointer',
                           transition: 'background 0.2s'
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = `${DESIGN.colors.primary}30`}
-                        onMouseLeave={(e) => e.currentTarget.style.background = `${DESIGN.colors.primary}20`}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                       >
-                        Add More
+                        Clear All
                       </button>
-                    )}
+                      {formData.mediaType === 'carousel' && (
+                        <button
+                          onClick={handleFileSelect}
+                          type="button"
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            color: DESIGN.colors.primary,
+                            background: `${DESIGN.colors.primary}20`,
+                            border: 'none',
+                            borderRadius: DESIGN.borderRadius.button,
+                            cursor: 'pointer',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = `${DESIGN.colors.primary}30`}
+                          onMouseLeave={(e) => e.currentTarget.style.background = `${DESIGN.colors.primary}20`}
+                        >
+                          Add More
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {uploadedFiles.map((file, index) => (
+                      <FilePreview
+                        key={file.id}
+                        file={file}
+                        onRemove={() => handleRemoveFile(file.id)}
+                        isCover={file.url === coverImage}
+                      />
+                    ))}
                   </div>
                 </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {uploadedFiles.map((file, index) => (
-                    <FilePreview
-                      key={file.id}
-                      file={file}
-                      onRemove={() => handleRemoveFile(file.id)}
-                      isCover={file.url === coverImage}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+              )}
+            </div>
 
             <div>
               <ToggleSwitch
@@ -1086,6 +1093,7 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
           </button>
           <button
             onClick={handleSave}
+            disabled={isSaving}
             style={{
               flex: 1,
               padding: '12px',
@@ -1100,10 +1108,10 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              transition: 'opacity 0.2s'
+              opacity: isSaving ? 0.7 : 1
             }}
           >
-            Save Changes
+            {isSaving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </div>
@@ -1111,7 +1119,7 @@ function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModalProps)
   );
 }
 
-// QR Code Modal - FIXED VERSION
+// QR Code Modal
 interface QRCodeModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -1119,15 +1127,73 @@ interface QRCodeModalProps {
 }
 
 function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
+    if (isOpen && event) {
+      const generateQR = async () => {
+        try {
+          // Generate QR code with event URL
+          const eventUrl = `${window.location.origin}/event/${event.id}`;
+          const qrText = `Event: ${event.name}\nDate: ${event.date}\nTime: ${event.time}\nLocation: ${event.location}\nCheck-in Code: ${event.qrCode}\nURL: ${eventUrl}`;
+          
+          // Using a simple canvas QR code generation
+          const canvas = document.createElement('canvas');
+          canvas.width = 400;
+          canvas.height = 400;
+          const ctx = canvas.getContext('2d');
+          
+          if (ctx) {
+            // Background
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, 400, 400);
+            
+            // QR code pattern (simplified for demo)
+            ctx.fillStyle = '#000000';
+            
+            // Draw QR code border
+            ctx.fillRect(50, 50, 300, 300);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(60, 60, 280, 280);
+            
+            // Add event info
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Event QR Code', 200, 40);
+            
+            // Add check-in code
+            ctx.font = '20px Arial';
+            ctx.fillText(`Code: ${event.qrCode}`, 200, 370);
+            
+            // Add small text
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#666666';
+            ctx.fillText('Scan to check in', 200, 390);
+            
+            setQrDataUrl(canvas.toDataURL('image/png'));
+          }
+        } catch (error) {
+          console.error('QR generation error:', error);
+          // Fallback to simple text
+          const canvas = document.createElement('canvas');
+          canvas.width = 200;
+          canvas.height = 200;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, 200, 200);
+            ctx.fillStyle = 'black';
+            ctx.font = '12px Arial';
+            ctx.fillText('QR Code', 80, 100);
+            setQrDataUrl(canvas.toDataURL());
+          }
+        }
+      };
+      generateQR();
     }
-  }, [isOpen]);
+  }, [isOpen, event]);
 
   if (!isOpen) return null;
 
@@ -1150,7 +1216,7 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
         background: DESIGN.colors.card,
         borderRadius: DESIGN.borderRadius.card,
         width: '100%',
-        maxWidth: '320px',
+        maxWidth: '400px',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -1186,36 +1252,45 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
         </div>
 
         {/* Content */}
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+        <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
           <div style={{
-            width: '200px',
-            height: '200px',
+            width: '256px',
+            height: '256px',
             background: 'white',
-            borderRadius: '8px',
+            borderRadius: '12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '16px'
+            padding: '16px',
+            border: '1px solid rgba(0, 0, 0, 0.1)'
           }}>
-            {event.qrCodeUrl ? (
-              <img src={event.qrCodeUrl} alt="QR Code" style={{ width: '100%', height: '100%' }} />
+            {qrDataUrl ? (
+              <img 
+                src={qrDataUrl} 
+                alt="QR Code" 
+                style={{ 
+                  width: '100%', 
+                  height: '100%',
+                  objectFit: 'contain'
+                }} 
+              />
             ) : (
               <div style={{ textAlign: 'center' }}>
-                <QrCode className="w-12 h-12" style={{ color: DESIGN.colors.textSecondary, margin: '0 auto' }} />
-                <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '8px' }}>QR Code</p>
+                <QrCode className="w-16 h-16" style={{ color: '#666666', margin: '0 auto 16px' }} />
+                <p style={{ fontSize: '14px', color: '#666666' }}>Generating QR code...</p>
               </div>
             )}
           </div>
           
           <div style={{ textAlign: 'center' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: DESIGN.colors.textPrimary, marginBottom: '4px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: DESIGN.colors.textPrimary, marginBottom: '8px' }}>
               {event.name}
             </h3>
-            <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
-              Scan to check in • Event ID: {event.id.substring(0, 8)}
+            <p style={{ fontSize: '14px', color: DESIGN.colors.textSecondary, marginBottom: '4px' }}>
+              Check-in Code: <strong>{event.qrCode}</strong>
             </p>
-            <p style={{ fontSize: '12px', color: DESIGN.colors.primary, marginTop: '8px' }}>
-              Code: {event.qrCode}
+            <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
+              Scan QR code or enter code to check in
             </p>
           </div>
         </div>
@@ -1245,14 +1320,17 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
           </button>
           <button
             onClick={() => {
-              if (event.qrCodeUrl) {
+              if (qrDataUrl) {
                 const link = document.createElement('a');
-                link.href = event.qrCodeUrl;
-                link.download = `qr-${event.name.replace(/\s+/g, '-')}.png`;
+                link.href = qrDataUrl;
+                link.download = `qr-${event.name.replace(/\s+/g, '-').toLowerCase()}.png`;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                toast({ title: 'Downloaded!', description: 'QR code saved to device' });
+                toast({ 
+                  title: 'Downloaded!', 
+                  description: 'QR code saved to device' 
+                });
               }
             }}
             style={{
@@ -1291,14 +1369,6 @@ interface DeleteEventModalProps {
 function DeleteEventModal({ isOpen, onClose, event, onConfirm }: DeleteEventModalProps) {
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-  }, [isOpen]);
-
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
@@ -1311,7 +1381,7 @@ function DeleteEventModal({ isOpen, onClose, event, onConfirm }: DeleteEventModa
     }
   };
 
-  if (!isOpen || !event) return null;
+  if (!isOpen) return null;
 
   return (
     <div style={{
@@ -1370,7 +1440,7 @@ function DeleteEventModal({ isOpen, onClose, event, onConfirm }: DeleteEventModa
         {/* Content */}
         <div style={{ padding: DESIGN.spacing.default }}>
           <p style={{ fontSize: '14px', color: DESIGN.colors.textPrimary, marginBottom: '16px' }}>
-            Are you sure you want to delete <strong>"{event.name}"</strong>? This will remove:
+            Are you sure you want to delete <strong>"{event?.name}"</strong>? This will remove:
           </p>
           
           <div style={{
@@ -1381,7 +1451,7 @@ function DeleteEventModal({ isOpen, onClose, event, onConfirm }: DeleteEventModa
           }}>
             <ul style={{ fontSize: '13px', color: DESIGN.colors.textSecondary, paddingLeft: '20px' }}>
               <li>All event details</li>
-              <li>{event.attendees} attendee records</li>
+              <li>{event?.attendees || 0} attendee records</li>
               <li>Check-in history</li>
               <li>All media files</li>
               <li>Notification history</li>
@@ -1439,9 +1509,7 @@ function DeleteEventModal({ isOpen, onClose, event, onConfirm }: DeleteEventModa
             }}
           >
             {isDeleting ? (
-              <>
-                Deleting...
-              </>
+              'Deleting...'
             ) : (
               <>
                 <Trash2 className="w-4 h-4" />
@@ -1455,29 +1523,30 @@ function DeleteEventModal({ isOpen, onClose, event, onConfirm }: DeleteEventModa
   );
 }
 
-// Real-time Notification Modal
-interface SendNotificationModalProps {
+// Notification Modal
+interface NotificationModalProps {
   isOpen: boolean;
   onClose: () => void;
   events: AppEvent[];
   selectedEventId?: string;
 }
 
-function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: SendNotificationModalProps) {
+function NotificationModal({ isOpen, onClose, events, selectedEventId }: NotificationModalProps) {
   const [selectedEvent, setSelectedEvent] = useState<string>(selectedEventId || 'all');
   const [notificationType, setNotificationType] = useState<'announcement' | 'reminder' | 'update' | 'emergency'>('announcement');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [sendTo, setSendTo] = useState<'all' | 'checked-in' | 'not-checked-in'>('all');
-  const [customTemplates, setCustomTemplates] = useState<string[]>([
+  const { toast } = useToast();
+  const [templates, setTemplates] = useState<string[]>([
     'Event starting soon! Get ready 🎉',
     'Reminder: Check in when you arrive',
     'Thank you for attending! Hope to see you again',
     'Event details have been updated',
+    'Important announcement: Please read',
   ]);
-  const [newTemplate, setNewTemplate] = useState('');
-  const { toast } = useToast();
+  const [customTemplate, setCustomTemplate] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -1496,11 +1565,12 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
 
     setIsSending(true);
     try {
+      // In a real app, this would send to your backend
       const event = events.find(e => e.id === selectedEvent);
       const eventName = selectedEvent === 'all' ? 'All Events' : event?.name || 'Event';
       
-      // Simulate sending notification
-      console.log('Sending notification:', { title, message, eventName });
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       toast({ 
         title: 'Notification Sent!', 
@@ -1512,31 +1582,12 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
       setMessage('');
       setSelectedEvent(selectedEventId || 'all');
       
-      setTimeout(() => onClose(), 1500);
+      setTimeout(() => onClose(), 1000);
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to send notification', variant: 'destructive' });
     } finally {
       setIsSending(false);
     }
-  };
-
-  const addTemplate = () => {
-    if (newTemplate.trim() && !customTemplates.includes(newTemplate.trim())) {
-      setCustomTemplates([...customTemplates, newTemplate.trim()]);
-      setNewTemplate('');
-      toast({ 
-        title: 'Template Added', 
-        description: 'Custom template saved successfully' 
-      });
-    }
-  };
-
-  const removeTemplate = (template: string) => {
-    setCustomTemplates(customTemplates.filter(t => t !== template));
-    toast({ 
-      title: 'Template Removed', 
-      description: 'Template deleted successfully' 
-    });
   };
 
   const getNotificationIcon = () => {
@@ -1546,6 +1597,26 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
       case 'update': return <RefreshCw className="w-5 h-5" style={{ color: DESIGN.colors.info }} />;
       default: return <Send className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />;
     }
+  };
+
+  const getRecipientCount = () => {
+    if (selectedEvent === 'all') {
+      return events.reduce((sum, e) => sum + e.attendees, 0);
+    }
+    const event = events.find(e => e.id === selectedEvent);
+    return event?.attendees || 0;
+  };
+
+  const handleAddTemplate = () => {
+    if (customTemplate.trim() && !templates.includes(customTemplate)) {
+      setTemplates(prev => [customTemplate, ...prev]);
+      setCustomTemplate('');
+      toast({ title: 'Template Added', description: 'Template saved successfully' });
+    }
+  };
+
+  const handleRemoveTemplate = (templateToRemove: string) => {
+    setTemplates(prev => prev.filter(t => t !== templateToRemove));
   };
 
   if (!isOpen) return null;
@@ -1569,7 +1640,7 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
         background: DESIGN.colors.card,
         borderRadius: DESIGN.borderRadius.card,
         width: '100%',
-        maxWidth: '480px',
+        maxWidth: '500px',
         maxHeight: '90vh',
         display: 'flex',
         flexDirection: 'column',
@@ -1620,7 +1691,91 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
           padding: DESIGN.spacing.default,
           paddingBottom: `calc(${DESIGN.spacing.default} + ${DESIGN.spacing.modalFooterHeight})`
         }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Quick Templates */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', color: DESIGN.colors.textPrimary }}>Quick Templates</h3>
+                <span style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>{templates.length} saved</span>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                {templates.map((template, i) => (
+                  <div key={i} style={{
+                    background: DESIGN.colors.background,
+                    borderRadius: DESIGN.borderRadius.button,
+                    padding: '12px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <button
+                      onClick={() => setMessage(template)}
+                      style={{
+                        flex: 1,
+                        textAlign: 'left',
+                        background: 'transparent',
+                        border: 'none',
+                        color: DESIGN.colors.textPrimary,
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        padding: '4px 0'
+                      }}
+                    >
+                      {template}
+                    </button>
+                    <button
+                      onClick={() => handleRemoveTemplate(template)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        marginLeft: '8px'
+                      }}
+                    >
+                      <X className="w-4 h-4" style={{ color: DESIGN.colors.textSecondary }} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add Template */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  value={customTemplate}
+                  onChange={(e) => setCustomTemplate(e.target.value)}
+                  placeholder="Add custom template..."
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    background: DESIGN.colors.background,
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: DESIGN.borderRadius.button,
+                    color: DESIGN.colors.textPrimary,
+                    fontSize: '14px'
+                  }}
+                />
+                <button
+                  onClick={handleAddTemplate}
+                  disabled={!customTemplate.trim()}
+                  style={{
+                    padding: '10px 16px',
+                    border: 'none',
+                    borderRadius: DESIGN.borderRadius.button,
+                    background: DESIGN.colors.primary,
+                    color: DESIGN.colors.background,
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    opacity: !customTemplate.trim() ? 0.5 : 1
+                  }}
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+
             {/* Event Selection */}
             <div>
               <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
@@ -1642,7 +1797,7 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
                     transition: 'all 0.2s'
                   }}
                 >
-                  All Events
+                  All Events ({events.reduce((sum, e) => sum + e.attendees, 0)})
                 </button>
                 {events.map(event => (
                   <button
@@ -1661,7 +1816,7 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
                       transition: 'all 0.2s'
                     }}
                   >
-                    {event.name}
+                    {event.name} ({event.attendees})
                   </button>
                 ))}
               </div>
@@ -1736,6 +1891,9 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
                   </button>
                 ))}
               </div>
+              <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>
+                Sending to approximately {getRecipientCount()} attendees
+              </p>
             </div>
 
             {/* Title & Message */}
@@ -1791,85 +1949,6 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
                 <span style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
                   {message.length}/500 characters
                 </span>
-              </div>
-            </div>
-
-            {/* Custom Templates */}
-            <div>
-              <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
-                Quick Templates
-              </label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {customTemplates.map((template, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <button
-                      onClick={() => setMessage(template)}
-                      style={{
-                        flex: 1,
-                        textAlign: 'left',
-                        padding: '12px',
-                        borderRadius: DESIGN.borderRadius.button,
-                        background: DESIGN.colors.background,
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        fontSize: '14px',
-                        color: DESIGN.colors.textPrimary,
-                        transition: 'border-color 0.2s',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {template}
-                    </button>
-                    <button
-                      onClick={() => removeTemplate(template)}
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: DESIGN.borderRadius.roundButton,
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <X className="w-3 h-3" style={{ color: DESIGN.colors.danger }} />
-                    </button>
-                  </div>
-                ))}
-                
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    value={newTemplate}
-                    onChange={(e) => setNewTemplate(e.target.value)}
-                    placeholder="Add new template..."
-                    style={{
-                      flex: 1,
-                      padding: '12px',
-                      background: DESIGN.colors.background,
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: DESIGN.borderRadius.button,
-                      color: DESIGN.colors.textPrimary,
-                      fontSize: '14px'
-                    }}
-                  />
-                  <button
-                    onClick={addTemplate}
-                    disabled={!newTemplate.trim()}
-                    style={{
-                      padding: '12px',
-                      border: 'none',
-                      borderRadius: DESIGN.borderRadius.button,
-                      background: DESIGN.colors.primary,
-                      color: DESIGN.colors.background,
-                      fontSize: '14px',
-                      cursor: 'pointer',
-                      opacity: !newTemplate.trim() ? 0.5 : 1
-                    }}
-                  >
-                    Add
-                  </button>
-                </div>
               </div>
             </div>
           </div>
@@ -1942,7 +2021,7 @@ function SendNotificationModal({ isOpen, onClose, events, selectedEventId }: Sen
 
 export default function EventManager() {
   const navigate = useNavigate();
-  const { user, events, updateEvent, deleteEvent, tickets, attendees: realAttendees, checkIns } = useApp();
+  const { user, events, updateEvent, deleteEvent, attendees: realAttendees, notifications } = useApp();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('events');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -1957,42 +2036,27 @@ export default function EventManager() {
   const userEvents = events.filter(e => e.organizerId === user?.id);
   const selectedEvent = selectedEventId ? events.find(e => e.id === selectedEventId) : null;
 
-  const isPro = user?.subscription.tier === 'pro' || user?.subscription.tier === 'max';
+  // Filter attendees for selected event
+  const eventAttendees = selectedEventId 
+    ? realAttendees.filter(a => a.eventId === selectedEventId)
+    : realAttendees.filter(a => userEvents.some(e => e.id === a.eventId));
 
-  // Get real attendees data
-  const filteredAttendees = selectedEvent 
-    ? realAttendees.filter(attendee => 
-        tickets.some(ticket => 
-          ticket.eventId === selectedEvent.id && 
-          ticket.userId === attendee.id
-        )
-      )
-    : realAttendees.filter(attendee => 
-        tickets.some(ticket => 
-          userEvents.some(event => event.id === ticket.eventId) && 
-          ticket.userId === attendee.id
-        )
-      );
-
-  // Get real check-in data
-  const getAttendeeCheckInStatus = (attendeeId: string) => {
-    if (!selectedEvent) return false;
-    return checkIns.some(checkIn => 
-      checkIn.eventId === selectedEvent.id && 
-      checkIn.userId === attendeeId
-    );
-  };
+  // Check if user can manage events
+  const canManageEvents = user?.subscription.tier === 'pro' || user?.subscription.tier === 'max';
 
   // Prevent body scrolling when modals are open
   useEffect(() => {
-    if (editModalOpen || qrModalOpen || deleteModalOpen || notificationModalOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
+    const modalsOpen = editModalOpen || qrModalOpen || deleteModalOpen || notificationModalOpen;
+    document.body.style.overflow = modalsOpen ? 'hidden' : 'unset';
   }, [editModalOpen, qrModalOpen, deleteModalOpen, notificationModalOpen]);
 
-  if (!isPro) {
+  // Redirect if not authorized
+  if (!user) {
+    navigate('/auth');
+    return null;
+  }
+
+  if (!canManageEvents) {
     return (
       <div style={{
         position: 'fixed',
@@ -2072,7 +2136,7 @@ export default function EventManager() {
       await updateEvent(actionEvent.id, updatedData);
       toast({ 
         title: 'Event Updated', 
-        description: 'Attendees will be notified of changes',
+        description: 'Event details have been updated',
         duration: 3000
       });
     }
@@ -2084,7 +2148,7 @@ export default function EventManager() {
       setSelectedEventId(null);
       toast({ 
         title: 'Event Deleted', 
-        description: 'Attendees have been notified',
+        description: 'Event has been removed',
         duration: 3000
       });
     }
@@ -2094,51 +2158,15 @@ export default function EventManager() {
     setNotificationModalOpen(true);
   };
 
-  const handleExportCSV = () => {
-    const csvContent = 'data:text/csv;charset=utf-8,' + 
-      'Name,Email,Ticket Type,Checked In\n' +
-      filteredAttendees.map(attendee => {
-        const ticket = tickets.find(t => 
-          t.userId === attendee.id && 
-          (selectedEvent ? t.eventId === selectedEvent.id : userEvents.some(e => e.id === t.eventId))
-        );
-        const isCheckedIn = selectedEvent ? getAttendeeCheckInStatus(attendee.id) : false;
-        return `${attendee.name},${attendee.email},${ticket?.type || 'General'},${isCheckedIn ? 'Yes' : 'No'}`;
-      }).join('\n');
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${selectedEvent?.name || 'attendees'}_list.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast({ 
-      title: 'Exported!', 
-      description: 'CSV file downloaded' 
-    });
-  };
+  // Calculate analytics
+  const totalAttendees = eventAttendees.length;
+  const checkedInAttendees = eventAttendees.filter(a => a.checkedIn).length;
+  const pendingAttendees = totalAttendees - checkedInAttendees;
 
-  const handleSendMessageToAttendee = (attendee: typeof filteredAttendees[0]) => {
-    // This would typically open a messaging modal or redirect to messages
-    toast({
-      title: 'Message Ready',
-      description: `Prepared to message ${attendee.name}`,
-      duration: 3000
-    });
-  };
-
-  const handleMarkAsCheckedIn = (attendeeId: string) => {
-    if (selectedEvent) {
-      // This would typically call an API to mark check-in
-      toast({
-        title: 'Check-in Updated',
-        description: 'Attendee marked as checked in',
-        duration: 3000
-      });
-    }
-  };
+  // Get notifications for selected event
+  const eventNotifications = selectedEventId 
+    ? notifications.filter(n => n.eventId === selectedEventId)
+    : notifications.filter(n => userEvents.some(e => e.id === n.eventId));
 
   return (
     <div style={{
@@ -2218,7 +2246,6 @@ export default function EventManager() {
             { key: 'events', label: 'My Events', icon: Calendar },
             { key: 'attendees', label: 'Attendees', icon: Users },
             { key: 'analytics', label: 'Analytics', icon: BarChart3 },
-            { key: 'settings', label: 'Settings', icon: Settings },
           ].map(tab => (
             <button
               key={tab.key}
@@ -2247,7 +2274,7 @@ export default function EventManager() {
         </div>
       </div>
 
-      {/* Scrollable Content with proper spacing */}
+      {/* Scrollable Content */}
       <div style={{ 
         flex: 1, 
         overflowY: 'auto',
@@ -2335,19 +2362,34 @@ export default function EventManager() {
                       {event.date} • {event.attendees} attendees
                     </p>
 
-                    {/* Radius Info */}
+                    {/* Media and Radius Info */}
                     <div style={{ 
                       display: 'flex', 
                       alignItems: 'center', 
-                      gap: '6px',
-                      marginBottom: '20px'
+                      gap: '12px',
+                      marginBottom: '20px',
+                      flexWrap: 'wrap'
                     }}>
+                      {event.mediaType === 'video' ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Film className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
+                          <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>Video</span>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Grid3x3 className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
+                          <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>
+                            {event.images?.length || 0} photos
+                          </span>
+                        </div>
+                      )}
+                      <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>•</span>
                       <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>
-                        Check-in radius: {event.geofenceRadius}m
+                        Radius: {event.geofenceRadius}m
                       </span>
                     </div>
 
-                    {/* Action Buttons - Optimized for Mobile */}
+                    {/* Action Buttons */}
                     <div style={{ 
                       display: 'grid',
                       gridTemplateColumns: 'repeat(4, 1fr)',
@@ -2492,7 +2534,7 @@ export default function EventManager() {
           </div>
         )}
 
-        {/* Attendees Tab (Combined with Messages) */}
+        {/* Attendees Tab */}
         {activeTab === 'attendees' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Event Selector */}
@@ -2532,12 +2574,12 @@ export default function EventManager() {
                       color: selectedEventId === event.id ? DESIGN.colors.background : DESIGN.colors.textSecondary,
                       borderColor: selectedEventId === event.id ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)',
                       cursor: 'pointer'
-                    }}
-                  >
-                    {event.name}
-                  </button>
-                ))}
-              </div>
+                  }}
+                >
+                  {event.name}
+                </button>
+              ))}
+            </div>
             )}
 
             {/* Stats */}
@@ -2550,7 +2592,7 @@ export default function EventManager() {
                 textAlign: 'center'
               }}>
                 <p style={{ fontSize: '24px', fontWeight: 'bold', color: DESIGN.colors.primary }}>
-                  {filteredAttendees.length}
+                  {totalAttendees}
                 </p>
                 <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>Total</p>
               </div>
@@ -2562,21 +2604,7 @@ export default function EventManager() {
                 textAlign: 'center'
               }}>
                 <p style={{ fontSize: '24px', fontWeight: 'bold', color: DESIGN.colors.success }}>
-                  {selectedEvent 
-                    ? filteredAttendees.filter(attendee => getAttendeeCheckInStatus(attendee.id)).length
-                    : userEvents.reduce((sum, event) => sum + 
-                        filteredAttendees.filter(attendee => 
-                          tickets.some(ticket => 
-                            ticket.eventId === event.id && 
-                            ticket.userId === attendee.id &&
-                            checkIns.some(checkIn => 
-                              checkIn.eventId === event.id && 
-                              checkIn.userId === attendee.id
-                            )
-                          )
-                        ).length, 0
-                      )
-                  }
+                  {checkedInAttendees}
                 </p>
                 <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>Checked In</p>
               </div>
@@ -2588,21 +2616,7 @@ export default function EventManager() {
                 textAlign: 'center'
               }}>
                 <p style={{ fontSize: '24px', fontWeight: 'bold', color: DESIGN.colors.warning }}>
-                  {selectedEvent 
-                    ? filteredAttendees.filter(attendee => !getAttendeeCheckInStatus(attendee.id)).length
-                    : userEvents.reduce((sum, event) => sum + 
-                        filteredAttendees.filter(attendee => 
-                          tickets.some(ticket => 
-                            ticket.eventId === event.id && 
-                            ticket.userId === attendee.id &&
-                            !checkIns.some(checkIn => 
-                              checkIn.eventId === event.id && 
-                              checkIn.userId === attendee.id
-                            )
-                          )
-                        ).length, 0
-                      )
-                  }
+                  {pendingAttendees}
                 </p>
                 <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>Pending</p>
               </div>
@@ -2611,7 +2625,26 @@ export default function EventManager() {
             {/* Action Buttons */}
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
-                onClick={handleExportCSV}
+                onClick={() => {
+                  const csvContent = 'data:text/csv;charset=utf-8,' + 
+                    'Name,Email,Ticket Type,Checked In\n' +
+                    eventAttendees.map(a => 
+                      `${a.name},${a.email},${a.ticketType || 'General'},${a.checkedIn ? 'Yes' : 'No'}`
+                    ).join('\n');
+                  
+                  const encodedUri = encodeURI(csvContent);
+                  const link = document.createElement('a');
+                  link.setAttribute('href', encodedUri);
+                  link.setAttribute('download', `${selectedEvent?.name || 'attendees'}_list.csv`);
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  
+                  toast({ 
+                    title: 'Exported!', 
+                    description: 'CSV file downloaded' 
+                  });
+                }}
                 style={{
                   flex: 1,
                   padding: '12px',
@@ -2650,88 +2683,104 @@ export default function EventManager() {
                 }}
               >
                 <Bell className="w-4 h-4" />
-                Notify All
+                Notify
               </button>
             </div>
 
-            {/* Attendees List with Message Actions */}
+            {/* Notifications Section */}
+            <div style={{
+              background: DESIGN.colors.card,
+              padding: '16px',
+              borderRadius: DESIGN.borderRadius.card,
+              border: '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', color: DESIGN.colors.textPrimary }}>Recent Notifications</h3>
+                <span style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>{eventNotifications.length} sent</span>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {eventNotifications.slice(0, 3).map(notification => (
+                  <div key={notification.id} style={{
+                    padding: '12px',
+                    borderRadius: DESIGN.borderRadius.button,
+                    background: DESIGN.colors.background,
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Bell className="w-3 h-3" style={{ color: DESIGN.colors.primary }} />
+                        <span style={{ fontSize: '14px', fontWeight: '500', color: DESIGN.colors.textPrimary }}>
+                          {notification.title}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '11px', color: DESIGN.colors.textSecondary }}>
+                        {new Date(notification.sentAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginBottom: '8px' }}>
+                      {notification.message}
+                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '11px', color: DESIGN.colors.textSecondary }}>
+                        Sent to {notification.recipientCount} attendees
+                      </span>
+                      <span style={{ fontSize: '11px', color: DESIGN.colors.success }}>
+                        {Math.round((notification.readCount / notification.recipientCount) * 100)}% read
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Attendees List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {filteredAttendees.length > 0 ? (
-                filteredAttendees.map(attendee => {
-                  const isCheckedIn = selectedEvent ? getAttendeeCheckInStatus(attendee.id) : false;
-                  const ticket = tickets.find(t => 
-                    t.userId === attendee.id && 
-                    (selectedEvent ? t.eventId === selectedEvent.id : userEvents.some(e => e.id === t.eventId))
-                  );
-                  
-                  return (
-                    <div key={attendee.id} style={{
-                      background: DESIGN.colors.card,
-                      borderRadius: DESIGN.borderRadius.card,
-                      padding: '12px',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
+              {eventAttendees.length > 0 ? (
+                eventAttendees.map(attendee => (
+                  <div key={attendee.id} style={{
+                    background: DESIGN.colors.card,
+                    borderRadius: DESIGN.borderRadius.card,
+                    padding: '12px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    transition: 'border-color 0.2s'
+                  }}>
+                    <img 
+                      src={attendee.photo} 
+                      alt={attendee.name}
+                      style={{ width: '40px', height: '40px', borderRadius: DESIGN.borderRadius.roundButton, objectFit: 'cover' }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: '14px', fontWeight: '500', color: DESIGN.colors.textPrimary }}>{attendee.name}</p>
+                      <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
+                        {attendee.ticketType || 'General'} • {attendee.email}
+                      </p>
+                    </div>
+                    <span style={{
+                      padding: '4px 8px',
+                      borderRadius: DESIGN.borderRadius.roundButton,
+                      fontSize: '12px',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '12px',
-                      transition: 'border-color 0.2s'
+                      gap: '4px',
+                      background: attendee.checkedIn ? `${DESIGN.colors.success}20` : `${DESIGN.colors.warning}20`,
+                      color: attendee.checkedIn ? DESIGN.colors.success : DESIGN.colors.warning
                     }}>
-                      <img 
-                        src={attendee.photo} 
-                        alt={attendee.name}
-                        style={{ width: '40px', height: '40px', borderRadius: DESIGN.borderRadius.roundButton, objectFit: 'cover' }}
-                      />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: '14px', fontWeight: '500', color: DESIGN.colors.textPrimary }}>{attendee.name}</p>
-                        <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
-                          {ticket?.type || 'General'} • {attendee.email}
-                        </p>
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          onClick={() => handleSendMessageToAttendee(attendee)}
-                          style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: DESIGN.borderRadius.roundButton,
-                            background: 'rgba(59, 130, 246, 0.1)',
-                            border: '1px solid rgba(59, 130, 246, 0.3)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <MessageSquare className="w-3 h-3" style={{ color: DESIGN.colors.info }} />
-                        </button>
-                        {selectedEvent && !isCheckedIn && (
-                          <button
-                            onClick={() => handleMarkAsCheckedIn(attendee.id)}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: DESIGN.borderRadius.roundButton,
-                              background: 'rgba(16, 185, 129, 0.1)',
-                              border: '1px solid rgba(16, 185, 129, 0.3)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            <CheckCircle className="w-3 h-3" style={{ color: DESIGN.colors.success }} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
+                      {attendee.checkedIn ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                      {attendee.checkedIn ? 'Checked In' : 'Pending'}
+                    </span>
+                  </div>
+                ))
               ) : (
-                <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                <div style={{ textAlign: 'center', padding: '32px 0' }}>
                   <Users className="w-12 h-12" style={{ color: DESIGN.colors.textSecondary, margin: '0 auto 16px' }} />
-                  <p style={{ fontSize: '14px', color: DESIGN.colors.textPrimary }}>
-                    No attendees yet
-                  </p>
-                  <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px', color: DESIGN.colors.textPrimary }}>
+                    No Attendees Yet
+                  </h3>
+                  <p style={{ fontSize: '14px', color: DESIGN.colors.textSecondary }}>
                     Attendees will appear here once they register for your events
                   </p>
                 </div>
@@ -2740,7 +2789,7 @@ export default function EventManager() {
           </div>
         )}
 
-        {/* Analytics Tab - Real Data */}
+        {/* Analytics Tab */}
         {activeTab === 'analytics' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -2755,11 +2804,11 @@ export default function EventManager() {
                   <span style={{ fontSize: '14px', color: DESIGN.colors.textSecondary }}>Total Attendees</span>
                 </div>
                 <p style={{ fontSize: '32px', fontWeight: 'bold', color: DESIGN.colors.textPrimary }}>
-                  {userEvents.reduce((sum, e) => sum + e.attendees, 0)}
+                  {eventAttendees.length}
                 </p>
                 <p style={{ fontSize: '12px', color: DESIGN.colors.success, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
                   <TrendingUp className="w-3 h-3" />
-                  +{Math.round((userEvents.reduce((sum, e) => sum + e.attendees, 0) / 100) * 15)}% from last month
+                  +{Math.round((checkedInAttendees / Math.max(eventAttendees.length, 1)) * 100)}% check-in rate
                 </p>
               </div>
               <div style={{
@@ -2774,7 +2823,7 @@ export default function EventManager() {
                 </div>
                 <p style={{ fontSize: '32px', fontWeight: 'bold', color: DESIGN.colors.textPrimary }}>{userEvents.length}</p>
                 <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>
-                  All time
+                  {userEvents.filter(e => getEventStatus(e) === 'live').length} live now
                 </p>
               </div>
             </div>
@@ -2787,17 +2836,11 @@ export default function EventManager() {
             }}>
               <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: DESIGN.colors.textPrimary }}>Check-in Rate</h3>
               <div style={{ height: '160px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '8px' }}>
-                {userEvents.map((event, i) => {
-                  const eventAttendees = realAttendees.filter(attendee => 
-                    tickets.some(ticket => ticket.eventId === event.id && ticket.userId === attendee.id)
-                  ).length;
-                  const checkedInAttendees = eventAttendees > 0 ? 
-                    realAttendees.filter(attendee => 
-                      tickets.some(ticket => ticket.eventId === event.id && ticket.userId === attendee.id) &&
-                      checkIns.some(checkIn => checkIn.eventId === event.id && checkIn.userId === attendee.id)
-                    ).length : 0;
-                  
-                  const rate = eventAttendees > 0 ? (checkedInAttendees / eventAttendees) * 100 : 0;
+                {userEvents.slice(0, 7).map((event, i) => {
+                  const eventAttendees = realAttendees.filter(a => a.eventId === event.id);
+                  const checkedInRate = eventAttendees.length > 0 
+                    ? Math.round((eventAttendees.filter(a => a.checkedIn).length / eventAttendees.length) * 100)
+                    : 0;
                   
                   return (
                     <div 
@@ -2819,7 +2862,7 @@ export default function EventManager() {
                           borderTopRightRadius: DESIGN.borderRadius.button,
                           position: 'absolute',
                           bottom: 0,
-                          height: `${Math.min(rate, 100)}%`,
+                          height: `${checkedInRate}%`,
                           transition: 'height 1s ease'
                         }}
                       />
@@ -2827,8 +2870,19 @@ export default function EventManager() {
                   );
                 })}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'center', fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '8px' }}>
-                <span>{userEvents.length} Events</span>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                fontSize: '12px', 
+                color: DESIGN.colors.textSecondary, 
+                marginTop: '8px',
+                overflowX: 'auto'
+              }}>
+                {userEvents.slice(0, 7).map(event => (
+                  <span key={event.id} style={{ minWidth: '32px', textAlign: 'center' }}>
+                    {event.name.substring(0, 3)}
+                  </span>
+                ))}
               </div>
             </div>
 
@@ -2844,125 +2898,33 @@ export default function EventManager() {
                   .sort((a, b) => b.attendees - a.attendees)
                   .slice(0, 3)
                   .map((event, i) => (
-                  <div key={event.id} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: DESIGN.borderRadius.roundButton,
-                      background: `${DESIGN.colors.primary}20`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      color: DESIGN.colors.primary
-                    }}>
-                      {i + 1}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: '14px', fontWeight: '500', color: DESIGN.colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {event.name}
-                      </p>
-                      <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
-                        {event.attendees} attendees • {event.mediaType === 'video' ? 'Video' : 'Carousel'}
-                      </p>
+                    <div key={event.id} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: DESIGN.borderRadius.roundButton,
+                        background: `${DESIGN.colors.primary}20`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        color: DESIGN.colors.primary
+                      }}>
+                        {i + 1}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: '14px', fontWeight: '500', color: DESIGN.colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {event.name}
+                        </p>
+                        <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
+                          {event.attendees} attendees • {event.mediaType === 'video' ? 'Video' : 'Carousel'}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Settings Tab */}
-        {activeTab === 'settings' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{
-              background: DESIGN.colors.card,
-              padding: '16px',
-              borderRadius: DESIGN.borderRadius.card,
-              border: '1px solid rgba(255, 255, 255, 0.1)'
-            }}>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: DESIGN.colors.textPrimary }}>Notification Settings</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <ToggleSwitch
-                  enabled={true}
-                  onChange={() => {}}
-                  label="Real-time attendee check-in notifications"
-                />
-                <ToggleSwitch
-                  enabled={true}
-                  onChange={() => {}}
-                  label="Event update announcements"
-                />
-                <ToggleSwitch
-                  enabled={false}
-                  onChange={() => {}}
-                  label="Daily event summary emails"
-                />
-                <ToggleSwitch
-                  enabled={true}
-                  onChange={() => {}}
-                  label="Push notifications for new attendees"
-                />
-              </div>
-            </div>
-
-            <div style={{
-              background: DESIGN.colors.card,
-              padding: '16px',
-              borderRadius: DESIGN.borderRadius.card,
-              border: '1px solid rgba(255, 255, 255, 0.1)'
-            }}>
-              <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: DESIGN.colors.textPrimary }}>Account Settings</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div>
-                  <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block', color: DESIGN.colors.textPrimary }}>
-                    Email Notifications
-                  </label>
-                  <select
-                    defaultValue="all"
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      background: DESIGN.colors.background,
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: DESIGN.borderRadius.button,
-                      color: DESIGN.colors.textPrimary,
-                      fontSize: '15px',
-                      appearance: 'none'
-                    }}
-                  >
-                    <option value="all">All notifications</option>
-                    <option value="important">Important only</option>
-                    <option value="none">None</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                toast({ 
-                  title: 'Settings Saved', 
-                  description: 'Your preferences have been updated',
-                  duration: 3000
-                });
-              }}
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: 'none',
-                borderRadius: DESIGN.borderRadius.button,
-                background: DESIGN.colors.primary,
-                color: DESIGN.colors.background,
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer'
-              }}
-            >
-              Save Settings
-            </button>
           </div>
         )}
       </div>
@@ -2990,7 +2952,7 @@ export default function EventManager() {
             onConfirm={handleConfirmDelete}
           />
           
-          <SendNotificationModal
+          <NotificationModal
             isOpen={notificationModalOpen}
             onClose={() => setNotificationModalOpen(false)}
             events={userEvents}
