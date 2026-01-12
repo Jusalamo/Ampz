@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Search, SlidersHorizontal, Plus, MapPin, X, Calendar, Clock, Heart } from 'lucide-react';
+import { Search, SlidersHorizontal, Plus, MapPin, X, Calendar, Clock, Heart, ChevronRight, Star } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { EventCard } from './EventCard';
 import { Input } from './ui/input';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { motion } from 'framer-motion';
+import { useEvents } from '@/hooks/useEvents';
 
 // Design Constants
 const DESIGN = {
@@ -114,6 +115,7 @@ const SNAP_POSITIONS = {
 export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const navigate = useNavigate();
   const { events, user } = useApp();
+  const { getSuggestedEvents, getUpcomingEvents } = useEvents(user?.id, user?.isDemo);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [drawerPosition, setDrawerPosition] = useState<DrawerPosition>('minimum');
@@ -124,6 +126,17 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [eventCards3D, setEventCards3D] = useState<Map<string, HTMLDivElement>>(new Map());
+  
+  // Get suggested and upcoming events using database queries
+  const suggestedEvents = useMemo(() => 
+    getSuggestedEvents(user?.profile?.interests || [], 4), 
+    [getSuggestedEvents, user?.profile?.interests]
+  );
+  
+  const upcomingEvents = useMemo(() => 
+    getUpcomingEvents(6), 
+    [getUpcomingEvents]
+  );
   
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -797,7 +810,94 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
               ))}
             </div>
 
-            {/* Events List */}
+            {/* Suggested For You Section */}
+            {suggestedEvents.length > 0 && selectedCategory === 'All' && !search && (
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-[15px] font-bold flex items-center gap-2" style={{ color: DESIGN.colors.textPrimary }}>
+                    <Star className="w-4 h-4" style={{ color: '#F59E0B' }} />
+                    Suggested For You
+                  </h3>
+                </div>
+                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                  {suggestedEvents.map((event) => (
+                    <div 
+                      key={event.id} 
+                      className="flex-shrink-0 w-[200px] cursor-pointer"
+                      onClick={() => navigate(`/event/${event.id}`)}
+                    >
+                      <div 
+                        className="rounded-[12px] overflow-hidden"
+                        style={{ background: DESIGN.colors.card, border: `1px solid ${DESIGN.colors.textSecondary}20` }}
+                      >
+                        <img 
+                          src={event.coverImage} 
+                          alt={event.name} 
+                          className="w-full h-24 object-cover"
+                        />
+                        <div className="p-2">
+                          <p className="text-[13px] font-semibold truncate" style={{ color: DESIGN.colors.textPrimary }}>
+                            {event.name}
+                          </p>
+                          <p className="text-[11px] truncate" style={{ color: DESIGN.colors.textSecondary }}>
+                            {event.date} • {event.location}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Upcoming Events Section */}
+            {upcomingEvents.length > 0 && selectedCategory === 'All' && !search && (
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-[15px] font-bold flex items-center gap-2" style={{ color: DESIGN.colors.textPrimary }}>
+                    <Calendar className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
+                    Upcoming Events
+                  </h3>
+                  <button 
+                    onClick={() => setSelectedCategory('All')}
+                    className="text-[12px] flex items-center gap-1"
+                    style={{ color: DESIGN.colors.primary }}
+                  >
+                    See All <ChevronRight className="w-3 h-3" />
+                  </button>
+                </div>
+                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                  {upcomingEvents.map((event) => (
+                    <div 
+                      key={event.id} 
+                      className="flex-shrink-0 w-[200px] cursor-pointer"
+                      onClick={() => navigate(`/event/${event.id}`)}
+                    >
+                      <div 
+                        className="rounded-[12px] overflow-hidden"
+                        style={{ background: DESIGN.colors.card, border: `1px solid ${DESIGN.colors.textSecondary}20` }}
+                      >
+                        <img 
+                          src={event.coverImage} 
+                          alt={event.name} 
+                          className="w-full h-24 object-cover"
+                        />
+                        <div className="p-2">
+                          <p className="text-[13px] font-semibold truncate" style={{ color: DESIGN.colors.textPrimary }}>
+                            {event.name}
+                          </p>
+                          <p className="text-[11px] truncate" style={{ color: DESIGN.colors.textSecondary }}>
+                            {event.date} • {event.location}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* All Events List */}
             <div 
               className="flex-1 overflow-y-auto space-y-3 pb-24"
               style={{
@@ -805,7 +905,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                 scrollbarColor: `${DESIGN.colors.primary} ${DESIGN.colors.card}`
               }}
             >
-              {filteredEvents.length > 0 ? (
+              {(search || selectedCategory !== 'All') && filteredEvents.length > 0 ? (
                 filteredEvents.map((event) => (
                   <EventCard
                     key={event.id}
@@ -813,7 +913,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                     onClick={() => handleEventCardClick(event)}
                   />
                 ))
-              ) : (
+              ) : (search || selectedCategory !== 'All') && filteredEvents.length === 0 ? (
                 <div className="text-center py-12">
                   <motion.div
                     initial={{ scale: 0 }}
@@ -827,7 +927,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                     Try adjusting your search or filters
                   </p>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         )}

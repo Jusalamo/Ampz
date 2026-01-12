@@ -231,7 +231,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 </Button>
                 <Button
                   className="flex-1 h-12"
-                  onClick={handleSimulateScan}
+                  onClick={() => setStep('code')}
                 >
                   <QrCode className="w-4 h-4 mr-2" />
                   Scan
