@@ -20,9 +20,12 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { Event } from '@/lib/types';
 import debounce from 'lodash/debounce';
 
-// Initialize Mapbox with token
-const MAPBOX_TOKEN = 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg';
-mapboxgl.accessToken = MAPBOX_TOKEN;
+// Initialize Mapbox with token from environment variable
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+const isMapboxAvailable = !!MAPBOX_TOKEN;
+if (MAPBOX_TOKEN) {
+  mapboxgl.accessToken = MAPBOX_TOKEN;
+}
 
 // Design Constants
 const DESIGN = {
@@ -368,6 +371,11 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   }, [step, isOpen]);
 
   const initializeMap = useCallback(async (container: HTMLDivElement, mapNumber: 1 | 2) => {
+    if (!isMapboxAvailable) {
+      setMapError('Map service unavailable. Please configure VITE_MAPBOX_TOKEN.');
+      return;
+    }
+    
     if (!container) {
       console.error('Map container not found');
       setMapError('Map container not available');
