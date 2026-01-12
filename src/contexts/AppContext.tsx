@@ -102,6 +102,7 @@ const rowToEvent = (row: any): Event => ({
   attendees: row.attendees_count || 0,
   organizerId: row.organizer_id,
   qrCode: row.qr_code,
+  qrCodeUrl: row.qr_code ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/#/event/${row.id}`)}&format=png&bgcolor=ffffff&color=000000&qzone=1&margin=10&ecc=H` : undefined,
   geofenceRadius: row.geofence_radius || 50,
   customTheme: row.custom_theme || '#8B5CF6',
   coverImage: row.cover_image || '',
@@ -116,6 +117,7 @@ const rowToEvent = (row: any): Event => ({
   notificationsEnabled: row.notifications_enabled ?? true,
   updatedAt: row.updated_at,
   ticketLink: row.ticket_link || '',
+  webTicketsLink: row.ticket_link || '', // Map ticket_link to webTicketsLink
   accessCode: row.access_code || '',
 });
 
@@ -186,19 +188,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, newSession) => {
+      async (event, newSession) => {
         setSession(newSession);
         
-        // Defer profile fetch
+        // Immediately process auth without setTimeout for faster login
         if (newSession?.user) {
-          setTimeout(async () => {
-            const profile = await fetchProfile(newSession.user.id);
-            if (profile) {
-              setUser(profileToUser(profile, newSession.user));
-              setIsDemo(profile.is_demo_account || false);
-            }
-            setIsLoading(false);
-          }, 0);
+          const profile = await fetchProfile(newSession.user.id);
+          if (profile) {
+            setUser(profileToUser(profile, newSession.user));
+            setIsDemo(profile.is_demo_account || false);
+          }
+          setIsLoading(false);
         } else {
           setUser(null);
           setIsDemo(false);
@@ -464,7 +464,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       has_video: (eventData.videos?.length || 0) > 0,
       media_type: eventData.mediaType || 'carousel',
       notifications_enabled: eventData.notificationsEnabled ?? true,
-      ticket_link: (eventData as any).ticketLink || '',
+      ticket_link: eventData.webTicketsLink || (eventData as any).ticketLink || '',
     };
 
     const { data, error } = await supabase
@@ -512,6 +512,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     if (updates.tags !== undefined) dbUpdates.tags = updates.tags;
     if (updates.mediaType !== undefined) dbUpdates.media_type = updates.mediaType;
+    if (updates.webTicketsLink !== undefined) dbUpdates.ticket_link = updates.webTicketsLink;
     if ((updates as any).ticketLink !== undefined) dbUpdates.ticket_link = (updates as any).ticketLink;
 
     const { error } = await supabase.from('events').update(dbUpdates).eq('id', eventId);

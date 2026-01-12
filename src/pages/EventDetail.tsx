@@ -530,10 +530,12 @@ export default function EventDetail() {
       // View ticket
       navigate(`/ticket/${event.id}`);
     } else {
-      // Buy ticket/register
-      if (event.price === 0) {
+      // Buy ticket/register - use webTicketsLink if available
+      if (event.webTicketsLink || event.ticketLink) {
+        // Open external ticket link (WebTickets)
+        window.open(event.webTicketsLink || event.ticketLink, '_blank', 'noopener,noreferrer');
+      } else if (event.price === 0) {
         // Free event - register immediately
-        // TODO: Implement free registration
         toast({
           title: 'Registered!',
           description: 'You have successfully registered for the event.',
@@ -930,22 +932,17 @@ export default function EventDetail() {
           }}
         />
         
-        {/* Status Badge */}
+        {/* Event Date Badge - Removed Live status */}
         <div className="absolute top-16 left-4 z-10">
-          <span className={cn(
-            'px-3 py-1.5 text-xs font-semibold rounded-full flex items-center gap-1.5 backdrop-blur-sm',
-            isLive 
-              ? 'bg-red-500/90 text-white animate-pulse' 
-              : 'bg-card/90 text-foreground'
-          )}
+          <span className="px-3 py-1.5 text-xs font-semibold rounded-full flex items-center gap-1.5 backdrop-blur-sm"
           style={{
             borderRadius: DESIGN.borderRadius.roundButton,
-            background: isLive ? `${DESIGN.colors.danger}E6` : `${DESIGN.colors.card}E6`,
-            color: isLive ? DESIGN.colors.textPrimary : DESIGN.colors.textPrimary,
-            border: `1px solid ${isLive ? `${DESIGN.colors.danger}80` : `${DESIGN.colors.textSecondary}40`}`
+            background: `${DESIGN.colors.card}E6`,
+            color: DESIGN.colors.textPrimary,
+            border: `1px solid ${DESIGN.colors.textSecondary}40`
           }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" aria-hidden="true"></span>
-            {isLive ? 'LIVE NOW' : 'UPCOMING'}
+            <Calendar className="w-3.5 h-3.5" aria-hidden="true" />
+            {formattedDate}
           </span>
         </div>
       </div>
