@@ -45,6 +45,37 @@ const DESIGN = {
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 const isMapboxAvailable = !!MAPBOX_TOKEN;
 
+// HTML escape function to prevent XSS attacks
+const escapeHtml = (text: string | undefined | null): string => {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+};
+
+// Validate and sanitize CSS color values to prevent injection
+const sanitizeColor = (color: string | undefined | null, fallback: string): string => {
+  if (!color) return fallback;
+  // Only allow valid hex colors or named colors
+  const hexPattern = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+  if (hexPattern.test(color)) return color;
+  // Fallback for any other value
+  return fallback;
+};
+
+// Sanitize URL to prevent javascript: or data: injection
+const sanitizeImageUrl = (url: string | undefined | null): string => {
+  if (!url) return '';
+  // Only allow http, https, and data:image URLs
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return escapeHtml(url);
+  }
+  if (url.startsWith('data:image/')) {
+    return url; // Data URLs for images are safe
+  }
+  return ''; // Block all other URL schemes
+};
+
 // Type definitions
 interface Coordinates {
   lng: number;
@@ -256,7 +287,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       markerEl.innerHTML = `
         <div class="relative transform transition-transform duration-200 hover:scale-110">
           <div class="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 border-white"
-               style="background-color: ${event.customTheme || DESIGN.colors.primary};">
+               style="background-color: ${sanitizeColor(event.customTheme, DESIGN.colors.primary)};">
             ${event.isFeatured ? 
               '<svg class="w-5 h-5 text-yellow-300" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>' : 
               '<div class="w-4 h-4 bg-white/40 rounded-full"></div>'}
@@ -307,6 +338,14 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     cardEl.style.width = '280px';
     cardEl.style.zIndex = '1000';
     
+    // Sanitize user-controlled data to prevent XSS
+    const safeName = escapeHtml(event.name);
+    const safeLocation = escapeHtml(event.location);
+    const safeDate = escapeHtml(event.date);
+    const safeTime = escapeHtml(event.time);
+    const safeCoverImage = sanitizeImageUrl(event.coverImage);
+    const safeTheme = sanitizeColor(event.customTheme, DESIGN.colors.primary);
+    
     cardEl.innerHTML = `
       <div class="rounded-[20px] shadow-2xl border overflow-hidden" style="
         background: ${DESIGN.colors.card};
@@ -315,15 +354,16 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       ">
         <div class="flex items-start gap-3 p-3">
           <img 
-            src="${event.coverImage}" 
-            alt="${event.name}"
+            src="${safeCoverImage}" 
+            alt="${safeName}"
             class="w-20 h-20 rounded-[12px] object-cover flex-shrink-0"
             style="border: 2px solid ${DESIGN.colors.primary}"
+            onerror="this.style.display='none'"
           />
           <div class="flex-1 min-w-0 py-1">
             <div class="flex items-start justify-between gap-2">
               <h3 class="font-bold text-[14px] line-clamp-1" style="color: ${DESIGN.colors.textPrimary}">
-                ${event.name}
+                ${safeName}
               </h3>
               <button class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 close-3d-card hover:scale-110 transition-transform"
                 style="background: ${DESIGN.colors.card}; color: ${DESIGN.colors.textSecondary}; border: 1px solid ${DESIGN.colors.textSecondary}20">
@@ -336,25 +376,25 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
               </svg>
-              <span>${event.date}</span>
+              <span>${safeDate}</span>
               <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
-              <span>${event.time}</span>
+              <span>${safeTime}</span>
             </div>
             <div class="flex items-center gap-2 text-[12px] mt-1" style="color: ${DESIGN.colors.textSecondary}">
               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
               </svg>
-              <span class="line-clamp-1">${event.location}</span>
+              <span class="line-clamp-1">${safeLocation}</span>
             </div>
             <div class="flex items-center justify-between mt-2">
-              <span class="text-[12px] font-semibold" style="color: ${event.customTheme || DESIGN.colors.primary}">
+              <span class="text-[12px] font-semibold" style="color: ${safeTheme}">
                 ${event.price === 0 ? 'FREE' : `N$${event.price}`}
               </span>
               <button class="h-7 px-3 text-[12px] rounded-[8px] font-medium view-event-btn hover:opacity-90 transition-opacity"
-                style="background: ${event.customTheme || DESIGN.colors.primary}; color: ${DESIGN.colors.background}">
+                style="background: ${safeTheme}; color: ${DESIGN.colors.background}">
                 View Event
               </button>
             </div>
