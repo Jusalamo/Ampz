@@ -23,7 +23,34 @@ export default function Auth() {
   const [localError, setLocalError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const redirectTo = searchParams.get('redirect') || '/home';
+  // Validate redirect path to prevent open redirect attacks
+  const validateRedirectPath = (path: string | null): string => {
+    if (!path) return '/home';
+    
+    // Must start with / and not contain protocol or double slashes
+    if (!path.startsWith('/') || path.startsWith('//') || path.includes('://')) {
+      return '/home';
+    }
+    
+    // Whitelist of allowed redirect path patterns
+    const allowedPatterns = [
+      /^\/home$/,
+      /^\/events$/,
+      /^\/connect$/,
+      /^\/profile$/,
+      /^\/matches$/,
+      /^\/settings$/,
+      /^\/activity$/,
+      /^\/chats$/,
+      /^\/event\/[a-f0-9-]+$/,
+      /^\/event\/[a-f0-9-]+\/checkin/,
+    ];
+    
+    const isAllowed = allowedPatterns.some(pattern => pattern.test(path.split('?')[0]));
+    return isAllowed ? path : '/home';
+  };
+
+  const redirectTo = validateRedirectPath(searchParams.get('redirect'));
 
   // Redirect if already authenticated
   useEffect(() => {

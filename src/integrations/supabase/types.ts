@@ -860,10 +860,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_within_geofence: {
-        Args: { event_uuid: string; user_lat: number; user_lon: number }
-        Returns: boolean
-      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
