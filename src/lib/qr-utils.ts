@@ -1,14 +1,57 @@
 import QRCode from 'qrcode';
+import { supabase } from '@/integrations/supabase/client';
+
+// Generate a SHA-256 hash for secure token storage
+async function hashToken(token: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(token);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 // Generate a unique access token for an event
 export function generateEventToken(eventId: string): string {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 15);
   const raw = `${eventId}-${timestamp}-${random}`;
-  // Simple encryption (in production, use proper encryption)
+  // Simple encoding for URL-safe token
   return btoa(raw).replace(/[+/=]/g, (c) => 
     c === '+' ? '-' : c === '/' ? '_' : ''
   );
+}
+
+// Generate a cryptographically secure token and store hash server-side
+export async function generateSecureEventToken(
+  eventId: string,
+  expiresAt?: Date
+): Promise<{ token: string; tokenId: string } | null> {
+  try {
+    // Generate secure random token
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    const token = Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+    
+    // Hash the token for storage
+    const tokenHash = await hashToken(token);
+    
+    // Store hash server-side via RPC
+    const { data, error } = await supabase.rpc('create_event_token', {
+      p_event_id: eventId,
+      p_token_hash: tokenHash,
+      p_expires_at: expiresAt?.toISOString() || null,
+    });
+    
+    if (error) {
+      console.error('Error creating event token:', error);
+      return null;
+    }
+    
+    return { token, tokenId: data };
+  } catch (error) {
+    console.error('Error generating secure token:', error);
+    return null;
+  }
 }
 
 // Generate a unique access code (human readable)
@@ -61,7 +104,7 @@ export function parseCheckInURL(url: string): { eventId: string; token: string }
   }
 }
 
-// Validate event token
+// Client-side token validation (for backwards compatibility and basic checks)
 export function validateEventToken(token: string, eventId: string): boolean {
   try {
     // Reverse the encoding
@@ -69,6 +112,33 @@ export function validateEventToken(token: string, eventId: string): boolean {
     const decoded = atob(padded);
     return decoded.startsWith(eventId);
   } catch (error) {
+    return false;
+  }
+}
+
+// Server-side secure token validation
+export async function validateSecureEventToken(
+  token: string,
+  eventId: string
+): Promise<boolean> {
+  try {
+    // Hash the token to compare with stored hash
+    const tokenHash = await hashToken(token);
+    
+    // Validate server-side
+    const { data, error } = await supabase.rpc('validate_event_token', {
+      p_token_hash: tokenHash,
+      p_event_id: eventId,
+    });
+    
+    if (error) {
+      console.error('Error validating token:', error);
+      return false;
+    }
+    
+    return data === true;
+  } catch (error) {
+    console.error('Error in secure token validation:', error);
     return false;
   }
 }

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { calculateDistance, isWithinGeofence, parseCheckInURL, validateEventToken } from '@/lib/qr-utils';
+import { calculateDistance, isWithinGeofence, parseCheckInURL, validateEventToken, validateSecureEventToken } from '@/lib/qr-utils';
 import { Event } from '@/lib/types';
 
 export interface CheckInResult {
@@ -218,8 +218,11 @@ export function useCheckIn(userId?: string) {
         };
       }
 
-      // Validate token
-      if (!validateEventToken(parsed.token, parsed.eventId)) {
+      // Validate token - try server-side first, fall back to client-side for legacy tokens
+      const isSecureTokenValid = await validateSecureEventToken(parsed.token, parsed.eventId);
+      const isLegacyTokenValid = validateEventToken(parsed.token, parsed.eventId);
+      
+      if (!isSecureTokenValid && !isLegacyTokenValid) {
         return { valid: false, error: 'Invalid or expired QR code' };
       }
 
