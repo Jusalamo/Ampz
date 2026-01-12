@@ -190,6 +190,41 @@ export type Database = {
           },
         ]
       }
+      event_tokens: {
+        Row: {
+          created_at: string
+          event_id: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          token_hash: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          token_hash: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_tokens_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           access_code: string | null
@@ -853,11 +888,23 @@ export type Database = {
         Args: { lat1: number; lat2: number; lon1: number; lon2: number }
         Returns: number
       }
+      create_event_token: {
+        Args: {
+          p_event_id: string
+          p_expires_at?: string
+          p_token_hash: string
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      validate_event_token: {
+        Args: { p_event_id: string; p_token_hash: string }
         Returns: boolean
       }
     }
