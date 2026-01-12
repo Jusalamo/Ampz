@@ -175,8 +175,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [isDemo]);
 
-  // Initialize auth state
+  // Initialize auth state - FIXED VERSION
   useEffect(() => {
+    let mounted = true;
+
     // Load theme from storage
     const storedTheme = localStorage.getItem('amps_theme') as 'dark' | 'light';
     const storedCurrency = localStorage.getItem('amps_currency');
@@ -186,41 +188,67 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     if (storedCurrency) setCurrencyState(storedCurrency);
 
-    // Set up auth state listener FIRST
+    // Initialize session immediately
+    const initializeAuth = async () => {
+      try {
+        // Get existing session first
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+
+        if (existingSession?.user) {
+          const profile = await fetchProfile(existingSession.user.id);
+          if (mounted && profile) {
+            setSession(existingSession);
+            setUser(profileToUser(profile, existingSession.user));
+            setIsDemo(profile.is_demo_account || false);
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    // Start initialization
+    initializeAuth();
+
+    // Set up auth state listener for future changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
+        if (!mounted) return;
+
+        console.log('Auth state changed:', event);
+        
         setSession(newSession);
         
-        // Immediately process auth without setTimeout for faster login
         if (newSession?.user) {
           const profile = await fetchProfile(newSession.user.id);
-          if (profile) {
+          if (mounted && profile) {
             setUser(profileToUser(profile, newSession.user));
             setIsDemo(profile.is_demo_account || false);
           }
-          setIsLoading(false);
         } else {
-          setUser(null);
-          setIsDemo(false);
+          if (mounted) {
+            setUser(null);
+            setIsDemo(false);
+          }
+        }
+
+        // Ensure loading is set to false after auth state change
+        if (mounted) {
           setIsLoading(false);
         }
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
-      setSession(existingSession);
-      if (existingSession?.user) {
-        const profile = await fetchProfile(existingSession.user.id);
-        if (profile) {
-          setUser(profileToUser(profile, existingSession.user));
-          setIsDemo(profile.is_demo_account || false);
-        }
-      }
-      setIsLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [fetchProfile]);
 
   // Fetch events and set up real-time subscription
@@ -322,11 +350,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }).eq('id', data.user.id);
         }
         
-        setIsDemo(true);
         return true;
       }
 
-      setIsDemo(true);
       return !error;
     } catch {
       return false;
