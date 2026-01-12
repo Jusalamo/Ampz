@@ -1045,12 +1045,11 @@ function NotificationModal({ isOpen, onClose, events, selectedEventId }: Notific
 
 export default function EventManager() {
   const navigate = useNavigate();
-  const { user, events, updateEvent, deleteEvent, checkIns, communityComments } = useApp();
+  const { user, events, updateEvent, deleteEvent, communityComments } = useApp();
   const { toast } = useToast();
   
   // Add defensive checks immediately
   const safeEvents = events || [];
-  const safeCheckIns = checkIns || [];
   const safeCommunityComments = communityComments || [];
   
   const [activeTab, setActiveTab] = useState<Tab>('events');
@@ -1107,31 +1106,9 @@ export default function EventManager() {
       ];
     }
     
-    // For production accounts, get real attendees from check-ins
-    if (selectedEventId) {
-      const eventCheckIns = safeCheckIns.filter(checkIn => checkIn.eventId === selectedEventId);
-      return eventCheckIns.map(checkIn => ({
-        id: checkIn.id,
-        name: checkIn.userName || 'Anonymous',
-        email: checkIn.userEmail || '',
-        checkedIn: true,
-        checkInTime: checkIn.timestamp,
-        ticketType: checkIn.ticketType || 'General'
-      }));
-    }
-    
-    // For all events, get all check-ins
-    const allCheckIns = safeCheckIns.filter(checkIn => 
-      userEvents.some(event => event.id === checkIn.eventId)
-    );
-    return allCheckIns.map(checkIn => ({
-      id: checkIn.id,
-      name: checkIn.userName || 'Anonymous',
-      email: checkIn.userEmail || '',
-      checkedIn: true,
-      checkInTime: checkIn.timestamp,
-      ticketType: checkIn.ticketType || 'General'
-    }));
+    // For production accounts, return empty as check-ins are not exposed in context
+    // Real attendee data would need to be fetched separately from the database
+    return [];
   };
 
   const attendees = getRealAttendees();
@@ -1968,7 +1945,7 @@ export default function EventManager() {
                         </div>
                         <div style={{ flex: 1 }}>
                           <p style={{ fontSize: '12px', fontWeight: '500', color: DESIGN.colors.textPrimary }}>
-                            {comment.authorName}
+                            {comment.userName}
                           </p>
                           <p style={{ fontSize: '11px', color: DESIGN.colors.textSecondary }}>
                             {new Date(comment.timestamp).toLocaleDateString()}
@@ -1976,7 +1953,7 @@ export default function EventManager() {
                         </div>
                       </div>
                       <p style={{ fontSize: '13px', color: DESIGN.colors.textSecondary, marginTop: '4px' }}>
-                        {comment.content}
+                        {comment.text}
                       </p>
                     </div>
                   ))}

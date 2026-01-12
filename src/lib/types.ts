@@ -71,6 +71,7 @@ export interface Event {
   attendees: number;
   organizerId: string;
   qrCode: string;
+  qrCodeUrl?: string; // Generated QR code image data URL
   geofenceRadius: number;
   customTheme: string;
   coverImage: string;
@@ -87,6 +88,8 @@ export interface Event {
   updatedAt?: string;
   ticketLink?: string;
   accessCode?: string;
+  webTicketsLink?: string;
+  createdAt?: string;
 }
 
 export interface ConnectionProfile {
