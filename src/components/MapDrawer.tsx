@@ -41,8 +41,9 @@ const DESIGN = {
   }
 };
 
-// Use environment variable for Mapbox token
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg';
+// Use environment variable for Mapbox token - no fallback for security
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+const isMapboxAvailable = !!MAPBOX_TOKEN;
 
 // Type definitions
 interface Coordinates {
@@ -136,6 +137,13 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   // Initialize map immediately on component mount
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
+
+    // Check if Mapbox token is available
+    if (!isMapboxAvailable) {
+      console.warn('VITE_MAPBOX_TOKEN environment variable is not set. Map will not be displayed.');
+      setMapReady(true);
+      return;
+    }
 
     try {
       mapboxgl.accessToken = MAPBOX_TOKEN;

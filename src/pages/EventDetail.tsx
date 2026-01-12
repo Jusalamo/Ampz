@@ -520,8 +520,8 @@ export default function EventDetail() {
     }
     
     if (hasTicket && isLive) {
-      // Check in to event
-      checkInToEvent(event.id);
+      // Check in to event with public visibility
+      checkInToEvent(event.id, true);
       toast({
         title: 'Checked in!',
         description: 'You have successfully checked in to the event.',
