@@ -52,12 +52,12 @@ export default function Auth() {
 
   const redirectTo = validateRedirectPath(searchParams.get('redirect'));
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated - immediate check
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
+    if (isAuthenticated) {
       navigate(redirectTo, { replace: true });
     }
-  }, [isAuthenticated, isLoading, navigate, redirectTo]);
+  }, [isAuthenticated, navigate, redirectTo]);
 
   const validateForm = (): boolean => {
     if (!formData.email || !formData.password) {
