@@ -8,7 +8,6 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    // Add this for development server
     historyApiFallback: true,
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
@@ -17,7 +16,6 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // Add this for production build
   build: {
     outDir: 'dist',
     rollupOptions: {
@@ -25,5 +23,9 @@ export default defineConfig(({ mode }) => ({
         main: path.resolve(__dirname, 'index.html'),
       },
     },
+  },
+  // Define environment variables
+  define: {
+    'process.env.VITE_MAPBOX_TOKEN': JSON.stringify(process.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg'),
   },
 }));
