@@ -2327,15 +2327,16 @@ export default function EventManager() {
             event={actionEvent}
             onConfirm={handleConfirmDelete}
           />
-          
-          <NotificationModal
-            isOpen={notificationModalOpen}
-            onClose={() => setNotificationModalOpen(false)}
-            events={userEvents}
-            selectedEventId={selectedEventId || undefined}
-          />
         </>
       )}
+      
+      {/* Notification Modal - Rendered independently of actionEvent */}
+      <NotificationModal
+        isOpen={notificationModalOpen}
+        onClose={() => setNotificationModalOpen(false)}
+        events={userEvents}
+        selectedEventId={selectedEventId || undefined}
+      />
 
       {/* Add CSS animations for live updates */}
       <style>{`
