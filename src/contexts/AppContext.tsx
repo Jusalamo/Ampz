@@ -175,7 +175,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [isDemo]);
 
-  // Initialize auth state - FIXED VERSION
+  // Initialize auth state - robust and non-blocking (prevents infinite spinners)
   useEffect(() => {
     let mounted = true;
 
@@ -188,65 +188,94 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     if (storedCurrency) setCurrencyState(storedCurrency);
 
-    // Initialize session immediately
-    const initializeAuth = async () => {
-      try {
-        // Get existing session first
-        const { data: { session: existingSession } } = await supabase.auth.getSession();
-        
+    const resolveUserFromSession = (sess: Session | null) => {
+      if (!mounted) return;
+
+      setSession(sess);
+
+      if (!sess?.user) {
+        setUser(null);
+        setIsDemo(false);
+        setIsLoading(false);
+        return;
+      }
+
+      // Immediately set a safe fallback user so routing can proceed instantly.
+      // We then hydrate with the real profile asynchronously.
+      const fallbackProfile = {
+        id: sess.user.id,
+        email: sess.user.email,
+        name:
+          (sess.user.user_metadata as any)?.name ??
+          sess.user.email?.split('@')[0] ??
+          'User',
+        is_demo_account: (sess.user.user_metadata as any)?.is_demo ?? false,
+      };
+
+      setUser(profileToUser(fallbackProfile, sess.user));
+      setIsDemo(!!fallbackProfile.is_demo_account);
+      setIsLoading(false);
+
+      // Hydrate profile without calling the backend inside the auth callback.
+      setTimeout(async () => {
+        const profile = await fetchProfile(sess.user.id);
         if (!mounted) return;
 
-        if (existingSession?.user) {
-          const profile = await fetchProfile(existingSession.user.id);
-          if (mounted && profile) {
-            setSession(existingSession);
-            setUser(profileToUser(profile, existingSession.user));
-            setIsDemo(profile.is_demo_account || false);
-          }
+        if (profile) {
+          setUser(profileToUser(profile, sess.user));
+          setIsDemo(profile.is_demo_account || false);
+          return;
         }
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-      } finally {
-        if (mounted) {
-          setIsLoading(false);
+
+        // Best-effort: create a profile row if missing (avoids "logged in but no app user" states).
+        const { data: created, error } = await supabase
+          .from('profiles')
+          .upsert(
+            {
+              id: sess.user.id,
+              email: sess.user.email,
+              name: fallbackProfile.name,
+              is_demo_account: fallbackProfile.is_demo_account,
+            },
+            { onConflict: 'id' }
+          )
+          .select('*')
+          .single();
+
+        if (!mounted) return;
+        if (!error && created) {
+          setUser(profileToUser(created, sess.user));
+          setIsDemo(created.is_demo_account || false);
         }
-      }
+      }, 0);
     };
 
-    // Start initialization
-    initializeAuth();
+    // Hard stop: never allow the app to be blocked by an infinite loading state.
+    const hardTimeout = window.setTimeout(() => {
+      if (mounted) setIsLoading(false);
+    }, 2000);
 
-    // Set up auth state listener for future changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        if (!mounted) return;
+    // Listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, newSession) => {
+      resolveUserFromSession(newSession);
+    });
 
-        console.log('Auth state changed:', event);
-        
-        setSession(newSession);
-        
-        if (newSession?.user) {
-          const profile = await fetchProfile(newSession.user.id);
-          if (mounted && profile) {
-            setUser(profileToUser(profile, newSession.user));
-            setIsDemo(profile.is_demo_account || false);
-          }
-        } else {
-          if (mounted) {
-            setUser(null);
-            setIsDemo(false);
-          }
-        }
-
-        // Ensure loading is set to false after auth state change
-        if (mounted) {
-          setIsLoading(false);
-        }
-      }
-    );
+    // THEN check for an existing session
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: existingSession } }) => {
+        resolveUserFromSession(existingSession);
+      })
+      .catch(() => {
+        if (mounted) setIsLoading(false);
+      })
+      .finally(() => {
+        window.clearTimeout(hardTimeout);
+      });
 
     return () => {
       mounted = false;
+      window.clearTimeout(hardTimeout);
       subscription.unsubscribe();
     };
   }, [fetchProfile]);
