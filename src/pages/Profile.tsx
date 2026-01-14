@@ -16,45 +16,6 @@ import {
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
 import { Switch } from '@/components/ui/switch';
-import { cn } from '@/lib/utils';
-
-// Design Constants from JSON
-const DESIGN = {
-  colors: {
-    primary: '#C4B5FD',
-    lavenderLight: '#E9D5FF',
-    accentPink: '#FFB8E6',
-    background: '#1A1A1A',
-    card: '#2D2D2D',
-    textPrimary: '#FFFFFF',
-    textSecondary: '#B8B8B8',
-    brandRed: '#FF6B6B',
-    brandYellow: '#FFD93D',
-  },
-  typography: {
-    h1: { size: '28px', weight: 'bold', color: '#FFFFFF' },
-    h2: { size: '24px', weight: 'semibold', color: '#1A1A1A' },
-    body: { size: '14px', weight: 'normal', color: '#B8B8B8' },
-    small: { size: '13px', weight: 'medium', color: '#B8B8B8' },
-    caption: { size: '13px', weight: 'semibold', color: '#B8B8B8', transform: 'uppercase' },
-  },
-  borderRadius: {
-    card: '24px',
-    button: '12px',
-    roundButton: '50%',
-    smallPill: '8px',
-  },
-  shadows: {
-    card: '0 8px 32px rgba(0, 0, 0, 0.4)',
-    button: '0 4px 16px rgba(0, 0, 0, 0.3)',
-  },
-  spacing: {
-    default: '16px',
-    cardPadding: '16px',
-    buttonGap: '12px',
-    modalPadding: '20px',
-  }
-};
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -76,11 +37,8 @@ export default function Profile() {
       icon: CreditCard,
       label: 'Subscription',
       value: user?.subscription.tier?.toUpperCase(),
-      gradient: user?.subscription.tier === 'pro' 
-        ? 'from-primary to-lavenderLight' 
-        : user?.subscription.tier === 'max' 
-        ? 'from-primary to-accentPink' 
-        : '',
+      isPro: user?.subscription.tier === 'pro',
+      isMax: user?.subscription.tier === 'max',
     },
     { 
       icon: Shield, 
@@ -100,97 +58,57 @@ export default function Profile() {
   };
 
   return (
-    <div 
-      className="fixed inset-0 overflow-auto"
-      style={{ 
-        background: DESIGN.colors.background,
-        paddingBottom: '80px' // Space for bottom nav
-      }}
-    >
+    <div className="fixed inset-0 overflow-auto bg-background pb-20">
       <div className="px-4 pt-5">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-[28px] font-bold" style={{ color: DESIGN.colors.textPrimary }}>
+          <h1 className="text-2xl font-bold text-foreground">
             Profile
           </h1>
           <button 
             onClick={() => navigate('/settings')}
-            className="w-10 h-10 rounded-full flex items-center justify-center border"
-            style={{
-              background: DESIGN.colors.card,
-              borderColor: DESIGN.colors.card,
-              borderRadius: DESIGN.borderRadius.roundButton,
-            }}
+            className="w-10 h-10 rounded-full flex items-center justify-center bg-card border border-border/20 ampz-transition hover:scale-105 active:scale-95"
           >
-            <Settings className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
+            <Settings className="w-5 h-5 text-foreground" />
           </button>
         </div>
 
         {/* Profile Card */}
-        <div 
-          className="p-6 mb-6 relative overflow-hidden"
-          style={{
-            background: DESIGN.colors.card,
-            borderRadius: DESIGN.borderRadius.card,
-            boxShadow: DESIGN.shadows.card,
-          }}
-        >
-          <div 
-            className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl opacity-20"
-            style={{ background: DESIGN.colors.primary }}
-          />
+        <div className="ampz-card p-6 mb-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl opacity-20 bg-primary" />
           <div className="relative">
             <div className="flex items-center gap-4 mb-4">
               <div className="relative">
                 <img
                   src={user?.profile.profilePhoto}
                   alt={user?.profile.name}
-                  className="w-20 h-20 rounded-full object-cover border-2"
-                  style={{ borderColor: DESIGN.colors.primary }}
+                  className="w-20 h-20 rounded-full object-cover border-2 border-primary"
                 />
                 <button 
                   onClick={() => navigate('/settings/edit-profile')}
-                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{
-                    background: DESIGN.colors.primary,
-                    borderRadius: DESIGN.borderRadius.roundButton,
-                  }}
+                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full flex items-center justify-center bg-primary ampz-transition hover:bg-accent active:scale-95"
                 >
-                  <Edit3 className="w-4 h-4" style={{ color: DESIGN.colors.background }} />
+                  <Edit3 className="w-4 h-4 text-primary-foreground" />
                 </button>
               </div>
               <div className="flex-1 min-w-0">
-                <h2 
-                  className="text-[24px] font-bold truncate"
-                  style={{ color: DESIGN.colors.textPrimary }}
-                >
+                <h2 className="text-2xl font-bold text-foreground truncate">
                   {user?.profile.name}
                 </h2>
-                <p 
-                  className="text-[14px] truncate"
-                  style={{ color: DESIGN.colors.textSecondary }}
-                >
+                <p className="text-sm text-muted-foreground truncate">
                   {user?.profile.location}
                 </p>
                 {user?.subscription.tier !== 'free' && (
-                  <span 
-                    className={`inline-block mt-2 px-3 py-1 text-[11px] font-semibold rounded-full ${
-                      user?.subscription.tier === 'pro' 
-                        ? 'bg-gradient-to-r from-primary to-lavenderLight' 
-                        : 'bg-gradient-to-r from-primary to-accentPink'
-                    }`}
-                    style={{ color: DESIGN.colors.background }}
-                  >
+                  <span className={`inline-block mt-2 px-3 py-1 text-xs font-semibold rounded-full text-primary-foreground ${
+                    user?.subscription.tier === 'pro' ? 'gradient-pro' : 'gradient-max'
+                  }`}>
                     {user?.subscription.tier?.toUpperCase()}
                   </span>
                 )}
               </div>
             </div>
             {user?.profile.bio && (
-              <p 
-                className="text-[14px] mb-4 line-clamp-2"
-                style={{ color: DESIGN.colors.textSecondary }}
-              >
+              <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
                 {user?.profile.bio}
               </p>
             )}
@@ -198,12 +116,7 @@ export default function Profile() {
               {user?.profile.interests.slice(0, 5).map((interest) => (
                 <span
                   key={interest}
-                  className="px-3 py-1 text-[12px] font-medium rounded-full"
-                  style={{
-                    background: `${DESIGN.colors.primary}20`,
-                    color: DESIGN.colors.primary,
-                    borderRadius: DESIGN.borderRadius.smallPill,
-                  }}
+                  className="px-3 py-1 text-xs font-medium rounded-ampz-sm bg-primary/20 text-primary"
                 >
                   {interest}
                 </span>
@@ -217,27 +130,13 @@ export default function Profile() {
           {stats.map(({ icon: Icon, value, label }) => (
             <div 
               key={label} 
-              className="p-4 text-center"
-              style={{
-                background: DESIGN.colors.card,
-                borderRadius: DESIGN.borderRadius.card,
-                boxShadow: DESIGN.shadows.card,
-              }}
+              className="ampz-card p-4 text-center"
             >
-              <Icon 
-                className="w-5 h-5 mx-auto mb-2" 
-                style={{ color: DESIGN.colors.primary }} 
-              />
-              <p 
-                className="text-[24px] font-bold mb-1"
-                style={{ color: DESIGN.colors.textPrimary }}
-              >
+              <Icon className="w-5 h-5 mx-auto mb-2 text-primary" />
+              <p className="text-2xl font-bold text-foreground mb-1">
                 {value}
               </p>
-              <p 
-                className="text-[12px]"
-                style={{ color: DESIGN.colors.textSecondary }}
-              >
+              <p className="text-xs text-muted-foreground">
                 {label}
               </p>
             </div>
@@ -245,24 +144,14 @@ export default function Profile() {
         </div>
 
         {/* Theme Toggle */}
-        <div 
-          className="p-4 flex items-center justify-between mb-4"
-          style={{
-            background: DESIGN.colors.card,
-            borderRadius: DESIGN.borderRadius.card,
-            boxShadow: DESIGN.shadows.card,
-          }}
-        >
+        <div className="ampz-card p-4 flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             {theme === 'dark' ? (
-              <Moon className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+              <Moon className="w-5 h-5 text-primary" />
             ) : (
-              <Sun className="w-5 h-5" style={{ color: DESIGN.colors.brandYellow }} />
+              <Sun className="w-5 h-5 text-brand-yellow" />
             )}
-            <span 
-              className="font-medium"
-              style={{ color: DESIGN.colors.textPrimary }}
-            >
+            <span className="font-medium text-foreground">
               Dark Mode
             </span>
           </div>
@@ -271,43 +160,29 @@ export default function Profile() {
 
         {/* Menu Items */}
         <div className="space-y-3 mb-6">
-          {menuItems.map(({ icon: Icon, label, value, gradient, onClick }) => (
+          {menuItems.map(({ icon: Icon, label, value, isPro, isMax, onClick }) => (
             <button
               key={label}
               onClick={onClick}
-              className="w-full p-4 flex items-center justify-between border border-transparent transition-all hover:scale-[1.02]"
-              style={{
-                background: DESIGN.colors.card,
-                borderRadius: DESIGN.borderRadius.card,
-                boxShadow: DESIGN.shadows.card,
-              }}
+              className="w-full ampz-card p-4 flex items-center justify-between ampz-interactive"
             >
               <div className="flex items-center gap-3">
-                <Icon className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
-                <span 
-                  className="font-medium"
-                  style={{ color: DESIGN.colors.textPrimary }}
-                >
+                <Icon className="w-5 h-5 text-primary" />
+                <span className="font-medium text-foreground">
                   {label}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 {value && (
-                  <span 
-                    className={`px-3 py-1 text-[11px] font-semibold rounded-full ${gradient || ''}`}
-                    style={{
-                      background: gradient ? undefined : DESIGN.colors.card,
-                      color: gradient ? DESIGN.colors.background : DESIGN.colors.textPrimary,
-                      borderRadius: DESIGN.borderRadius.smallPill,
-                    }}
-                  >
+                  <span className={`px-3 py-1 text-xs font-semibold rounded-ampz-sm ${
+                    isPro ? 'gradient-pro text-primary-foreground' : 
+                    isMax ? 'gradient-max text-foreground' : 
+                    'bg-card text-foreground'
+                  }`}>
                     {value}
                   </span>
                 )}
-                <ChevronRight 
-                  className="w-5 h-5" 
-                  style={{ color: DESIGN.colors.textSecondary }} 
-                />
+                <ChevronRight className="w-5 h-5 text-muted-foreground" />
               </div>
             </button>
           ))}
@@ -316,13 +191,7 @@ export default function Profile() {
         {/* Logout */}
         <button
           onClick={handleLogout}
-          className="w-full p-4 flex items-center justify-center gap-3 border border-transparent transition-all hover:scale-[1.02]"
-          style={{
-            background: DESIGN.colors.card,
-            borderRadius: DESIGN.borderRadius.card,
-            boxShadow: DESIGN.shadows.card,
-            color: DESIGN.colors.brandRed,
-          }}
+          className="w-full ampz-card p-4 flex items-center justify-center gap-3 text-destructive ampz-interactive"
         >
           <LogOut className="w-5 h-5" />
           <span className="font-medium">Log Out</span>
