@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Open+Sans&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&display=swap");
 @tailwind base;
@@ -6,15 +6,30 @@
 @tailwind utilities;
 
 /* =========================================================
-   ROOT DESIGN TOKENS
+   AMPZ DESIGN SYSTEM TOKENS v1.0.0
+   Pure, centralized design system. No one-off styles.
    ========================================================= */
 @layer base {
   :root {
-    /* Brand Colors */
+    /* ===== AMPZ RADIUS TOKENS (ONLY THESE VALUES ALLOWED) ===== */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --radius: 12px;
+
+    /* ===== AMPZ ACCENT COLORS (IDENTICAL ACROSS MODES) ===== */
+    --ampz-accent-primary: 262 97% 45%;
+    --ampz-accent-active: 250 100% 65%;
+
+    /* ===== AMPZ MOTION TIMING ===== */
+    --motion-hover: 130ms;
+    --motion-press: 100ms;
+    --motion-easing: ease-out;
+
+    /* ===== BRAND COLORS (FIXED IDENTITY) ===== */
     --brand-purple: 263 70% 50%;
     --brand-pink: 330 81% 60%;
     --brand-orange: 25 95% 53%;
-
     --brand-blue: 217 91% 60%;
     --brand-teal: 174 72% 40%;
     --brand-green: 160 84% 39%;
@@ -22,130 +37,148 @@
     --brand-red: 0 84% 60%;
     --brand-gold: 36 77% 84%;
 
-    /* Dark Mode Default */
-    --background: 264 31% 88%;
-    --background-secondary: 0 0% 4%;
-    --background-tertiary: 0 0% 9%;
-    --foreground: 240 5% 10%;
-
-    --card: 0 0% 98%;
-    --card-foreground: 240 5% 10%;
-
-    --primary: 258 89% 66%;
-    --primary-foreground: 250 100% 97%;
-
-    --muted: 240 4% 83%;
-    --muted-foreground: 240 5% 10%;
-
-    --border: 240 4% 83%;
-    --ring: 258 89% 66%;
-
-    --radius: 1.5rem;
-
-    /* Layout */
+    /* ===== LAYOUT ===== */
     --header-height: 64px;
     --nav-height: 72px;
+    --spacing: 0.25rem;
+
+    /* ===== FONT FAMILIES ===== */
+    --font-sans: "Open Sans", ui-sans-serif, system-ui, sans-serif;
+    --font-serif: 'Cormorant Garamond', ui-serif, Georgia, serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+
+  /* ===== LIGHT MODE (Default) ===== */
+  :root {
+    --background: 0 0% 100%;
+    --background-secondary: 268 27% 93%;
+    --background-tertiary: 268 20% 96%;
+    --foreground: 240 6% 7%;
+
+    --card: 268 27% 93%;
+    --card-foreground: 240 6% 7%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 7%;
+
+    --primary: 262 97% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 268 20% 90%;
+    --secondary-foreground: 240 6% 7%;
+
+    --muted: 268 15% 85%;
+    --muted-foreground: 240 4% 42%;
+
+    --accent: 250 100% 65%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 268 15% 80%;
+    --input: 268 15% 80%;
+    --ring: 262 97% 45%;
+
+    /* Semantic text colors */
+    --text-primary: 240 6% 7%;
+    --text-secondary: 240 4% 42%;
+    --text-muted: 240 3% 56%;
+    --text-disabled: 240 3% 56%;
+
+    /* Surface for cards/panels */
+    --surface: 268 27% 93%;
 
     /* Shadows */
-    --shadow-card: 0 20px 60px rgba(0, 0, 0, 0.45);
-    --shadow-glow: 0 0 30px hsl(var(--brand-purple) / 0.4);
-    --popover: 240 5% 90%;
-    --popover-foreground: 240 5% 10%;
-    --secondary: 240 5% 33%;
-    --secondary-foreground: 0 0% 98%;
-    --accent: 269 100% 98%;
-    --accent-foreground: 270 91% 65%;
-    --destructive: 0 72% 50%;
-    --destructive-foreground: 0 85% 97%;
-    --input: 240 4% 83%;
-    --chart-1: 255 91% 76%;
-    --chart-2: 270 95% 75%;
-    --chart-3: 234 89% 73%;
-    --chart-4: 258 89% 66%;
-    --chart-5: 240 3% 46%;
-    --sidebar: 0 0% 98%;
-    --sidebar-foreground: 240 5% 10%;
-    --sidebar-primary: 258 89% 66%;
-    --sidebar-primary-foreground: 250 100% 97%;
-    --sidebar-accent: 240 5% 33%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 4% 83%;
-    --sidebar-ring: 258 89% 66%;
-    --font-sans: "Open Sans", ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
-    --font-serif: 'Cormorant Garamond', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
-    --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
-    --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
-    --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
-    --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
-    --tracking-normal: 0em;
-    --spacing: 0.25rem;
+    --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
+    --shadow-button: 0 2px 8px rgba(0, 0, 0, 0.06);
+    --shadow-glow: 0 4px 20px hsl(262 97% 45% / 0.15);
+
+    /* Chart colors */
+    --chart-1: 262 97% 45%;
+    --chart-2: 250 100% 65%;
+    --chart-3: 330 81% 60%;
+    --chart-4: 217 91% 60%;
+    --chart-5: 160 84% 39%;
+
+    /* Sidebar */
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 240 6% 7%;
+    --sidebar-primary: 262 97% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 268 27% 93%;
+    --sidebar-accent-foreground: 240 6% 7%;
+    --sidebar-border: 268 15% 80%;
+    --sidebar-ring: 262 97% 45%;
   }
 
-  .light {
-    --background: 0 0% 100%;
-    --background-secondary: 0 0% 98%;
-    --background-tertiary: 0 0% 96%;
-    --foreground: 0 0% 9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
-
-    --border: 0 0% 88%;
-
-    --shadow-card: 0 4px 14px rgba(0, 0, 0, 0.08);
-    --shadow-glow: 0 4px 20px hsl(var(--brand-purple) / 0.15);
-  }
+  /* ===== DARK MODE ===== */
   .dark {
-    --background: 277 83% 4%;
-    --foreground: 0 0% 98%;
-    --card: 240 3.7037% 15.8824%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 5% 26%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 262 83.2558% 57.8431%;
-    --primary-foreground: 214 31.8182% 91.3725%;
-    --secondary: 215 13.7931% 34.1176%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3% 46%;
-    --muted-foreground: 0 0% 98%;
-    --accent: 258 89.5349% 66.2745%;
-    --accent-foreground: 210 40% 96.0784%;
+    --background: 240 6% 7%;
+    --background-secondary: 240 5% 12%;
+    --background-tertiary: 240 4% 16%;
+    --foreground: 0 0% 100%;
+
+    --card: 240 5% 12%;
+    --card-foreground: 0 0% 100%;
+
+    --popover: 240 5% 12%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 262 97% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 4% 20%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 240 4% 25%;
+    --muted-foreground: 0 0% 69%;
+
+    --accent: 250 100% 65%;
+    --accent-foreground: 0 0% 100%;
+
     --destructive: 0 84% 60%;
-    --destructive-foreground: 0 85% 97%;
-    --border: 240 5% 33%;
-    --input: 240 5% 33%;
-    --ring: 258 89.5349% 66.2745%;
-    --chart-1: 252 94% 85%;
-    --chart-2: 269 97% 85%;
-    --chart-3: 229 93% 81%;
-    --chart-4: 255 91% 76%;
-    --chart-5: 240 3% 46%;
-    --sidebar: 240 3% 15%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 255 91% 76%;
-    --sidebar-primary-foreground: 261 72% 22%;
-    --sidebar-accent: 270 95% 75%;
-    --sidebar-accent-foreground: 273 86% 20%;
-    --sidebar-border: 240 5% 33%;
-    --sidebar-ring: 255 91% 76%;
-    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-sm: 0px 4px 0px -2px hsla(0, 0%, 0%, 0.45);
-    --shadow: 0px 4px 0px -2px hsla(0, 0%, 0%, 0.45);
-    --shadow-md: 0px 4px 0px -2px hsla(0, 0%, 0%, 0.45);
-    --shadow-lg: 0px 4px 0px -2px hsla(0, 0%, 0%, 0.45);
-    --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
-    --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 4% 20%;
+    --input: 240 4% 20%;
+    --ring: 262 97% 45%;
+
+    /* Semantic text colors */
+    --text-primary: 0 0% 100%;
+    --text-secondary: 0 0% 69%;
+    --text-muted: 0 0% 56%;
+    --text-disabled: 0 0% 56%;
+
+    /* Surface for cards/panels */
+    --surface: 240 5% 12%;
+
+    /* Shadows */
+    --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --shadow-button: 0 4px 16px rgba(0, 0, 0, 0.3);
+    --shadow-glow: 0 0 30px hsl(262 97% 45% / 0.4);
+
+    /* Chart colors */
+    --chart-1: 262 97% 55%;
+    --chart-2: 250 100% 70%;
+    --chart-3: 330 81% 65%;
+    --chart-4: 217 91% 65%;
+    --chart-5: 160 84% 45%;
+
+    /* Sidebar */
+    --sidebar: 240 5% 12%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 262 97% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 4% 20%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 240 4% 20%;
+    --sidebar-ring: 262 97% 55%;
   }
 }
 
 /* =========================================================
-   GLOBAL RESET & SCROLL MODEL (FIXES iOS + CLIPPING)
+   GLOBAL RESET & SCROLL MODEL
    ========================================================= */
 @layer base {
   *,
@@ -162,8 +195,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI',
-      Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family: var(--font-sans);
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-font-smoothing: antialiased;
@@ -179,7 +211,6 @@
    APP SHELL (RESPONSIVE FOUNDATION)
    ========================================================= */
 @layer components {
-  /* Full-width shell */
   .app-shell {
     width: 100%;
     min-height: 100dvh;
@@ -187,7 +218,6 @@
     justify-content: center;
   }
 
-  /* Content containers */
   .content-mobile {
     width: 100%;
     max-width: 480px;
@@ -203,7 +233,6 @@
     max-width: 1200px;
   }
 
-  /* Adaptive container selector */
   .content-container {
     width: 100%;
     padding-inline: 16px;
@@ -223,19 +252,88 @@
 }
 
 /* =========================================================
-   CARDS & SURFACES
+   AMPZ COMPONENT CLASSES
    ========================================================= */
 @layer components {
-  .glass-card {
-    background-color: hsl(var(--card) / 0.85);
-    backdrop-filter: blur(14px);
-    border: 1px solid hsl(var(--border));
-    border-radius: 1rem;
+  /* Card with glass effect */
+  .ampz-card {
+    @apply bg-card border border-border/20;
+    border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
   }
 
-  .light .glass-card {
-    background-color: hsl(var(--card));
+  .ampz-card-inner {
+    border-radius: var(--radius-md);
+  }
+
+  /* Surface container */
+  .ampz-surface {
+    background-color: hsl(var(--surface));
+    border-radius: var(--radius-lg);
+  }
+
+  /* Glass effect */
+  .glass-card {
+    background-color: hsl(var(--card) / 0.85);
+    backdrop-filter: blur(14px);
+    border: 1px solid hsl(var(--border) / 0.2);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Button transitions following AMPZ motion */
+  .ampz-transition {
+    transition: all var(--motion-hover) var(--motion-easing);
+  }
+
+  .ampz-transition-press {
+    transition: all var(--motion-press) var(--motion-easing);
+  }
+
+  /* Interactive states */
+  .ampz-interactive {
+    @apply ampz-transition;
+  }
+
+  .ampz-interactive:hover {
+    @apply scale-[1.02];
+  }
+
+  .ampz-interactive:active {
+    @apply scale-[0.98];
+    transition-duration: var(--motion-press);
+  }
+
+  /* Primary button */
+  .ampz-btn-primary {
+    @apply bg-primary text-primary-foreground font-medium ampz-transition;
+    border-radius: var(--radius-md);
+  }
+
+  .ampz-btn-primary:hover {
+    background-color: hsl(var(--ampz-accent-active));
+  }
+
+  .ampz-btn-primary:active {
+    @apply scale-[0.98];
+    background-color: hsl(var(--ampz-accent-active));
+    transition-duration: var(--motion-press);
+  }
+
+  /* Secondary button */
+  .ampz-btn-secondary {
+    @apply bg-secondary text-secondary-foreground font-medium ampz-transition;
+    border-radius: var(--radius-md);
+  }
+
+  /* Ghost button */
+  .ampz-btn-ghost {
+    @apply bg-transparent text-foreground font-medium ampz-transition;
+    border-radius: var(--radius-md);
+  }
+
+  .ampz-btn-ghost:hover {
+    @apply bg-muted;
   }
 }
 
@@ -263,10 +361,37 @@
     background-clip: text;
     color: transparent;
   }
+
+  .gradient-primary {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--primary)),
+      hsl(var(--accent))
+    );
+  }
+
+  /* Pro badge gradient */
+  .gradient-pro {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--brand-purple)),
+      hsl(var(--brand-pink))
+    );
+  }
+
+  /* Max badge gradient */
+  .gradient-max {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--brand-yellow)),
+      hsl(var(--brand-orange)),
+      hsl(var(--brand-gold))
+    );
+  }
 }
 
 /* =========================================================
-   MAP LAYOUT (MOBILE → DESKTOP SAFE)
+   MAP LAYOUT
    ========================================================= */
 @layer components {
   .map-container {
@@ -283,7 +408,7 @@
 }
 
 /* =========================================================
-   CHAT SCROLL REGION (ONLY PLACE WITH INTERNAL SCROLL)
+   CHAT SCROLL REGION
    ========================================================= */
 @layer components {
   .chat-scroll {
@@ -306,9 +431,7 @@
   }
 
   .pb-nav {
-    padding-bottom: calc(
-      var(--nav-height) + env(safe-area-inset-bottom)
-    );
+    padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
   }
 }
 
@@ -354,5 +477,22 @@
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  /* Text color utilities using semantic tokens */
+  .text-primary-content {
+    color: hsl(var(--text-primary));
+  }
+
+  .text-secondary-content {
+    color: hsl(var(--text-secondary));
+  }
+
+  .text-muted-content {
+    color: hsl(var(--text-muted));
+  }
+
+  .text-disabled-content {
+    color: hsl(var(--text-disabled));
   }
 }

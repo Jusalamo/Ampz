@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { QrCode, Map, Plus, Ticket, Calendar, Users, Heart, ChevronRight, ChevronLeft, Bell, Zap, Bookmark, Star, Settings } from 'lucide-react';
+import { QrCode, Map, Plus, Ticket, Calendar, Users, Heart, ChevronRight, Bell, Zap, Bookmark, Star, Settings } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
 import { CheckInModal } from '@/components/modals/CheckInModal';
@@ -10,31 +10,6 @@ import { SubscriptionModal } from '@/components/modals/SubscriptionModal';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-
-// Design Constants
-const DESIGN = {
-  colors: {
-    primary: '#C4B5FD',
-    lavenderLight: '#E9D5FF',
-    accentPink: '#FFB8E6',
-    background: '#1A1A1A',
-    card: '#2D2D2D',
-    textPrimary: '#FFFFFF',
-    textSecondary: '#B8B8B8'
-  },
-  spacing: {
-    default: '16px',
-    cardPadding: '16px',
-    buttonGap: '12px',
-    sectionSpacing: '24px'
-  },
-  borderRadius: {
-    card: '24px',
-    button: '12px',
-    roundButton: '50%',
-    smallPill: '8px'
-  }
-};
 
 export default function Home() {
   const navigate = useNavigate();
@@ -86,7 +61,6 @@ export default function Home() {
   useEffect(() => {
     if (myEventsCarouselRef.current && myEvents?.length > 0) {
       const container = myEventsCarouselRef.current;
-      const cardWidth = (container.offsetWidth - 12) / 2;
       container.scrollTo({
         left: myEventsIndex * container.offsetWidth,
         behavior: 'smooth',
@@ -129,28 +103,28 @@ export default function Home() {
     { 
       icon: QrCode, 
       label: 'QR Scan', 
-      color: 'bg-purple-500', 
+      colorClass: 'bg-brand-purple', 
       onClick: () => setShowCheckIn(true),
       pro: false
     },
     { 
       icon: Plus, 
       label: 'Create Event', 
-      color: 'bg-pink-500', 
+      colorClass: 'bg-brand-pink', 
       onClick: handleCreateEvent, 
       pro: !isProUser
     },
     { 
       icon: Settings, 
       label: 'Manage Events', 
-      color: 'bg-orange-500', 
+      colorClass: 'bg-brand-orange', 
       onClick: handleManageEvents,
       pro: !isProUser
     },
     { 
       icon: Ticket, 
       label: 'Tickets', 
-      color: 'bg-green-500', 
+      colorClass: 'bg-brand-green', 
       onClick: () => setShowTickets(true),
       pro: false
     },
@@ -162,22 +136,19 @@ export default function Home() {
       icon: Calendar, 
       value: myEvents.length, 
       label: 'My Events',
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/10'
+      colorClass: 'text-brand-blue'
     },
     { 
       icon: Users, 
       value: user?.subscription?.tier === 'free' ? 2 : 12, 
       label: 'Matches',
-      color: 'text-green-500',
-      bgColor: 'bg-green-500/10'
+      colorClass: 'text-brand-green'
     },
     { 
       icon: Heart, 
       value: user?.subscription?.tier === 'free' ? (user?.likesRemaining ?? 10) : '∞', 
       label: 'Likes Left',
-      color: 'text-pink-500',
-      bgColor: 'bg-pink-500/10'
+      colorClass: 'text-brand-pink'
     },
   ];
 
@@ -185,77 +156,36 @@ export default function Home() {
   const itemsPerSlide = 2;
   const totalMyEventsSlides = Math.ceil(myEvents.length / itemsPerSlide);
 
-  // Handle my events carousel navigation
-  const handleMyEventsPrev = () => {
-    setMyEventsIndex(prev => (prev - 1 + totalMyEventsSlides) % totalMyEventsSlides);
-  };
-
-  const handleMyEventsNext = () => {
-    setMyEventsIndex(prev => (prev + 1) % totalMyEventsSlides);
-  };
-
-  // Handle featured events navigation
-  const handleFeaturedPrev = () => {
-    setFeaturedIndex(prev => (prev - 1 + featuredEvents.length) % featuredEvents.length);
-  };
-
-  const handleFeaturedNext = () => {
-    setFeaturedIndex(prev => (prev + 1) % featuredEvents.length);
-  };
-
   return (
-    <div 
-      className="min-h-screen pb-20"
-      style={{ background: DESIGN.colors.background, color: DESIGN.colors.textPrimary }}
-    >
+    <div className="min-h-screen pb-20 bg-background text-foreground">
       {/* Header - Fixed size with larger logo */}
       <header 
         className={cn(
-          'fixed top-0 left-0 right-0 z-50 transition-transform duration-300 backdrop-blur-xl h-16 flex items-center',
+          'fixed top-0 left-0 right-0 z-50 ampz-transition backdrop-blur-xl h-16 flex items-center bg-background/95 border-b border-border/20',
           isHeaderHidden ? '-translate-y-full' : 'translate-y-0'
         )}
-        style={{ 
-          background: `${DESIGN.colors.background}95`,
-          borderBottom: `1px solid ${DESIGN.colors.textSecondary}20`
-        }}
       >
         <div className="container mx-auto px-4 w-full">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div 
-                className="w-10 h-10 rounded-lg flex items-center justify-center"
-                style={{ background: DESIGN.colors.primary }}
-              >
-                <Zap className="w-5 h-5" style={{ color: DESIGN.colors.background }} />
+              <div className="w-10 h-10 rounded-ampz-md flex items-center justify-center bg-primary">
+                <Zap className="w-5 h-5 text-primary-foreground" />
               </div>
               <span className="text-2xl font-bold tracking-tight">Ampz</span>
             </div>
             <div className="flex items-center gap-3">
               {user?.subscription?.tier !== 'free' && (
-                <span 
-                  className="px-3 py-1 text-xs font-bold rounded-full uppercase"
-                  style={{ 
-                    background: DESIGN.colors.primary,
-                    color: DESIGN.colors.background
-                  }}
-                >
+                <span className="px-3 py-1 text-xs font-bold rounded-full uppercase bg-primary text-primary-foreground">
                   {user?.subscription?.tier}
                 </span>
               )}
               <button
                 onClick={() => navigate('/activity')}
-                className="relative w-10 h-10 rounded-full flex items-center justify-center transition-colors"
-                style={{ 
-                  background: DESIGN.colors.card,
-                  border: `1px solid ${DESIGN.colors.textSecondary}20`
-                }}
+                className="relative w-10 h-10 rounded-full flex items-center justify-center bg-card border border-border/20 ampz-transition hover:scale-105 active:scale-95"
               >
-                <Bell className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
+                <Bell className="w-5 h-5 text-foreground" />
                 {unreadNotificationsCount > 0 && (
-                  <span 
-                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center"
-                    style={{ background: '#EF4444', color: '#FFFFFF' }}
-                  >
+                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center bg-destructive text-destructive-foreground">
                     {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
                   </span>
                 )}
@@ -270,10 +200,7 @@ export default function Home() {
         {/* Welcome Section */}
         <div className="mb-6">
           <div className="flex items-center gap-3">
-            <div 
-              className="w-12 h-12 rounded-full overflow-hidden border-2"
-              style={{ borderColor: DESIGN.colors.primary }}
-            >
+            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary">
               <img 
                 src={user?.profile?.profilePhoto || '/default-avatar.png'} 
                 alt={user?.profile?.name || 'User'} 
@@ -284,7 +211,7 @@ export default function Home() {
               />
             </div>
             <div>
-              <p className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
+              <p className="text-sm text-muted-foreground">
                 Welcome back
               </p>
               <h1 className="text-xl font-bold">
@@ -296,21 +223,16 @@ export default function Home() {
 
         {/* Stats Grid - Compact Squares */}
         <div className="grid grid-cols-3 gap-2 mb-6">
-          {stats.map(({ icon: Icon, value, label, color, bgColor }) => (
+          {stats.map(({ icon: Icon, value, label, colorClass }) => (
             <div 
               key={label} 
-              className="rounded-xl p-3 text-center"
-              style={{ 
-                background: DESIGN.colors.card,
-                border: `1px solid ${DESIGN.colors.textSecondary}20`,
-                borderRadius: DESIGN.borderRadius.card
-              }}
+              className="ampz-card p-3 text-center"
             >
-              <Icon className={cn("w-5 h-5 mx-auto mb-1", color)} />
-              <p className="text-lg font-bold" style={{ color: DESIGN.colors.textPrimary }}>
+              <Icon className={cn("w-5 h-5 mx-auto mb-1", colorClass)} />
+              <p className="text-lg font-bold text-foreground">
                 {value}
               </p>
-              <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+              <p className="text-xs text-muted-foreground">
                 {label}
               </p>
             </div>
@@ -321,34 +243,20 @@ export default function Home() {
         <div className="mb-8">
           <h2 className="text-lg font-bold mb-3">Quick Actions</h2>
           <div className="grid grid-cols-2 gap-3">
-            {quickActions.map(({ icon: Icon, label, color, onClick, pro }) => (
+            {quickActions.map(({ icon: Icon, label, colorClass, onClick, pro }) => (
               <button 
                 key={label} 
                 onClick={onClick}
-                className="rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition-all relative group active:scale-95"
-                style={{ 
-                  background: DESIGN.colors.card,
-                  border: `1px solid ${DESIGN.colors.textSecondary}20`,
-                  borderRadius: DESIGN.borderRadius.card
-                }}
+                className="ampz-card p-4 flex flex-col items-center justify-center gap-2 relative ampz-interactive"
               >
-                <div 
-                  className={cn("w-12 h-12 rounded-xl flex items-center justify-center", color)}
-                  style={{ borderRadius: DESIGN.borderRadius.card }}
-                >
+                <div className={cn("w-12 h-12 rounded-ampz-lg flex items-center justify-center", colorClass)}>
                   <Icon className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-sm font-medium" style={{ color: DESIGN.colors.textPrimary }}>
+                <span className="text-sm font-medium text-foreground">
                   {label}
                 </span>
                 {pro && (
-                  <span 
-                    className="absolute top-2 right-2 px-1.5 py-0.5 text-xs font-bold rounded"
-                    style={{ 
-                      background: DESIGN.colors.primary,
-                      color: DESIGN.colors.background
-                    }}
-                  >
+                  <span className="absolute top-2 right-2 px-1.5 py-0.5 text-xs font-bold rounded-ampz-sm bg-primary text-primary-foreground">
                     PRO
                   </span>
                 )}
@@ -361,12 +269,7 @@ export default function Home() {
         <div className="mb-8">
           <button 
             onClick={() => navigate('/events')}
-            className="w-full text-white rounded-xl p-4 flex items-center justify-center gap-3 transition-all active:scale-98"
-            style={{ 
-              background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
-              border: '1px solid #1E40AF',
-              borderRadius: DESIGN.borderRadius.card
-            }}
+            className="w-full rounded-ampz-lg p-4 flex items-center justify-center gap-3 ampz-interactive bg-brand-blue text-white border border-brand-blue"
           >
             <Map className="w-6 h-6" />
             <span className="text-lg font-bold">Explore Events Map</span>
@@ -379,15 +282,14 @@ export default function Home() {
           <section className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Bookmark className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+                <Bookmark className="w-5 h-5 text-primary" />
                 My Events
               </h2>
               <div className="flex items-center gap-2">
                 {createdEvents.length > 0 && isProUser && (
                   <button 
                     onClick={() => navigate('/event-manager')}
-                    className="text-sm font-medium flex items-center gap-1 hover:underline"
-                    style={{ color: DESIGN.colors.primary }}
+                    className="text-sm font-medium flex items-center gap-1 hover:underline text-primary"
                   >
                     <Settings className="w-4 h-4" />
                     Manage
@@ -395,8 +297,7 @@ export default function Home() {
                 )}
                 <button 
                   onClick={() => navigate('/events')}
-                  className="text-sm font-medium flex items-center gap-1 hover:underline"
-                  style={{ color: DESIGN.colors.primary }}
+                  className="text-sm font-medium flex items-center gap-1 hover:underline text-primary"
                 >
                   See All
                   <ChevronRight className="w-4 h-4" />
@@ -408,7 +309,6 @@ export default function Home() {
               <div 
                 ref={myEventsCarouselRef}
                 className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar"
-                style={{ scrollBehavior: 'smooth' }}
               >
                 {Array.from({ length: totalMyEventsSlides }).map((_, slideIndex) => (
                   <div 
@@ -425,48 +325,34 @@ export default function Home() {
                           return (
                             <div 
                               key={event.id} 
-                              className="rounded-xl overflow-hidden transition-all group cursor-pointer active:scale-98"
-                              style={{ 
-                                background: DESIGN.colors.card,
-                                border: `1px solid ${DESIGN.colors.textSecondary}20`,
-                                borderRadius: DESIGN.borderRadius.card
-                              }}
+                              className="ampz-card overflow-hidden cursor-pointer ampz-interactive"
                               onClick={() => navigate(`/event/${event.id}`)}
                             >
-                              {/* Event Image with Bookmark Badge - Same color as section header */}
+                              {/* Event Image with Bookmark Badge */}
                               <div className="relative h-32">
                                 <img 
                                   src={event.coverImage} 
                                   alt={event.name}
-                                  className="w-full h-full object-cover rounded-t-[20px]"
+                                  className="w-full h-full object-cover rounded-t-ampz-lg"
                                   onError={(e) => {
                                     e.currentTarget.src = '/default-event.jpg';
                                   }}
                                 />
                                 <div className="absolute top-2 right-2">
                                   {isBookmarked && (
-                                    <div 
-                                      className="w-8 h-8 rounded-full flex items-center justify-center"
-                                      style={{ background: DESIGN.colors.primary }}
-                                    >
+                                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-primary">
                                       <Bookmark className="w-4 h-4 text-white fill-white" />
                                     </div>
                                   )}
                                 </div>
                                 {isCreated && (
                                   <div className="absolute top-2 left-2">
-                                    <div 
-                                      className="px-2 py-1 rounded text-xs font-bold text-white"
-                                      style={{ background: `${DESIGN.colors.primary}90` }}
-                                    >
+                                    <div className="px-2 py-1 rounded-ampz-sm text-xs font-bold text-white bg-primary/90">
                                       CREATED
                                     </div>
                                   </div>
                                 )}
-                                <div 
-                                  className="absolute bottom-2 left-2 text-white text-xs px-2 py-1 rounded"
-                                  style={{ background: 'rgba(0, 0, 0, 0.7)' }}
-                                >
+                                <div className="absolute bottom-2 left-2 text-white text-xs px-2 py-1 rounded-ampz-sm bg-black/70">
                                   {event.attendees || 0} going
                                 </div>
                               </div>
@@ -477,20 +363,14 @@ export default function Home() {
                                   {event.name}
                                 </h3>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                                  <span className="text-xs text-muted-foreground">
                                     {event.category || 'Event'}
                                   </span>
-                                  <span 
-                                    className="text-xs font-semibold px-2 py-0.5 rounded"
-                                    style={{ 
-                                      background: DESIGN.colors.primary,
-                                      color: DESIGN.colors.background
-                                    }}
-                                  >
+                                  <span className="text-xs font-semibold px-2 py-0.5 rounded-ampz-sm bg-primary text-primary-foreground">
                                     {event.price === 0 ? 'FREE' : `N$${event.price}`}
                                   </span>
                                 </div>
-                                <p className="text-xs mt-1 line-clamp-1" style={{ color: DESIGN.colors.textSecondary }}>
+                                <p className="text-xs mt-1 line-clamp-1 text-muted-foreground">
                                   {event.location || 'Location not specified'}
                                 </p>
                               </div>
@@ -502,7 +382,7 @@ export default function Home() {
                 ))}
               </div>
 
-              {/* Carousel Navigation - Removed arrows, kept pills */}
+              {/* Carousel Navigation Pills */}
               {totalMyEventsSlides > 1 && (
                 <div className="flex justify-center gap-1.5 mt-4">
                   {Array.from({ length: totalMyEventsSlides }).map((_, index) => (
@@ -510,16 +390,11 @@ export default function Home() {
                       key={index}
                       onClick={() => setMyEventsIndex(index)}
                       className={cn(
-                        "h-1.5 rounded-full transition-all",
+                        "h-1.5 rounded-full ampz-transition",
                         index === myEventsIndex 
-                          ? "w-4" 
-                          : "w-1.5"
+                          ? "w-4 bg-primary" 
+                          : "w-1.5 bg-muted-foreground"
                       )}
-                      style={{
-                        backgroundColor: index === myEventsIndex 
-                          ? DESIGN.colors.primary 
-                          : DESIGN.colors.textSecondary
-                      }}
                       aria-label={`Go to slide ${index + 1}`}
                     />
                   ))}
@@ -531,39 +406,31 @@ export default function Home() {
           <section className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Bookmark className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+                <Bookmark className="w-5 h-5 text-primary" />
                 My Events
               </h2>
             </div>
-            <div 
-              className="rounded-xl p-8 text-center border border-dashed"
-              style={{ 
-                background: DESIGN.colors.card,
-                borderColor: DESIGN.colors.textSecondary,
-                borderRadius: DESIGN.borderRadius.card
-              }}
-            >
-              <Bookmark className="w-12 h-12 mx-auto mb-3" style={{ color: DESIGN.colors.textSecondary }} />
-              <p style={{ color: DESIGN.colors.textSecondary }}>No events yet</p>
-              <p className="text-sm mt-1" style={{ color: DESIGN.colors.textSecondary }}>
+            <div className="ampz-card p-8 text-center border border-dashed border-muted-foreground">
+              <Bookmark className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+              <p className="text-muted-foreground">No events yet</p>
+              <p className="text-sm mt-1 text-muted-foreground">
                 {isProUser ? 'Create or bookmark events to see them here' : 'Upgrade to Pro to create events'}
               </p>
             </div>
           </section>
         )}
 
-        {/* Featured Events - Carousel (Reduced size by 5%) */}
+        {/* Featured Events - Carousel */}
         {featuredEvents.length > 0 ? (
           <section className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Star className="w-5 h-5" style={{ color: '#FBBF24' }} />
+                <Star className="w-5 h-5 text-brand-yellow" />
                 Featured Events
               </h2>
               <button 
                 onClick={() => navigate('/events')}
-                className="text-sm font-medium flex items-center gap-1 hover:underline"
-                style={{ color: DESIGN.colors.primary }}
+                className="text-sm font-medium flex items-center gap-1 hover:underline text-primary"
               >
                 View All
                 <ChevronRight className="w-4 h-4" />
@@ -574,93 +441,62 @@ export default function Home() {
               <div 
                 ref={featuredRef}
                 className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth no-scrollbar"
-                style={{ scrollBehavior: 'smooth' }}
               >
                 {featuredEvents.map((event) => (
                   <div 
                     key={event.id} 
                     className="flex-shrink-0 w-full snap-start px-1"
                   >
-                    {/* Reduced card size by 5% (scaled down) with rounded top corners */}
                     <div 
-                      className="transition-all cursor-pointer active:scale-98 overflow-hidden"
-                      style={{ 
-                        background: DESIGN.colors.card,
-                        border: `1px solid ${DESIGN.colors.textSecondary}20`,
-                        borderRadius: DESIGN.borderRadius.card,
-                        transform: 'scale(0.95)',
-                        transformOrigin: 'center'
-                      }}
+                      className="ampz-card overflow-hidden cursor-pointer ampz-interactive scale-95"
                       onClick={() => navigate(`/event/${event.id}`)}
                     >
-                      {/* Featured Event Image - Rounded top corners to match card */}
+                      {/* Featured Event Image */}
                       <div className="relative h-44">
                         <img 
                           src={event.coverImage} 
                           alt={event.name}
-                          className="w-full h-full object-cover"
-                          style={{ borderTopLeftRadius: DESIGN.borderRadius.card, borderTopRightRadius: DESIGN.borderRadius.card }}
+                          className="w-full h-full object-cover rounded-t-ampz-lg"
                           onError={(e) => {
                             e.currentTarget.src = '/default-event.jpg';
                           }}
                         />
                         <div className="absolute top-3 right-3">
-                          <div 
-                            className="w-10 h-10 rounded-full flex items-center justify-center"
-                            style={{ 
-                              background: 'rgba(251, 191, 36, 0.9)',
-                              backdropFilter: 'blur(4px)'
-                            }}
-                          >
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-brand-yellow/90 backdrop-blur-sm">
                             <Star className="w-5 h-5 text-black fill-black" />
                           </div>
                         </div>
-                        <div 
-                          className="absolute bottom-3 left-3 text-white text-sm px-3 py-1 rounded"
-                          style={{ background: 'rgba(0, 0, 0, 0.7)' }}
-                        >
+                        <div className="absolute bottom-3 left-3 text-white text-sm px-3 py-1 rounded-ampz-sm bg-black/70">
                           {event.attendees || 0} going
                         </div>
                       </div>
                       
-                      {/* Event Details - Adjusted padding for reduced size */}
+                      {/* Event Details */}
                       <div className="p-3">
                         <div className="flex items-start justify-between mb-2">
                           <h3 className="text-base font-bold line-clamp-1">{event.name}</h3>
-                          <span 
-                            className="text-sm font-semibold px-2 py-0.5 rounded"
-                            style={{ 
-                              background: DESIGN.colors.primary,
-                              color: DESIGN.colors.background
-                            }}
-                          >
+                          <span className="text-sm font-semibold px-2 py-0.5 rounded-ampz-sm bg-primary text-primary-foreground">
                             {event.price === 0 ? 'FREE' : `N$${event.price}`}
                           </span>
                         </div>
                         
                         <div className="flex items-center gap-2 mb-2">
-                          <span 
-                            className="px-2 py-1 text-xs font-medium rounded"
-                            style={{ 
-                              background: `${DESIGN.colors.primary}10`,
-                              color: DESIGN.colors.primary
-                            }}
-                          >
+                          <span className="px-2 py-1 text-xs font-medium rounded-ampz-sm bg-primary/10 text-primary">
                             {event.category || 'Event'}
                           </span>
-                          <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                          <span className="text-xs text-muted-foreground">
                             {event.date || 'TBA'} • {event.time || 'TBA'}
                           </span>
                         </div>
                         
-                        <p className="text-xs line-clamp-2 mb-2" style={{ color: DESIGN.colors.textSecondary }}>
+                        <p className="text-xs line-clamp-2 mb-2 text-muted-foreground">
                           {event.description || 'Join this amazing event!'}
                         </p>
                         
-                        {/* Location only */}
-                        <div className="flex items-center gap-2 pt-2" style={{ borderTop: `1px solid ${DESIGN.colors.textSecondary}20` }}>
-                          <Map className="w-3 h-3" style={{ color: DESIGN.colors.textSecondary }} />
-                          <span className="text-xs line-clamp-1" style={{ color: DESIGN.colors.textSecondary }}>
+                        {/* Location */}
+                        <div className="flex items-center gap-2 pt-2 border-t border-border/20">
+                          <Map className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-xs line-clamp-1 text-muted-foreground">
                             {event.location || 'Location not specified'}
                           </span>
                         </div>
@@ -670,7 +506,7 @@ export default function Home() {
                 ))}
               </div>
 
-              {/* Featured Events Navigation - Removed arrows, kept pills */}
+              {/* Featured Events Navigation Pills */}
               {featuredEvents.length > 1 && (
                 <div className="flex justify-center gap-1.5 mt-4">
                   {featuredEvents.map((_, index) => (
@@ -678,16 +514,11 @@ export default function Home() {
                       key={index}
                       onClick={() => setFeaturedIndex(index)}
                       className={cn(
-                        "h-1.5 rounded-full transition-all",
+                        "h-1.5 rounded-full ampz-transition",
                         index === featuredIndex 
-                          ? "w-4" 
-                          : "w-1.5"
+                          ? "w-4 bg-primary" 
+                          : "w-1.5 bg-muted-foreground"
                       )}
-                      style={{
-                        backgroundColor: index === featuredIndex 
-                          ? DESIGN.colors.primary 
-                          : DESIGN.colors.textSecondary
-                      }}
                       aria-label={`Go to slide ${index + 1}`}
                     />
                   ))}
@@ -699,21 +530,14 @@ export default function Home() {
           <section className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Star className="w-5 h-5" style={{ color: '#FBBF24' }} />
+                <Star className="w-5 h-5 text-brand-yellow" />
                 Featured Events
               </h2>
             </div>
-            <div 
-              className="rounded-xl p-8 text-center border border-dashed"
-              style={{ 
-                background: DESIGN.colors.card,
-                borderColor: DESIGN.colors.textSecondary,
-                borderRadius: DESIGN.borderRadius.card
-              }}
-            >
-              <Star className="w-12 h-12 mx-auto mb-3" style={{ color: DESIGN.colors.textSecondary }} />
-              <p style={{ color: DESIGN.colors.textSecondary }}>No featured events</p>
-              <p className="text-sm mt-1" style={{ color: DESIGN.colors.textSecondary }}>
+            <div className="ampz-card p-8 text-center border border-dashed border-muted-foreground">
+              <Star className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+              <p className="text-muted-foreground">No featured events</p>
+              <p className="text-sm mt-1 text-muted-foreground">
                 Check back later for featured events
               </p>
             </div>
