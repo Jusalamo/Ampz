@@ -93,6 +93,9 @@ export type Database = {
           is_demo: boolean | null
           liked_by: string[] | null
           likes_count: number | null
+          moderated_at: string | null
+          moderated_by: string | null
+          moderation_status: string | null
           reply_to: string | null
           user_id: string | null
         }
@@ -104,6 +107,9 @@ export type Database = {
           is_demo?: boolean | null
           liked_by?: string[] | null
           likes_count?: number | null
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_status?: string | null
           reply_to?: string | null
           user_id?: string | null
         }
@@ -115,6 +121,9 @@ export type Database = {
           is_demo?: boolean | null
           liked_by?: string[] | null
           likes_count?: number | null
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_status?: string | null
           reply_to?: string | null
           user_id?: string | null
         }
@@ -124,6 +133,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_comments_moderated_by_fkey"
+            columns: ["moderated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -151,6 +167,9 @@ export type Database = {
           is_demo: boolean | null
           liked_by: string[] | null
           likes_count: number | null
+          moderated_at: string | null
+          moderated_by: string | null
+          moderation_status: string | null
           user_id: string | null
         }
         Insert: {
@@ -161,6 +180,9 @@ export type Database = {
           is_demo?: boolean | null
           liked_by?: string[] | null
           likes_count?: number | null
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_status?: string | null
           user_id?: string | null
         }
         Update: {
@@ -171,6 +193,9 @@ export type Database = {
           is_demo?: boolean | null
           liked_by?: string[] | null
           likes_count?: number | null
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_status?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -182,8 +207,53 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "community_photos_moderated_by_fkey"
+            columns: ["moderated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "community_photos_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_moderation_actions: {
+        Row: {
+          action: string
+          content_id: string
+          content_type: string
+          created_at: string | null
+          id: string
+          moderator_id: string | null
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          content_id: string
+          content_type: string
+          created_at?: string | null
+          id?: string
+          moderator_id?: string | null
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          content_id?: string
+          content_type?: string
+          created_at?: string | null
+          id?: string
+          moderator_id?: string | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_moderation_actions_moderator_id_fkey"
+            columns: ["moderator_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
