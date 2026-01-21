@@ -32,11 +32,14 @@ export default function Activity() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('all');
 
-  // Mock friend requests
-  const [friendRequests, setFriendRequests] = useState([
-    { id: '1', name: 'Sarah Chen', photo: 'https://i.pravatar.cc/100?img=5', mutualFriends: 3, timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString() },
-    { id: '2', name: 'Mike Johnson', photo: 'https://i.pravatar.cc/100?img=12', mutualFriends: 1, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
-  ]);
+  // Friend requests - will be populated from real data when available
+  const [friendRequests, setFriendRequests] = useState<{
+    id: string;
+    name: string;
+    photo: string;
+    mutualFriends: number;
+    timestamp: string;
+  }[]>([]);
 
   const getIcon = (type: string) => {
     switch (type) {
