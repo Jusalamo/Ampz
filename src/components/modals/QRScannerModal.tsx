@@ -31,6 +31,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const controlsRef = useRef<{ stop: () => void } | null>(null);
+  const isStartingRef = useRef(false);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -110,30 +111,41 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       controlsRef.current = null;
     }
     codeReaderRef.current = null;
+    isStartingRef.current = false;
   }, []);
 
   // Start QR code scanning
   const startScanning = useCallback(async () => {
     if (!videoRef.current) return;
+    if (isStartingRef.current) return;
+    isStartingRef.current = true;
     
     try {
       codeReaderRef.current = new BrowserMultiFormatReader();
+
+      // Prefer the rear/environment camera when available.
+      let preferredDeviceId: string | undefined;
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+        const env = videoInputs.find((d) => /back|rear|environment/i.test(d.label));
+        preferredDeviceId = env?.deviceId || videoInputs[0]?.deviceId;
+      } catch {
+        // ignore; decoder will pick a default device
+      }
       
       controlsRef.current = await codeReaderRef.current.decodeFromVideoDevice(
-        undefined,
+        preferredDeviceId,
         videoRef.current,
         async (result, error) => {
           if (result) {
             stopScanning();
             const code = result.getText();
-            
-            let eventCode = code;
-            if (code.includes('/event/')) {
-              eventCode = code.split('/event/').pop() || code;
-            }
-            
-            setManualCode(eventCode);
-            await handleCodeValidation(eventCode);
+
+            // IMPORTANT: pass the full scanned string into validateQRCode.
+            // It supports both full check-in URLs and legacy access/QR codes.
+            setManualCode(code);
+            await handleCodeValidation(code);
           }
         }
       );
@@ -141,6 +153,8 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       console.error('Camera access error:', err);
       setErrorMessage('Unable to access camera. Please use manual code entry.');
       setStep('code');
+    } finally {
+      isStartingRef.current = false;
     }
   }, [stopScanning, handleCodeValidation]);
 

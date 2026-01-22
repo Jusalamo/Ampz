@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { QrCode, Map, Plus, Ticket, Calendar, Users, Heart, ChevronRight, Bell, Zap, Bookmark, Star, Settings } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
-import { CheckInModal } from '@/components/modals/CheckInModal';
+import { QRScannerModal } from '@/components/modals/QRScannerModal';
 import { TicketsModal } from '@/components/modals/TicketsModal';
 import { EventWizardModal } from '@/components/modals/EventWizardModal';
 import { SubscriptionModal } from '@/components/modals/SubscriptionModal';
@@ -548,7 +548,15 @@ export default function Home() {
       <BottomNav />
 
       {/* Modals */}
-      <CheckInModal isOpen={showCheckIn} onClose={() => setShowCheckIn(false)} />
+      <QRScannerModal
+        isOpen={showCheckIn}
+        onClose={() => setShowCheckIn(false)}
+        userId={user?.id}
+        onCheckInSuccess={() => {
+          // keep UI responsive; navigation happens inside the modal on success
+          setShowCheckIn(false);
+        }}
+      />
       <TicketsModal isOpen={showTickets} onClose={() => setShowTickets(false)} />
       <EventWizardModal isOpen={showEventWizard} onClose={() => setShowEventWizard(false)} />
       <SubscriptionModal isOpen={showSubscription} onClose={() => setShowSubscription(false)} />
