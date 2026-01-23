@@ -41,6 +41,7 @@ import { useApp } from '@/contexts/AppContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Event as EventType } from '@/lib/types';
+import { EditEventModal } from '@/components/modals/EditEventModal';
 
 // Type alias to avoid conflict with DOM Event
 type AppEvent = EventType;
@@ -1062,6 +1063,7 @@ export default function EventManager() {
   // Modal states
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [actionEvent, setActionEvent] = useState<AppEvent | null>(null);
 
   const userEvents = safeEvents.filter(e => e.organizerId === user?.id);
@@ -1143,12 +1145,18 @@ export default function EventManager() {
 
   // Prevent body scrolling when modals are open
   useEffect(() => {
-    if (qrModalOpen || deleteModalOpen || notificationModalOpen) {
+    if (qrModalOpen || deleteModalOpen || notificationModalOpen || editModalOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
     }
-  }, [qrModalOpen, deleteModalOpen, notificationModalOpen]);
+  }, [qrModalOpen, deleteModalOpen, notificationModalOpen, editModalOpen]);
+
+  // Handle edit event - open modal instead of navigating
+  const handleEditEvent = (event: AppEvent) => {
+    setActionEvent(event);
+    setEditModalOpen(true);
+  };
 
   if (!isPro) {
     return (
@@ -1566,7 +1574,7 @@ export default function EventManager() {
                       </button>
                       
                       <button
-                        onClick={() => navigate(`/event/${event.id}/edit`)}
+                        onClick={() => handleEditEvent(event)}
                         style={{
                           height: '40px',
                           padding: '0 8px',
@@ -2336,6 +2344,13 @@ export default function EventManager() {
         onClose={() => setNotificationModalOpen(false)}
         events={userEvents}
         selectedEventId={selectedEventId || undefined}
+      />
+
+      {/* Edit Event Modal */}
+      <EditEventModal
+        isOpen={editModalOpen}
+        onClose={() => { setEditModalOpen(false); setActionEvent(null); }}
+        event={actionEvent}
       />
 
       {/* Add CSS animations for live updates */}
