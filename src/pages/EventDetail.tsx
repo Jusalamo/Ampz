@@ -13,7 +13,7 @@ import { CommunityComments } from '@/components/CommunityComments';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
-// Design Constants
+// Design Constants - Updated with better spacing
 const DESIGN = {
   colors: {
     primary: '#C4B5FD',
@@ -31,7 +31,9 @@ const DESIGN = {
     app: '16px',
     card: '16px',
     button: '12px',
-    modal: '20px'
+    modal: '20px',
+    section: '24px',
+    component: '12px'
   },
   borderRadius: {
     card: '24px',
@@ -617,27 +619,24 @@ export default function EventDetail() {
       className="min-h-screen"
       style={{ background: DESIGN.colors.background }}
     >
-      {/* Fixed Header */}
+      {/* Fixed Header - Cleaner spacing */}
       <header 
         className={cn(
-          'fixed top-0 left-0 right-0 z-40 transition-all duration-300',
+          'fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-4 pt-safe',
           isScrolled 
-            ? 'bg-background/95 backdrop-blur-xl' 
-            : 'bg-transparent'
+            ? 'bg-background/95 backdrop-blur-xl py-2' 
+            : 'bg-transparent py-3'
         )}
         style={{
           background: isScrolled ? `${DESIGN.colors.background}F2` : 'transparent',
           borderBottom: isScrolled ? `1px solid ${DESIGN.colors.textSecondary}20` : 'none'
         }}
       >
-        <div 
-          className="flex items-center justify-between px-4 h-14 pt-safe max-w-app mx-auto"
-          style={{ paddingLeft: DESIGN.spacing.app, paddingRight: DESIGN.spacing.app }}
-        >
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
           <button
             onClick={handleBack}
             className={cn(
-              'w-9 h-9 rounded-full flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2',
+              'w-10 h-10 rounded-full flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2',
               isScrolled 
                 ? 'bg-card hover:bg-card/80' 
                 : 'bg-black/40 backdrop-blur-sm hover:bg-black/60'
@@ -650,12 +649,12 @@ export default function EventDetail() {
             }}
             aria-label="Go back"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
           
           {isScrolled && (
             <h1 
-              className="text-sm font-semibold truncate max-w-[180px]" 
+              className="text-sm font-semibold truncate max-w-[200px] px-4" 
               aria-label={event.name}
               style={{ color: DESIGN.colors.textPrimary }}
             >
@@ -667,7 +666,7 @@ export default function EventDetail() {
             <button 
               onClick={handleShare}
               className={cn(
-                'w-9 h-9 rounded-full flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2',
+                'w-10 h-10 rounded-full flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2',
                 isScrolled 
                   ? 'bg-card hover:bg-card/80' 
                   : 'bg-black/40 backdrop-blur-sm hover:bg-black/60'
@@ -680,12 +679,12 @@ export default function EventDetail() {
               }}
               aria-label="Share event"
             >
-              <Share2 className="w-4 h-4" />
+              <Share2 className="w-5 h-5" />
             </button>
             <button
               onClick={handleBookmark}
               className={cn(
-                'w-9 h-9 rounded-full flex items-center justify-center transition-all focus:outline-none focus:ring-2 focus:ring-offset-2',
+                'w-10 h-10 rounded-full flex items-center justify-center transition-all focus:outline-none focus:ring-2 focus:ring-offset-2',
                 isBookmarked 
                   ? 'bg-primary text-primary-foreground' 
                   : isScrolled 
@@ -700,23 +699,23 @@ export default function EventDetail() {
               }}
               aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark event'}
             >
-              <Bookmark className={cn('w-4 h-4', isBookmarked && 'fill-current')} />
+              <Bookmark className={cn('w-5 h-5', isBookmarked && 'fill-current')} />
             </button>
           </div>
         </div>
       </header>
 
-      {/* Hero Media Section - Fixed height and positioning */}
-      <div className="relative h-64 overflow-hidden">
+      {/* Hero Media Section - YouTube-like aspect ratio (16:9) */}
+      <div className="relative w-full pt-[56.25%] bg-black overflow-hidden">
         {event.mediaType === 'video' && event.videos && event.videos.length > 0 ? (
-          /* Video Player */
-          <div className="relative w-full h-full group">
+          /* Video Player - Fixed aspect ratio */
+          <div className="absolute inset-0 group">
             {/* Video Element */}
             <video
               ref={videoRef}
               src={event.videos[0]}
-              className="w-full h-full object-cover"
-              muted={true} // Always muted by default for autoplay
+              className="absolute inset-0 w-full h-full object-cover"
+              muted={true}
               loop
               playsInline
               preload="auto"
@@ -728,123 +727,161 @@ export default function EventDetail() {
               }}
             />
             
-            {/* Video Controls Overlay - Fixed positioning not to clip */}
-            <div 
-              className="absolute bottom-0 left-0 right-0 p-4 z-20"
-              style={{
-                background: 'linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 100%)',
-                paddingBottom: '24px' // Extra padding to avoid clipping
-              }}
-            >
-              <div className="flex items-center justify-between max-w-2xl mx-auto">
-                <div className="flex items-center gap-2">
+            {/* Video Controls Overlay - YouTube-style */}
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              {/* Bottom controls bar */}
+              <div 
+                className="absolute bottom-0 left-0 right-0"
+                style={{
+                  background: 'linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 100%)',
+                  padding: '16px',
+                  paddingBottom: '32px' // Extra space for better control access
+                }}
+              >
+                <div className="flex items-center justify-between max-w-5xl mx-auto">
+                  <div className="flex items-center gap-3">
+                    {/* Play/Pause Button */}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleVideoPlay();
+                      }}
+                      className="w-11 h-11 rounded-full flex items-center justify-center bg-white/90 hover:bg-white transition-all duration-200 cursor-pointer"
+                      style={{
+                        color: DESIGN.colors.background,
+                        transform: 'scale(1)'
+                      }}
+                      aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
+                    >
+                      {isVideoPlaying ? (
+                        <Pause className="w-5 h-5" />
+                      ) : (
+                        <Play className="w-5 h-5 ml-0.5" />
+                      )}
+                    </button>
+                    
+                    {/* Volume Control */}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleVideoMute();
+                      }}
+                      className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all duration-200 cursor-pointer backdrop-blur-sm"
+                      style={{
+                        color: DESIGN.colors.textPrimary
+                      }}
+                      aria-label={isVideoMuted ? 'Unmute video' : 'Mute video'}
+                    >
+                      {isVideoMuted ? (
+                        <VolumeX className="w-5 h-5" />
+                      ) : (
+                        <Volume2 className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
+                  
+                  {/* Expand Button */}
                   <button
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      toggleVideoPlay();
+                      openVideoModal();
                     }}
-                    className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer relative"
+                    className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all duration-200 cursor-pointer backdrop-blur-sm"
                     style={{
-                      background: 'rgba(255, 255, 255, 0.9)',
-                      color: DESIGN.colors.background,
-                      zIndex: 100
+                      color: DESIGN.colors.textPrimary
                     }}
-                    aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
-                    type="button"
+                    aria-label="Open video in fullscreen"
                   >
-                    {isVideoPlaying ? (
-                      <Pause className="w-5 h-5" />
-                    ) : (
-                      <Play className="w-5 h-5 ml-0.5" />
-                    )}
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      toggleVideoMute();
-                    }}
-                    className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer relative"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.9)',
-                      color: DESIGN.colors.background,
-                      zIndex: 100
-                    }}
-                    aria-label={isVideoMuted ? 'Unmute video' : 'Mute video'}
-                    type="button"
-                  >
-                    {isVideoMuted ? (
-                      <VolumeX className="w-5 h-5" />
-                    ) : (
-                      <Volume2 className="w-5 h-5" />
-                    )}
+                    <Maximize2 className="w-5 h-5" />
                   </button>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openVideoModal();
-                  }}
-                  className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer relative"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    color: DESIGN.colors.background,
-                    zIndex: 100
-                  }}
-                  aria-label="Open video in fullscreen"
-                  type="button"
-                >
-                  <Maximize2 className="w-5 h-5" />
-                </button>
               </div>
             </div>
             
-            {/* Play overlay when video ended */}
-            {isVideoEnded && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-30">
+            {/* Always visible controls on hover state */}
+            <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between pointer-events-none">
+              <div className="pointer-events-auto">
                 <button
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     toggleVideoPlay();
                   }}
-                  className="w-16 h-16 rounded-full flex items-center justify-center cursor-pointer"
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all duration-200 opacity-80 hover:opacity-100 backdrop-blur-sm cursor-pointer"
                   style={{
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    color: DESIGN.colors.background
+                    color: DESIGN.colors.textPrimary
                   }}
-                  aria-label="Replay video"
-                  type="button"
+                  aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
                 >
-                  <Play className="w-8 h-8 ml-1" />
+                  {isVideoPlaying ? (
+                    <Pause className="w-4 h-4" />
+                  ) : (
+                    <Play className="w-4 h-4 ml-0.5" />
+                  )}
                 </button>
               </div>
-            )}
+              
+              <div className="pointer-events-auto">
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openVideoModal();
+                  }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all duration-200 opacity-80 hover:opacity-100 backdrop-blur-sm cursor-pointer"
+                  style={{
+                    color: DESIGN.colors.textPrimary
+                  }}
+                  aria-label="Open video in fullscreen"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
             
             {/* Video Indicator */}
             <div 
-              className="absolute top-3 left-3 px-2 py-1 rounded-full backdrop-blur-sm z-20"
+              className="absolute top-4 left-4 px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-2"
               style={{
-                background: 'rgba(0, 0, 0, 0.6)'
+                background: 'rgba(0, 0, 0, 0.7)'
               }}
             >
-              <div className="flex items-center gap-1">
-                <Film className="w-3 h-3 text-white" />
-                <span className="text-xs text-white">Video</span>
-              </div>
+              <Film className="w-3.5 h-3.5 text-white" />
+              <span className="text-xs text-white font-medium">Video</span>
             </div>
+            
+            {/* Play overlay when video ended */}
+            {isVideoEnded && (
+              <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleVideoPlay();
+                  }}
+                  className="w-16 h-16 rounded-full flex items-center justify-center bg-white hover:bg-white/90 transition-all cursor-pointer group"
+                  style={{
+                    color: DESIGN.colors.background
+                  }}
+                  aria-label="Replay video"
+                >
+                  <Play className="w-8 h-8 ml-1 group-hover:scale-110 transition-transform" />
+                </button>
+              </div>
+            )}
           </div>
         ) : (
-          /* Image Carousel with Auto-rotation */
-          <div className="relative w-full h-full">
+          /* Image Carousel */
+          <div className="absolute inset-0">
             {eventImages && eventImages.length > 0 ? (
               <>
                 <img
                   src={eventImages[currentImageIndex]}
                   alt={`Event image ${currentImageIndex + 1}`}
-                  className="w-full h-full object-cover"
+                  className="absolute inset-0 w-full h-full object-cover"
                   loading="eager"
                   decoding="async"
                   onError={(e) => {
@@ -855,15 +892,16 @@ export default function EventDetail() {
                 {/* Carousel Controls */}
                 {eventImages.length > 1 && (
                   <>
+                    {/* Navigation Buttons */}
                     <button
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         prevImage();
                       }}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 z-10"
+                      className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-all hover:scale-105 active:scale-95 z-10 opacity-80 hover:opacity-100"
                       style={{
-                        background: 'rgba(0, 0, 0, 0.6)',
+                        background: 'rgba(0, 0, 0, 0.7)',
                         color: DESIGN.colors.textPrimary
                       }}
                       aria-label="Previous image"
@@ -876,9 +914,9 @@ export default function EventDetail() {
                         e.stopPropagation();
                         nextImage();
                       }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 active:scale-95 z-10"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-all hover:scale-105 active:scale-95 z-10 opacity-80 hover:opacity-100"
                       style={{
-                        background: 'rgba(0, 0, 0, 0.6)',
+                        background: 'rgba(0, 0, 0, 0.7)',
                         color: DESIGN.colors.textPrimary
                       }}
                       aria-label="Next image"
@@ -886,8 +924,8 @@ export default function EventDetail() {
                       <ChevronRight className="w-5 h-5" />
                     </button>
                     
-                    {/* Carousel Dots */}
-                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+                    {/* Carousel Dots - YouTube-style */}
+                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-10">
                       {eventImages.map((_, index) => (
                         <button
                           key={index}
@@ -899,10 +937,10 @@ export default function EventDetail() {
                             setTimeout(() => startCarouselRotation(), 3000);
                           }}
                           className={cn(
-                            'w-2 h-2 rounded-full transition-all duration-300 hover:scale-125 active:scale-110',
+                            'w-8 h-1.5 rounded-full transition-all duration-300 hover:scale-110 active:scale-105',
                             index === currentImageIndex 
-                              ? 'bg-white w-4' 
-                              : 'bg-white/50'
+                              ? 'bg-white' 
+                              : 'bg-white/50 hover:bg-white/70'
                           )}
                           aria-label={`Go to image ${index + 1}`}
                         />
@@ -910,510 +948,550 @@ export default function EventDetail() {
                     </div>
                     
                     {/* Image Counter */}
-                    <div className="absolute top-3 left-3 px-2 py-1 rounded-full backdrop-blur-sm z-10"
-                         style={{
-                           background: 'rgba(0, 0, 0, 0.6)'
-                         }}>
-                      <div className="flex items-center gap-1">
-                        <Grid3x3 className="w-3 h-3 text-white" />
-                        <span className="text-xs text-white">
-                          {currentImageIndex + 1}/{eventImages.length}
-                        </span>
-                      </div>
+                    <div 
+                      className="absolute top-4 right-4 px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-2 z-10"
+                      style={{
+                        background: 'rgba(0, 0, 0, 0.7)'
+                      }}
+                    >
+                      <Grid3x3 className="w-3.5 h-3.5 text-white" />
+                      <span className="text-xs text-white font-medium">
+                        {currentImageIndex + 1}/{eventImages.length}
+                      </span>
                     </div>
                   </>
                 )}
               </>
             ) : (
               /* Fallback if no images */
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-purple-900/20 to-pink-900/20">
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-r from-purple-900/20 to-pink-900/20">
                 <Image className="w-16 h-16" style={{ color: DESIGN.colors.textSecondary }} />
               </div>
             )}
           </div>
         )}
-        
-        {/* Gradient overlay - Fixed to not interfere with controls */}
-        <div 
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: 'linear-gradient(to top, rgba(26, 26, 26, 0.8) 0%, rgba(26, 26, 26, 0.4) 50%, transparent 100%)'
-          }}
-        />
-        
-        {/* REMOVED: Event Date Badge - Was redundant since we have date in description */}
       </div>
 
-      {/* Main Content */}
+      {/* Main Content - YouTube-like spacing */}
       <main 
         ref={contentRef} 
-        className="relative z-10 pb-24"
+        className="relative z-10 pb-32 max-w-5xl mx-auto"
         style={{ 
           paddingLeft: DESIGN.spacing.app,
           paddingRight: DESIGN.spacing.app,
-          marginTop: '-24px',
           background: DESIGN.colors.background
         }}
       >
-        {/* Title and Tags */}
-        <div className="mb-4">
-          <div className="flex items-start justify-between gap-3 mb-3">
+        {/* Event Info Section - Better spacing */}
+        <div className="px-4 py-6">
+          {/* Title and Price */}
+          <div className="mb-5">
             <h1 
-              className="font-bold leading-snug flex-1"
+              className="font-bold mb-3"
               style={{ 
                 fontSize: DESIGN.typography.h1,
-                color: DESIGN.colors.textPrimary 
+                color: DESIGN.colors.textPrimary,
+                lineHeight: 1.2
               }}
             >
               {event.name}
             </h1>
-            {event.isFeatured && (
-              <span 
-                className="px-2.5 py-1 text-white text-xs font-semibold rounded-full whitespace-nowrap"
-                style={{
-                  background: 'linear-gradient(135deg, #C4B5FD 0%, #FFB8E6 100%)',
-                  borderRadius: DESIGN.borderRadius.roundButton
-                }}
-              >
-                FEATURED
-              </span>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-2 flex-wrap">
-            <span 
-              className="px-2.5 py-1 text-xs font-medium rounded-lg"
-              style={{
-                background: DESIGN.colors.card,
-                color: DESIGN.colors.textPrimary,
-                borderRadius: DESIGN.borderRadius.button,
-                border: `1px solid ${DESIGN.colors.textSecondary}30`
-              }}
-            >
-              {event.category}
-            </span>
-            <div 
-              className="text-sm"
-              style={{ color: DESIGN.colors.textSecondary }}
-            >
-              <span className="font-medium" style={{ color: DESIGN.colors.primary }}>
-                {event.price === 0 ? 'FREE' : `N${event.price}`}
-              </span>
-              <span className="mx-1" aria-hidden="true">•</span>
-              <span>{event.attendees} attending</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs Navigation */}
-        <nav 
-          className="flex border-b mb-6"
-          style={{ 
-            borderBottom: `1px solid ${DESIGN.colors.textSecondary}20`
-          }}
-          aria-label="Event details tabs"
-        >
-          <button
-            onClick={() => setActiveTab('details')}
-            className={cn(
-              'flex-1 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2',
-              activeTab === 'details'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            )}
-            style={{
-              borderBottomColor: activeTab === 'details' ? DESIGN.colors.primary : 'transparent',
-              color: activeTab === 'details' ? DESIGN.colors.primary : DESIGN.colors.textSecondary,
-              fontSize: DESIGN.typography.small
-            }}
-            aria-current={activeTab === 'details' ? 'page' : undefined}
-          >
-            Details
-          </button>
-          <button
-            onClick={() => setActiveTab('photos')}
-            className={cn(
-              'flex-1 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2',
-              activeTab === 'photos'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            )}
-            style={{
-              borderBottomColor: activeTab === 'photos' ? DESIGN.colors.primary : 'transparent',
-              color: activeTab === 'photos' ? DESIGN.colors.primary : DESIGN.colors.textSecondary,
-              fontSize: DESIGN.typography.small
-            }}
-            aria-current={activeTab === 'photos' ? 'page' : undefined}
-          >
-            <Image className="w-3.5 h-3.5" />
-            Photos {eventPhotos.length > 0 && `(${eventPhotos.length})`}
-          </button>
-          <button
-            onClick={() => setActiveTab('comments')}
-            className={cn(
-              'flex-1 py-3 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2',
-              activeTab === 'comments'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            )}
-            style={{
-              borderBottomColor: activeTab === 'comments' ? DESIGN.colors.primary : 'transparent',
-              color: activeTab === 'comments' ? DESIGN.colors.primary : DESIGN.colors.textSecondary,
-              fontSize: DESIGN.typography.small
-            }}
-            aria-current={activeTab === 'comments' ? 'page' : undefined}
-          >
-            <MessageCircle className="w-3.5 h-3.5" />
-            Comments {eventComments.length > 0 && `(${eventComments.length})`}
-          </button>
-        </nav>
-
-        {/* Tab Content */}
-        <div className="min-h-[400px]">
-          {/* Details Tab */}
-          {activeTab === 'details' && (
-            <div className="space-y-6">
-              {/* Info Cards */}
-              <div className="grid grid-cols-2 gap-3">
-                <div 
-                  className="p-3 rounded-xl border"
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {/* Price Badge */}
+                <span 
+                  className="px-4 py-2 text-lg font-bold rounded-xl"
                   style={{
                     background: DESIGN.colors.card,
-                    borderRadius: DESIGN.borderRadius.cardInner,
+                    color: DESIGN.colors.primary,
+                    borderRadius: DESIGN.borderRadius.button,
                     border: `1px solid ${DESIGN.colors.textSecondary}20`
                   }}
                 >
-                  <div className="flex items-center gap-2 mb-1">
-                    <div 
-                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" 
-                      aria-hidden="true"
-                      style={{
-                        background: `${DESIGN.colors.primary}1A`,
-                        borderRadius: DESIGN.borderRadius.button
-                      }}
-                    >
-                      <Calendar className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p 
-                        className="text-xs truncate"
-                        style={{ color: DESIGN.colors.textSecondary }}
-                      >
-                        Date
-                      </p>
-                      <p 
-                        className="text-sm font-semibold truncate"
-                        style={{ color: DESIGN.colors.textPrimary }}
-                      >
-                        {formattedDate}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                  {event.price === 0 ? 'FREE' : `₦${event.price}`}
+                </span>
                 
+                {/* Attendance Count */}
                 <div 
-                  className="p-3 rounded-xl border"
-                  style={{
-                    background: DESIGN.colors.card,
-                    borderRadius: DESIGN.borderRadius.cardInner,
-                    border: `1px solid ${DESIGN.colors.textSecondary}20`
-                  }}
+                  className="flex items-center gap-1.5"
+                  style={{ color: DESIGN.colors.textSecondary }}
                 >
-                  <div className="flex items-center gap-2 mb-1">
-                    <div 
-                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" 
-                      aria-hidden="true"
-                      style={{
-                        background: `${DESIGN.colors.primary}1A`,
-                        borderRadius: DESIGN.borderRadius.button
-                      }}
-                    >
-                      <Clock className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p 
-                        className="text-xs truncate"
-                        style={{ color: DESIGN.colors.textSecondary }}
-                      >
-                        Time
-                      </p>
-                      <p 
-                        className="text-sm font-semibold truncate"
-                        style={{ color: DESIGN.colors.textPrimary }}
-                      >
-                        {event.time}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div 
-                  className="p-3 rounded-xl border col-span-2"
-                  style={{
-                    background: DESIGN.colors.card,
-                    borderRadius: DESIGN.borderRadius.cardInner,
-                    border: `1px solid ${DESIGN.colors.textSecondary}20`
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" 
-                      aria-hidden="true"
-                      style={{
-                        background: `${DESIGN.colors.primary}1A`,
-                        borderRadius: DESIGN.borderRadius.button
-                      }}
-                    >
-                      <MapPin className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
-                    </div>
-                    <div className="flex-1 min-w-0 mr-2">
-                      <p 
-                        className="text-xs truncate"
-                        style={{ color: DESIGN.colors.textSecondary }}
-                      >
-                        Location
-                      </p>
-                      <p 
-                        className="text-sm font-semibold truncate"
-                        style={{ color: DESIGN.colors.textPrimary }}
-                      >
-                        {event.location}
-                      </p>
-                      <p 
-                        className="text-xs truncate"
-                        style={{ color: DESIGN.colors.textSecondary }}
-                      >
-                        {event.address}
-                      </p>
-                    </div>
-                    <button 
-                      onClick={handleNavigateToMap}
-                      className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-primary hover:bg-primary/20 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
-                      style={{
-                        background: `${DESIGN.colors.primary}1A`,
-                        borderRadius: DESIGN.borderRadius.button,
-                        color: DESIGN.colors.primary
-                      }}
-                      aria-label="Open location in maps"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  <Users className="w-4 h-4" />
+                  <span className="text-sm font-medium">{event.attendees} attending</span>
                 </div>
               </div>
-
-              {/* Description */}
-              <section>
-                <h3 
-                  className="font-bold mb-3 flex items-center gap-2"
-                  style={{ 
-                    fontSize: DESIGN.typography.h4,
-                    color: DESIGN.colors.textPrimary 
-                  }}
-                >
-                  About This Event
-                  {descriptionTruncated && (
-                    <button 
-                      onClick={toggleDescription}
-                      className="text-primary text-xs font-medium hover:underline flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-offset-2 rounded"
-                      style={{
-                        color: DESIGN.colors.primary,
-                        fontSize: DESIGN.typography.caption
-                      }}
-                      aria-expanded={showFullDescription}
-                    >
-                      {showFullDescription ? 'Show less' : 'Read more'}
-                      {showFullDescription ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                    </button>
-                  )}
-                </h3>
-                <div className={cn(
-                  'leading-relaxed',
-                  !showFullDescription && descriptionTruncated && 'line-clamp-4'
-                )}
-                style={{
-                  color: DESIGN.colors.textSecondary,
-                  fontSize: DESIGN.typography.body
-                }}>
-                  {event.description}
-                </div>
-              </section>
-
-              {/* Tags */}
-              {event.tags.length > 0 && (
-                <section>
-                  <h3 
-                    className="font-semibold mb-2"
-                    style={{ 
-                      color: DESIGN.colors.textSecondary,
-                      fontSize: DESIGN.typography.small
-                    }}
-                  >
-                    Tags
-                  </h3>
-                  <div className="flex flex-wrap gap-1.5">
-                    {event.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="px-2.5 py-1 text-xs font-medium rounded-lg border"
-                        style={{
-                          background: DESIGN.colors.card,
-                          color: DESIGN.colors.textPrimary,
-                          borderRadius: DESIGN.borderRadius.button,
-                          border: `1px solid ${DESIGN.colors.textSecondary}30`
-                        }}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {/* Attendees Preview */}
-              <div 
-                className="p-4 rounded-xl border"
+              
+              {/* Category Tag */}
+              <span 
+                className="px-3 py-1.5 text-sm font-medium rounded-lg"
                 style={{
                   background: DESIGN.colors.card,
-                  borderRadius: DESIGN.borderRadius.cardInner,
+                  color: DESIGN.colors.textPrimary,
+                  borderRadius: DESIGN.borderRadius.button,
                   border: `1px solid ${DESIGN.colors.textSecondary}20`
                 }}
               >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" style={{ color: DESIGN.colors.primary }} aria-hidden="true" />
-                    <span 
-                      className="font-medium"
-                      style={{ 
-                        color: DESIGN.colors.textPrimary,
-                        fontSize: DESIGN.typography.body 
-                      }}
-                    >
-                      {event.attendees} people attending
-                    </span>
-                  </div>
-                  <button 
-                    className="text-xs font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 rounded"
+                {event.category}
+              </span>
+            </div>
+          </div>
+
+          {/* Tabs Navigation - YouTube-style */}
+          <nav 
+            className="flex border-b mb-6"
+            style={{ 
+              borderBottom: `2px solid ${DESIGN.colors.textSecondary}20`
+            }}
+            aria-label="Event details tabs"
+          >
+            <button
+              onClick={() => setActiveTab('details')}
+              className={cn(
+                'flex-1 py-3 text-sm font-semibold transition-all duration-200 focus:outline-none relative',
+                activeTab === 'details'
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              style={{
+                color: activeTab === 'details' ? DESIGN.colors.primary : DESIGN.colors.textSecondary,
+                fontSize: DESIGN.typography.body
+              }}
+              aria-current={activeTab === 'details' ? 'page' : undefined}
+            >
+              Details
+              {activeTab === 'details' && (
+                <div 
+                  className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-0.5 rounded-full"
+                  style={{ background: DESIGN.colors.primary }}
+                />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('photos')}
+              className={cn(
+                'flex-1 py-3 text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 focus:outline-none relative',
+                activeTab === 'photos'
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              style={{
+                color: activeTab === 'photos' ? DESIGN.colors.primary : DESIGN.colors.textSecondary,
+                fontSize: DESIGN.typography.body
+              }}
+              aria-current={activeTab === 'photos' ? 'page' : undefined}
+            >
+              <Image className="w-4 h-4" />
+              Photos {eventPhotos.length > 0 && `(${eventPhotos.length})`}
+              {activeTab === 'photos' && (
+                <div 
+                  className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-0.5 rounded-full"
+                  style={{ background: DESIGN.colors.primary }}
+                />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('comments')}
+              className={cn(
+                'flex-1 py-3 text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 focus:outline-none relative',
+                activeTab === 'comments'
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              style={{
+                color: activeTab === 'comments' ? DESIGN.colors.primary : DESIGN.colors.textSecondary,
+                fontSize: DESIGN.typography.body
+              }}
+              aria-current={activeTab === 'comments' ? 'page' : undefined}
+            >
+              <MessageCircle className="w-4 h-4" />
+              Comments {eventComments.length > 0 && `(${eventComments.length})`}
+              {activeTab === 'comments' && (
+                <div 
+                  className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-0.5 rounded-full"
+                  style={{ background: DESIGN.colors.primary }}
+                />
+              )}
+            </button>
+          </nav>
+
+          {/* Tab Content */}
+          <div className="min-h-[400px]">
+            {/* Details Tab */}
+            {activeTab === 'details' && (
+              <div className="space-y-8">
+                {/* Info Cards Grid - Better spacing */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Date Card */}
+                  <div 
+                    className="p-4 rounded-xl border transition-all hover:border-primary/30"
                     style={{
-                      color: DESIGN.colors.primary,
-                      fontSize: DESIGN.typography.caption
+                      background: DESIGN.colors.card,
+                      borderRadius: DESIGN.borderRadius.cardInner,
+                      border: `1px solid ${DESIGN.colors.textSecondary}20`
                     }}
-                    onClick={() => {/* TODO: Implement see all attendees */}}
                   >
-                    See all
-                  </button>
+                    <div className="flex items-start gap-3">
+                      <div 
+                        className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" 
+                        aria-hidden="true"
+                        style={{
+                          background: `${DESIGN.colors.primary}20`,
+                          borderRadius: DESIGN.borderRadius.button
+                        }}
+                      >
+                        <Calendar className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p 
+                          className="text-xs font-medium mb-1"
+                          style={{ color: DESIGN.colors.textSecondary }}
+                        >
+                          Date
+                        </p>
+                        <p 
+                          className="text-sm font-semibold"
+                          style={{ color: DESIGN.colors.textPrimary }}
+                        >
+                          {formattedDate}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Time Card */}
+                  <div 
+                    className="p-4 rounded-xl border transition-all hover:border-primary/30"
+                    style={{
+                      background: DESIGN.colors.card,
+                      borderRadius: DESIGN.borderRadius.cardInner,
+                      border: `1px solid ${DESIGN.colors.textSecondary}20`
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div 
+                        className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" 
+                        aria-hidden="true"
+                        style={{
+                          background: `${DESIGN.colors.primary}20`,
+                          borderRadius: DESIGN.borderRadius.button
+                        }}
+                      >
+                        <Clock className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p 
+                          className="text-xs font-medium mb-1"
+                          style={{ color: DESIGN.colors.textSecondary }}
+                        >
+                          Time
+                        </p>
+                        <p 
+                          className="text-sm font-semibold"
+                          style={{ color: DESIGN.colors.textPrimary }}
+                        >
+                          {event.time}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Location Card - Full width */}
+                  <div 
+                    className="p-4 rounded-xl border col-span-2 transition-all hover:border-primary/30"
+                    style={{
+                      background: DESIGN.colors.card,
+                      borderRadius: DESIGN.borderRadius.cardInner,
+                      border: `1px solid ${DESIGN.colors.textSecondary}20`
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div 
+                        className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" 
+                        aria-hidden="true"
+                        style={{
+                          background: `${DESIGN.colors.primary}20`,
+                          borderRadius: DESIGN.borderRadius.button
+                        }}
+                      >
+                        <MapPin className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+                      </div>
+                      <div className="flex-1 min-w-0 mr-3">
+                        <p 
+                          className="text-xs font-medium mb-1"
+                          style={{ color: DESIGN.colors.textSecondary }}
+                        >
+                          Location
+                        </p>
+                        <p 
+                          className="text-sm font-semibold mb-1"
+                          style={{ color: DESIGN.colors.textPrimary }}
+                        >
+                          {event.location}
+                        </p>
+                        <p 
+                          className="text-xs"
+                          style={{ color: DESIGN.colors.textSecondary }}
+                        >
+                          {event.address}
+                        </p>
+                      </div>
+                      <button 
+                        onClick={handleNavigateToMap}
+                        className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
+                        style={{
+                          background: `${DESIGN.colors.primary}20`,
+                          borderRadius: DESIGN.borderRadius.button,
+                          color: DESIGN.colors.primary
+                        }}
+                        aria-label="Open location in maps"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex -space-x-2">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className="w-8 h-8 rounded-full border-2 overflow-hidden"
-                      style={{
-                        background: '#4A4A4A',
-                        borderColor: DESIGN.colors.background
+
+                {/* Description Section */}
+                <section className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 
+                      className="font-bold"
+                      style={{ 
+                        fontSize: DESIGN.typography.h4,
+                        color: DESIGN.colors.textPrimary 
                       }}
-                      aria-hidden="true"
                     >
-                      <img
-                        src={`https://i.pravatar.cc/100?img=${i + 10}`}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    </div>
-                  ))}
-                  {event.attendees > 4 && (
-                    <div 
-                      className="w-8 h-8 rounded-full flex items-center justify-center border-2 text-xs font-semibold text-white"
-                      style={{
-                        background: DESIGN.colors.primary,
-                        borderColor: DESIGN.colors.background
-                      }}
-                      aria-label={`${event.attendees - 4} more attendees`}
-                    >
-                      +{event.attendees - 4}
-                    </div>
+                      About This Event
+                    </h3>
+                    {descriptionTruncated && (
+                      <button 
+                        onClick={toggleDescription}
+                        className="text-primary text-sm font-medium hover:underline flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg px-3 py-1.5"
+                        style={{
+                          color: DESIGN.colors.primary,
+                          fontSize: DESIGN.typography.small,
+                          background: `${DESIGN.colors.primary}10`
+                        }}
+                        aria-expanded={showFullDescription}
+                      >
+                        {showFullDescription ? 'Show less' : 'Read more'}
+                        {showFullDescription ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                    )}
+                  </div>
+                  <div className={cn(
+                    'leading-relaxed',
+                    !showFullDescription && descriptionTruncated && 'line-clamp-4'
                   )}
+                  style={{
+                    color: DESIGN.colors.textSecondary,
+                    fontSize: DESIGN.typography.bodyLarge
+                  }}>
+                    {event.description}
+                  </div>
+                </section>
+
+                {/* Tags Section */}
+                {event.tags.length > 0 && (
+                  <section className="space-y-3">
+                    <h3 
+                      className="font-semibold"
+                      style={{ 
+                        color: DESIGN.colors.textSecondary,
+                        fontSize: DESIGN.typography.body
+                      }}
+                    >
+                      Tags
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {event.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-3 py-1.5 text-sm font-medium rounded-lg border transition-all hover:border-primary/50"
+                          style={{
+                            background: DESIGN.colors.card,
+                            color: DESIGN.colors.textPrimary,
+                            borderRadius: DESIGN.borderRadius.button,
+                            border: `1px solid ${DESIGN.colors.textSecondary}30`
+                          }}
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Attendees Preview */}
+                <div 
+                  className="p-5 rounded-xl border transition-all hover:border-primary/30"
+                  style={{
+                    background: DESIGN.colors.card,
+                    borderRadius: DESIGN.borderRadius.cardInner,
+                    border: `1px solid ${DESIGN.colors.textSecondary}20`
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-10 h-10 rounded-lg flex items-center justify-center"
+                        style={{
+                          background: `${DESIGN.colors.primary}20`,
+                          borderRadius: DESIGN.borderRadius.button
+                        }}
+                      >
+                        <Users className="w-5 h-5" style={{ color: DESIGN.colors.primary }} aria-hidden="true" />
+                      </div>
+                      <div>
+                        <span 
+                          className="font-bold block"
+                          style={{ 
+                            color: DESIGN.colors.textPrimary,
+                            fontSize: DESIGN.typography.bodyLarge 
+                          }}
+                        >
+                          {event.attendees} people attending
+                        </span>
+                        <span 
+                          className="text-sm"
+                          style={{ color: DESIGN.colors.textSecondary }}
+                        >
+                          Join the community
+                        </span>
+                      </div>
+                    </div>
+                    <button 
+                      className="text-sm font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg px-3 py-1.5"
+                      style={{
+                        color: DESIGN.colors.primary,
+                        background: `${DESIGN.colors.primary}10`
+                      }}
+                      onClick={() => {/* TODO: Implement see all attendees */}}
+                    >
+                      See all
+                    </button>
+                  </div>
+                  <div className="flex -space-x-3">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div
+                        key={i}
+                        className="w-10 h-10 rounded-full border-2 overflow-hidden transition-transform hover:scale-110"
+                        style={{
+                          background: '#4A4A4A',
+                          borderColor: DESIGN.colors.card
+                        }}
+                        aria-hidden="true"
+                      >
+                        <img
+                          src={`https://i.pravatar.cc/100?img=${i + 10}`}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </div>
+                    ))}
+                    {event.attendees > 5 && (
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center border-2 text-sm font-bold text-white transition-transform hover:scale-110"
+                        style={{
+                          background: DESIGN.colors.primary,
+                          borderColor: DESIGN.colors.card
+                        }}
+                        aria-label={`${event.attendees - 5} more attendees`}
+                      >
+                        +{event.attendees - 5}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Photos Tab */}
-          {activeTab === 'photos' && (
-            <div className="min-h-[300px]">
-              <CommunityPhotos eventId={event.id} photos={eventPhotos} />
-            </div>
-          )}
+            {/* Photos Tab */}
+            {activeTab === 'photos' && (
+              <div className="min-h-[300px]">
+                <CommunityPhotos eventId={event.id} photos={eventPhotos} />
+              </div>
+            )}
 
-          {/* Comments Tab */}
-          {activeTab === 'comments' && (
-            <div className="min-h-[300px]">
-              <CommunityComments eventId={event.id} comments={eventComments} />
-            </div>
-          )}
+            {/* Comments Tab */}
+            {activeTab === 'comments' && (
+              <div className="min-h-[300px]">
+                <CommunityComments eventId={event.id} comments={eventComments} />
+              </div>
+            )}
+          </div>
         </div>
       </main>
 
-      {/* Sticky Bottom CTA */}
+      {/* Sticky Bottom CTA - Better spacing */}
       <footer 
-        className="fixed bottom-0 left-0 right-0 backdrop-blur-xl border-t p-4 pb-safe z-40"
+        className="fixed bottom-0 left-0 right-0 backdrop-blur-xl border-t z-50"
         style={{
           background: `${DESIGN.colors.background}F2`,
           borderTop: `1px solid ${DESIGN.colors.textSecondary}20`,
-          padding: DESIGN.spacing.app
+          padding: `${DESIGN.spacing.app} ${DESIGN.spacing.app} max(env(safe-area-inset-bottom), ${DESIGN.spacing.app})`
         }}
       >
-        <div className="mx-auto">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p 
-                className="font-bold truncate"
-                style={{ 
-                  fontSize: DESIGN.typography.h4,
-                  color: DESIGN.colors.textPrimary 
-                }}
-              >
-                {event.price === 0 ? 'FREE ENTRY' : `N${event.price}`}
-              </p>
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-center justify-between gap-4 px-4">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline gap-2">
+                <p 
+                  className="font-bold"
+                  style={{ 
+                    fontSize: DESIGN.typography.h3,
+                    color: DESIGN.colors.textPrimary 
+                  }}
+                >
+                  {event.price === 0 ? 'FREE' : `₦${event.price}`}
+                </p>
+                <p 
+                  className="text-sm"
+                  style={{ color: DESIGN.colors.textSecondary }}
+                >
+                  {hasTicket ? 'Ticket purchased' : 'Per person'}
+                </p>
+              </div>
               <p 
                 className="text-xs truncate"
                 style={{ color: DESIGN.colors.textSecondary }}
               >
-                {hasTicket ? 'Ticket purchased' : 'Per person'}
+                {hasTicket ? 'You have a ticket for this event' : 'Secure your spot now'}
               </p>
             </div>
             <Button 
               className={cn(
-                'flex-1 h-12 rounded-xl text-base font-semibold min-w-[120px] focus:outline-none focus:ring-2 focus:ring-offset-2'
+                'flex-1 h-14 rounded-xl text-base font-semibold min-w-[140px] focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all hover:scale-[1.02] active:scale-[0.98]'
               )}
               style={{
                 borderRadius: DESIGN.borderRadius.cardInner,
-                height: '48px',
+                height: '56px',
                 background: hasTicket && isLive 
                   ? `linear-gradient(135deg, ${DESIGN.colors.success} 0%, #059669 100%)`
                   : `linear-gradient(135deg, ${DESIGN.colors.primary} 0%, ${DESIGN.colors.lavenderLight} 100%)`,
                 color: DESIGN.colors.background,
-                boxShadow: '0 4px 20px rgba(196, 181, 253, 0.3)'
+                boxShadow: '0 8px 32px rgba(196, 181, 253, 0.4)'
               }}
               size="lg"
               onClick={handleCTAClick}
             >
-              <Ticket className="w-4 h-4 mr-2" />
+              <Ticket className="w-5 h-5 mr-2" />
               {getCTAText()}
             </Button>
           </div>
         </div>
       </footer>
 
-      {/* Video Modal */}
+      {/* Video Modal - Improved */}
       {isVideoModalOpen && event.mediaType === 'video' && event.videos && event.videos.length > 0 && (
-        <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
-          <div className="relative w-full h-full flex items-center justify-center">
+        <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center">
+          <div className="relative w-full h-full">
             <video
               ref={fullscreenVideoRef}
               src={event.videos[0]}
-              className="w-full h-full object-contain"
+              className="w-full h-full object-contain bg-black"
               muted={isFullscreenVideoMuted}
               loop
               controls={false}
@@ -1425,31 +1503,36 @@ export default function EventDetail() {
             />
             
             {/* Custom Video Controls */}
-            <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={toggleFullscreenVideoPlay}
-                    className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all"
-                    aria-label={isFullscreenVideoPlaying ? 'Pause video' : 'Play video'}
-                  >
-                    {isFullscreenVideoPlaying ? (
-                      <Pause className="w-6 h-6 text-white" />
-                    ) : (
-                      <Play className="w-6 h-6 text-white ml-1" />
-                    )}
-                  </button>
-                  <button
-                    onClick={toggleFullscreenVideoMute}
-                    className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all"
-                    aria-label={isFullscreenVideoMuted ? 'Unmute video' : 'Mute video'}
-                  >
-                    {isFullscreenVideoMuted ? (
-                      <VolumeX className="w-6 h-6 text-white" />
-                    ) : (
-                      <Volume2 className="w-6 h-6 text-white" />
-                    )}
-                  </button>
+            <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-300">
+              <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/80 to-transparent">
+                <div className="flex items-center justify-between max-w-4xl mx-auto">
+                  <div className="flex items-center gap-6">
+                    {/* Play/Pause */}
+                    <button
+                      onClick={toggleFullscreenVideoPlay}
+                      className="w-14 h-14 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all"
+                      aria-label={isFullscreenVideoPlaying ? 'Pause video' : 'Play video'}
+                    >
+                      {isFullscreenVideoPlaying ? (
+                        <Pause className="w-7 h-7 text-white" />
+                      ) : (
+                        <Play className="w-7 h-7 text-white ml-1" />
+                      )}
+                    </button>
+                    
+                    {/* Volume */}
+                    <button
+                      onClick={toggleFullscreenVideoMute}
+                      className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all"
+                      aria-label={isFullscreenVideoMuted ? 'Unmute video' : 'Mute video'}
+                    >
+                      {isFullscreenVideoMuted ? (
+                        <VolumeX className="w-6 h-6 text-white" />
+                      ) : (
+                        <Volume2 className="w-6 h-6 text-white" />
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1457,10 +1540,10 @@ export default function EventDetail() {
             {/* Close Button */}
             <button
               onClick={closeVideoModal}
-              className="absolute top-6 right-6 w-12 h-12 rounded-full flex items-center justify-center bg-black/60 backdrop-blur-sm hover:bg-black/80 transition-all"
+              className="absolute top-8 right-8 w-14 h-14 rounded-full flex items-center justify-center bg-black/60 backdrop-blur-sm hover:bg-black/80 transition-all z-10"
               aria-label="Close video"
             >
-              <X className="w-6 h-6 text-white" />
+              <X className="w-7 h-7 text-white" />
             </button>
           </div>
         </div>
