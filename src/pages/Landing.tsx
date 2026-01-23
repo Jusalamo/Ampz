@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Zap, Users, Calendar, MapPin, QrCode, MessageCircle, ChevronRight, Sparkles, Pause, Play } from 'lucide-react';
+import { Zap, Users, Calendar, MapPin, QrCode, MessageCircle, ChevronRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ColorBends from '@/components/ColorBends';
 import { useApp } from '@/contexts/AppContext';
@@ -90,7 +90,7 @@ export default function Landing() {
     { icon: MessageCircle, label: 'Real-time Chat', description: 'Chat before and during events' },
   ];
 
-  // Testimonials for social proof - duplicated for seamless loop
+  // Testimonials for social proof
   const testimonials = [
     {
       text: "Met my best friend at a concert through Amps!",
@@ -143,12 +143,12 @@ export default function Landing() {
       testimonialIntervalRef.current = setInterval(() => {
         setTestimonialPosition(prev => {
           // Reset to start for seamless loop
-          if (prev >= 100 * (testimonials.length)) {
+          if (prev >= 100 * testimonials.length) {
             return 0;
           }
-          return prev + 0.5; // Adjust speed here (0.5% per interval)
+          return prev + 0.3; // Adjust speed here (0.3% per interval)
         });
-      }, 50); // Update every 50ms for smooth movement
+      }, 30); // Update every 30ms for smooth movement
     }
 
     return () => {
@@ -289,8 +289,8 @@ export default function Landing() {
               Discover amazing events and connect with people who share your passions
             </p>
 
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12 max-w-md mx-auto">
+            {/* Centered CTA Button */}
+            <div className="flex justify-center mb-12">
               <Button
                 onClick={() => navigate('/auth')}
                 className="h-12 px-8 font-semibold transition-all hover:scale-105"
@@ -304,47 +304,6 @@ export default function Landing() {
               >
                 Get Started Free
               </Button>
-              <Button
-                onClick={() => navigate('/auth?mode=login')}
-                variant="outline"
-                className="h-12 px-8 font-semibold backdrop-blur-sm hover:bg-white/10 transition-all"
-                style={{
-                  fontSize: DESIGN.typography.button.size,
-                  color: DESIGN.colors.primary,
-                  borderColor: DESIGN.colors.primary,
-                  borderRadius: DESIGN.borderRadius.button
-                }}
-              >
-                Sign In
-              </Button>
-            </div>
-
-            {/* Trust Indicators */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
-              <div className="text-center">
-                <div className="text-2xl font-bold mb-1" style={{ color: DESIGN.colors.primary }}>
-                  10K+
-                </div>
-                <div className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
-                  Active Users
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold mb-1" style={{ color: DESIGN.colors.primary }}>
-                  500+
-                </div>
-                <div className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
-                  Events Monthly
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold mb-1" style={{ color: DESIGN.colors.primary }}>
-                  95%
-                </div>
-                <div className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
-                  Satisfaction Rate
-                </div>
-              </div>
             </div>
           </div>
         </section>
@@ -592,35 +551,15 @@ export default function Landing() {
             </div>
 
             {/* Continuous Testimonial Carousel */}
-            <div className="relative overflow-hidden py-8">
-              {/* Pause/Play Control */}
-              <div className="absolute top-0 right-0 z-20">
-                <button
-                  onClick={() => setIsTestimonialPaused(!isTestimonialPaused)}
-                  className="w-10 h-10 flex items-center justify-center rounded-full"
-                  style={{ 
-                    background: DESIGN.colors.primary,
-                    color: DESIGN.colors.background,
-                    boxShadow: DESIGN.shadows.purpleGlow
-                  }}
-                >
-                  {isTestimonialPaused ? (
-                    <Play className="w-5 h-5 ml-0.5" />
-                  ) : (
-                    <Pause className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
-
+            <div className="relative overflow-hidden">
               {/* Carousel Track */}
               <div
                 ref={testimonialCarouselRef}
-                className="relative"
+                className="flex gap-4"
                 style={{
                   transform: `translateX(-${testimonialPosition}%)`,
                   transition: isTestimonialPaused ? 'none' : 'transform 0.1s linear',
-                  display: 'flex',
-                  gap: '24px'
+                  width: 'max-content'
                 }}
                 onMouseDown={handleTestimonialMouseDown}
                 onMouseUp={handleTestimonialMouseUp}
@@ -630,7 +569,7 @@ export default function Landing() {
                 {duplicatedTestimonials.map((testimonial, index) => (
                   <div
                     key={index}
-                    className="flex-shrink-0 w-[calc(33.333%-16px)] md:w-[calc(25%-18px)] p-6 cursor-pointer select-none"
+                    className="flex-shrink-0 w-[280px] h-[280px] p-6 cursor-pointer select-none flex flex-col justify-between"
                     style={{ 
                       background: DESIGN.colors.card,
                       borderRadius: DESIGN.borderRadius.card,
@@ -642,23 +581,25 @@ export default function Landing() {
                     onTouchStart={handleTestimonialMouseDown}
                     onTouchEnd={handleTestimonialMouseUp}
                   >
-                    <div className="flex items-center gap-1 mb-4">
-                      {[...Array(5)].map((_, i) => (
-                        <div 
-                          key={i}
-                          className="w-4 h-4"
-                          style={{ color: DESIGN.colors.primary }}
-                        >
-                          ★
-                        </div>
-                      ))}
+                    <div>
+                      <div className="flex items-center gap-1 mb-4">
+                        {[...Array(5)].map((_, i) => (
+                          <div 
+                            key={i}
+                            className="w-4 h-4"
+                            style={{ color: DESIGN.colors.primary }}
+                          >
+                            ★
+                          </div>
+                        ))}
+                      </div>
+                      <p 
+                        className="italic text-base line-clamp-4 mb-4"
+                        style={{ color: DESIGN.colors.textPrimary }}
+                      >
+                        "{testimonial.text}"
+                      </p>
                     </div>
-                    <p 
-                      className="mb-4 italic text-base"
-                      style={{ color: DESIGN.colors.textPrimary }}
-                    >
-                      "{testimonial.text}"
-                    </p>
                     <div>
                       <div 
                         className="font-bold"
@@ -716,7 +657,7 @@ export default function Landing() {
             >
               Join thousands of people discovering events and making meaningful connections
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex justify-center">
               <Button
                 onClick={() => navigate('/auth')}
                 className="h-12 px-8 font-semibold transition-all hover:scale-105"
@@ -729,19 +670,6 @@ export default function Landing() {
                 }}
               >
                 Create Free Account
-              </Button>
-              <Button
-                onClick={() => navigate('/events')}
-                variant="outline"
-                className="h-12 px-8 font-semibold backdrop-blur-sm hover:bg-white/10 transition-all"
-                style={{
-                  fontSize: DESIGN.typography.button.size,
-                  color: DESIGN.colors.primary,
-                  borderColor: DESIGN.colors.primary,
-                  borderRadius: DESIGN.borderRadius.button
-                }}
-              >
-                Browse Events
               </Button>
             </div>
           </div>
