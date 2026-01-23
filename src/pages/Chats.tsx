@@ -93,12 +93,12 @@ function QuickAddModal({
   onSendRequest: (userId: string) => void;
 }) {
   const [searchQuery, setSearchQuery] = useState('');
-  const { connectionProfiles, friends, sentRequests } = useApp();
+  const { connectionProfiles = [], friends = [], sentRequests = [] } = useApp();
   
   // Filter out already friends and people with pending requests
   const availableProfiles = connectionProfiles.filter(profile => 
     !friends.some(friend => friend.id === profile.id) &&
-    !sentRequests.some(request => request.userId === profile.id)
+    !sentRequests.some(request => request.toUserId === profile.id)
   );
 
   // Filter profiles based on search
@@ -251,13 +251,18 @@ function FriendRequestsModal({
   const [activeTab, setActiveTab] = useState<'received' | 'sent'>('received');
   const { toast } = useToast();
   const { 
-    friendRequests, 
-    sentRequests, 
+    friendRequests = [], 
+    sentRequests = [], 
     acceptFriendRequest, 
     declineFriendRequest, 
     cancelFriendRequest,
-    connectionProfiles
+    connectionProfiles = []
   } = useApp();
+
+  // Safe default functions
+  const safeAcceptFriendRequest = acceptFriendRequest || (() => Promise.resolve());
+  const safeDeclineFriendRequest = declineFriendRequest || (() => Promise.resolve());
+  const safeCancelFriendRequest = cancelFriendRequest || (() => Promise.resolve());
 
   // Enrich requests with user data
   const enrichedReceivedRequests = friendRequests.map(request => {
@@ -266,7 +271,7 @@ function FriendRequestsModal({
       ...request,
       name: user?.name || 'Unknown User',
       photo: user?.photo || 'https://i.pravatar.cc/100?img=0',
-      mutualFriends: Math.floor(Math.random() * 5) // This should come from your backend
+      mutualFriends: Math.floor(Math.random() * 5)
     };
   });
 
@@ -276,13 +281,13 @@ function FriendRequestsModal({
       ...request,
       name: user?.name || 'Unknown User',
       photo: user?.photo || 'https://i.pravatar.cc/100?img=0',
-      mutualFriends: Math.floor(Math.random() * 5) // This should come from your backend
+      mutualFriends: Math.floor(Math.random() * 5)
     };
   });
 
   const handleAcceptRequest = async (requestId: string) => {
     try {
-      await acceptFriendRequest(requestId);
+      await safeAcceptFriendRequest(requestId);
       toast({
         title: 'Friend request accepted!',
         description: 'You can now message each other.',
@@ -298,7 +303,7 @@ function FriendRequestsModal({
 
   const handleDeclineRequest = async (requestId: string) => {
     try {
-      await declineFriendRequest(requestId);
+      await safeDeclineFriendRequest(requestId);
       toast({
         title: 'Request declined',
         description: 'The request has been removed.',
@@ -314,7 +319,7 @@ function FriendRequestsModal({
 
   const handleCancelRequest = async (requestId: string) => {
     try {
-      await cancelFriendRequest(requestId);
+      await safeCancelFriendRequest(requestId);
       toast({
         title: 'Request cancelled',
         description: 'Your friend request has been cancelled.',
@@ -329,18 +334,22 @@ function FriendRequestsModal({
   };
 
   const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString();
+    } catch {
+      return 'Recently';
+    }
   };
 
   return (
@@ -435,7 +444,7 @@ function FriendRequestsModal({
                         {request.mutualFriends} mutual friends
                       </p>
                       <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>
-                        {formatTime(request.createdAt)}
+                        {formatTime(request.createdAt || request.timestamp || new Date().toISOString())}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -505,7 +514,7 @@ function FriendRequestsModal({
                       <div className="flex items-center gap-1 mt-1">
                         <Clock className="w-3 h-3" style={{ color: DESIGN.colors.textSecondary }} />
                         <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                          {formatTime(request.createdAt)}
+                          {formatTime(request.createdAt || request.timestamp || new Date().toISOString())}
                         </p>
                       </div>
                     </div>
@@ -557,14 +566,14 @@ function FriendRequestsModal({
 export default function Chats() {
   const navigate = useNavigate();
   const { 
-    matches, 
+    matches = [], 
     user, 
     isDemo, 
-    friends, 
-    friendRequests, 
-    sentRequests, 
+    friends = [], 
+    friendRequests = [], 
+    sentRequests = [], 
     sendFriendRequest,
-    connectionProfiles 
+    connectionProfiles = [] 
   } = useApp();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('matches');
@@ -609,11 +618,11 @@ export default function Chats() {
 
   // Filter matches based on search
   const filteredMatches = matches.filter(match =>
-    match.matchProfile.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    match.eventName.toLowerCase().includes(searchQuery.toLowerCase())
+    match?.matchProfile?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    match?.eventName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const unreadMatchesCount = matches.filter(m => m.unread).length;
+  const unreadMatchesCount = matches.filter(m => m?.unread).length;
   const friendRequestsCount = friendRequests.length;
   const hasFriends = friends && friends.length > 0;
   const hasFriendRequests = friendRequests.length > 0;
@@ -635,18 +644,22 @@ export default function Chats() {
   }, [selectedMatch, messages]);
 
   const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString();
+    } catch {
+      return 'Recently';
+    }
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -696,11 +709,18 @@ export default function Chats() {
 
   const handleSendFriendRequest = async (userId: string) => {
     try {
-      await sendFriendRequest(userId);
-      toast({
-        title: 'Friend request sent!',
-        description: 'They will be notified of your request.',
-      });
+      if (sendFriendRequest) {
+        await sendFriendRequest(userId);
+        toast({
+          title: 'Friend request sent!',
+          description: 'They will be notified of your request.',
+        });
+      } else {
+        toast({
+          title: 'Feature not available',
+          description: 'Friend requests are not implemented yet.',
+        });
+      }
       setShowQuickAdd(false);
     } catch (error) {
       toast({
@@ -737,8 +757,8 @@ export default function Chats() {
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <img
-                    src={selectedMatch.matchProfile.photo}
-                    alt={selectedMatch.matchProfile.name}
+                    src={selectedMatch.matchProfile?.photo}
+                    alt={selectedMatch.matchProfile?.name}
                     className="w-10 h-10 rounded-full object-cover"
                     style={{ border: `2px solid ${DESIGN.colors.background}` }}
                   />
@@ -752,7 +772,7 @@ export default function Chats() {
                     fontSize: DESIGN.typography.bodyLarge,
                     color: DESIGN.colors.textPrimary
                   }}>
-                    {selectedMatch.matchProfile.name}
+                    {selectedMatch.matchProfile?.name || 'Unknown'}
                   </h3>
                   <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                     {selectedMatch.online ? 'Online' : `Active ${formatTime(selectedMatch.timestamp)}`}
@@ -817,8 +837,8 @@ export default function Chats() {
           <div className="text-center py-4">
             <div className="relative w-20 h-20 mx-auto mb-3">
               <img
-                src={selectedMatch.matchProfile.photo}
-                alt={selectedMatch.matchProfile.name}
+                src={selectedMatch.matchProfile?.photo}
+                alt={selectedMatch.matchProfile?.name}
                 className="w-full h-full rounded-full object-cover"
                 style={{ border: `4px solid ${DESIGN.colors.primary}20` }}
               />
@@ -827,7 +847,7 @@ export default function Chats() {
               fontSize: DESIGN.typography.h3,
               color: DESIGN.colors.textPrimary
             }}>
-              {selectedMatch.matchProfile.name}
+              {selectedMatch.matchProfile?.name || 'Unknown'}
             </h3>
             <p className="text-sm mb-2" style={{ color: DESIGN.colors.textSecondary }}>
               Matched at {selectedMatch.eventName}
@@ -1043,6 +1063,18 @@ export default function Chats() {
                 </span>
               )}
             </button>
+            {activeTab === 'friends' && (
+              <button 
+                onClick={() => setShowQuickAdd(true)}
+                className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
+                style={{
+                  background: `${DESIGN.colors.primary}10`,
+                  borderRadius: DESIGN.borderRadius.roundButton
+                }}
+              >
+                <UserPlus className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -1157,8 +1189,8 @@ export default function Chats() {
                   >
                     <div className="relative">
                       <img
-                        src={match.matchProfile.photo}
-                        alt={match.matchProfile.name}
+                        src={match.matchProfile?.photo}
+                        alt={match.matchProfile?.name}
                         className="w-14 h-14 rounded-full object-cover"
                         style={{ border: `2px solid ${DESIGN.colors.background}` }}
                       />
@@ -1171,7 +1203,7 @@ export default function Chats() {
                       <div className="flex items-center justify-between mb-1">
                         <h3 className={cn('font-semibold', match.unread && 'font-bold')}
                           style={{ color: DESIGN.colors.textPrimary }}>
-                          {match.matchProfile.name}
+                          {match.matchProfile?.name || 'Unknown'}
                         </h3>
                         <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
                           {formatTime(match.timestamp)}
