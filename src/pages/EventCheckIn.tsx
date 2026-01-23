@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, MapPin, Calendar, Clock, CheckCircle, AlertCircle, LogIn } from 'lucide-react';
+import { Loader2, MapPin, Calendar, Clock, CheckCircle, AlertCircle, LogIn, ArrowLeft } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,6 +19,7 @@ export default function EventCheckIn() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false);
 
   const token = searchParams.get('token');
 
@@ -72,7 +73,22 @@ export default function EventCheckIn() {
         };
 
         setEvent(eventData);
-      } catch {
+
+        // Check if user has already checked in
+        if (user) {
+          const { data: checkInData } = await supabase
+            .from('check_ins')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('event_id', id)
+            .limit(1);
+
+          if (checkInData && checkInData.length > 0) {
+            setAlreadyCheckedIn(true);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching event:', err);
         setError('Failed to load event');
       } finally {
         setLoading(false);
@@ -80,7 +96,7 @@ export default function EventCheckIn() {
     };
 
     fetchEvent();
-  }, [id]);
+  }, [id, user]);
 
   const handleCheckIn = async () => {
     if (!event || !user) return;
@@ -94,10 +110,13 @@ export default function EventCheckIn() {
       
       if (result.success) {
         setSuccess(true);
+        setAlreadyCheckedIn(true);
       } else {
         // Check if error is specifically about geofence
         if (result.error?.includes('inside the event\'s geofence')) {
           setLocationError(result.error);
+        } else if (result.error?.includes('already checked in')) {
+          setAlreadyCheckedIn(true);
         } else {
           setError(result.error || 'Failed to check in');
         }
@@ -164,6 +183,15 @@ export default function EventCheckIn() {
 
         <div className="px-4 -mt-12 relative z-10">
           <div className="bg-card rounded-2xl p-6 border border-border">
+            <Button
+              variant="ghost"
+              className="mb-4 -ml-2"
+              onClick={() => navigate(-1)}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+            
             <h1 className="text-2xl font-bold mb-2">{event.name}</h1>
             
             <div className="space-y-3 mb-6">
@@ -217,22 +245,31 @@ export default function EventCheckIn() {
     );
   }
 
-  // Success state
-  if (success) {
+  // Success state or already checked in
+  if (success || alreadyCheckedIn) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center">
             <CheckCircle className="w-10 h-10 text-green-500" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">You're Checked In!</h1>
-          <p className="text-muted-foreground mb-6">Welcome to {event.name}</p>
-          <div className="flex gap-3 justify-center">
-            <Button onClick={() => navigate(`/event/${event.id}`)}>
+          <h1 className="text-2xl font-bold mb-2">
+            {alreadyCheckedIn && !success ? 'Already Checked In!' : 'You\'re Checked In!'}
+          </h1>
+          <p className="text-muted-foreground mb-6">
+            {alreadyCheckedIn && !success 
+              ? `You're already checked in to ${event.name}` 
+              : `Welcome to ${event.name}`}
+          </p>
+          <div className="flex flex-col gap-3 justify-center">
+            <Button onClick={() => navigate(`/event/${event.id}`)} className="w-full">
               View Event
             </Button>
             <Button variant="outline" onClick={() => navigate('/connect')}>
               Meet People
+            </Button>
+            <Button variant="ghost" onClick={() => navigate('/events')}>
+              Browse More Events
             </Button>
           </div>
         </div>
@@ -255,6 +292,15 @@ export default function EventCheckIn() {
 
       <div className="px-4 -mt-12 relative z-10">
         <div className="bg-card rounded-2xl p-6 border border-border">
+          <Button
+            variant="ghost"
+            className="mb-4 -ml-2"
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          
           <h1 className="text-2xl font-bold mb-2">{event.name}</h1>
           
           <div className="space-y-3 mb-6">
@@ -280,6 +326,19 @@ export default function EventCheckIn() {
                 <div>
                   <p className="font-medium text-destructive">Location Check Failed</p>
                   <p className="text-sm text-muted-foreground mt-1">{locationError}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* General Error */}
+          {error && !locationError && (
+            <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-destructive">Check-In Failed</p>
+                  <p className="text-sm text-muted-foreground mt-1">{error}</p>
                 </div>
               </div>
             </div>
