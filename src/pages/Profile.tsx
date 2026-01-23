@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Settings,
@@ -16,6 +17,7 @@ import {
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
 import { Switch } from '@/components/ui/switch';
+import { SubscriptionModal } from '@/components/modals/SubscriptionModal';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -39,6 +41,7 @@ export default function Profile() {
       value: user?.subscription.tier?.toUpperCase(),
       isPro: user?.subscription.tier === 'pro',
       isMax: user?.subscription.tier === 'max',
+      onClick: () => setShowSubscriptionModal(true),
     },
     { 
       icon: Shield, 
@@ -51,6 +54,8 @@ export default function Profile() {
       onClick: () => {},
     }] : []),
   ];
+
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -197,6 +202,14 @@ export default function Profile() {
           <span className="font-medium">Log Out</span>
         </button>
       </div>
+
+      {/* Subscription Modal */}
+      {showSubscriptionModal && (
+        <SubscriptionModal 
+          isOpen={showSubscriptionModal} 
+          onClose={() => setShowSubscriptionModal(false)} 
+        />
+      )}
 
       <BottomNav />
     </div>
