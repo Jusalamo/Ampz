@@ -84,33 +84,57 @@ export async function generateQRCodeDataURL(data: string): Promise<string> {
 }
 
 // Build check-in URL for an event with geofence validation
-export function buildCheckInURL(eventId: string, token: string): string {
+export function buildCheckInURL(eventId: string, token?: string): string {
   const baseURL = window.location.origin;
-  return `${baseURL}/event/${eventId}/checkin?token=${token}&checkGeofence=true`;
+  const url = `${baseURL}/event/${eventId}/checkin`;
+  
+  if (token) {
+    return `${url}?token=${token}`;
+  }
+  return url;
 }
 
 // Parse check-in URL and extract event ID and token
 export function parseCheckInURL(url: string): { eventId: string; token: string } | null {
   try {
-    // Handle multiple URL formats:
-    // 1. Regular check-in URL with token: /event/{id}/checkin?token={token}
-    // 2. Event page URL: /event/{id}
-    // 3. Event check-in page URL: /event/{id}/checkin
-    
     // Remove any hash or query parameters for basic parsing
     const cleanUrl = url.split('#')[0].split('?')[0];
     
-    // Try to extract event ID from URL
-    const eventIdMatch = cleanUrl.match(/\/event\/([^/]+)(\/checkin)?$/);
-    if (!eventIdMatch) return null;
+    // Try to extract event ID from URL - handle multiple formats
+    let eventId: string | null = null;
     
-    const eventId = eventIdMatch[1];
+    // Format 1: /event/{id}/checkin
+    const eventCheckInMatch = cleanUrl.match(/\/event\/([^/]+)\/checkin$/);
+    if (eventCheckInMatch) {
+      eventId = eventCheckInMatch[1];
+    }
+    
+    // Format 2: /event/{id}
+    if (!eventId) {
+      const eventPageMatch = cleanUrl.match(/\/event\/([^/]+)$/);
+      if (eventPageMatch) {
+        eventId = eventPageMatch[1];
+      }
+    }
+    
+    // Format 3: Just an event ID (UUID)
+    if (!eventId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(url)) {
+      eventId = url;
+    }
+    
+    if (!eventId) {
+      return null;
+    }
     
     // Extract token from query parameters if present
-    const urlObj = new URL(url, window.location.origin);
-    const token = urlObj.searchParams.get('token');
-    
-    return { eventId, token: token || '' };
+    try {
+      const urlObj = new URL(url, window.location.origin);
+      const token = urlObj.searchParams.get('token') || '';
+      return { eventId, token };
+    } catch {
+      // If URL parsing fails, just return the event ID
+      return { eventId, token: '' };
+    }
   } catch (error) {
     console.error('Error parsing check-in URL:', error);
     return null;
@@ -119,17 +143,11 @@ export function parseCheckInURL(url: string): { eventId: string; token: string }
 
 // Extract event ID from URL
 export function extractEventIdFromURL(url: string): string | null {
-  try {
-    const cleanUrl = url.split('#')[0].split('?')[0];
-    const eventIdMatch = cleanUrl.match(/\/event\/([^/]+)(\/checkin)?$/);
-    return eventIdMatch ? eventIdMatch[1] : null;
-  } catch (error) {
-    console.error('Error extracting event ID from URL:', error);
-    return null;
-  }
+  const parsed = parseCheckInURL(url);
+  return parsed?.eventId || null;
 }
 
-// Client-side token validation (for backwards compatibility and basic checks)
+// Client-side token validation (for backwards compatibility)
 export function validateEventToken(token: string, eventId: string): boolean {
   if (!token) return false;
   
@@ -143,7 +161,7 @@ export function validateEventToken(token: string, eventId: string): boolean {
   }
 }
 
-// Server-side secure token validation with geofence check
+// Server-side secure token validation
 export async function validateSecureEventToken(
   token: string,
   eventId: string
@@ -215,19 +233,12 @@ export async function downloadQRCode(eventName: string, qrDataUrl: string): Prom
   document.body.removeChild(link);
 }
 
-// New function: Generate QR code URL that includes geofence check
+// Generate QR code URL that includes geofence check
 export function generateEventQRCodeURL(eventId: string, token?: string): string {
-  const baseURL = window.location.origin;
-  const checkinURL = `${baseURL}/event/${eventId}/checkin`;
-  
-  if (token) {
-    return `${checkinURL}?token=${token}&checkGeofence=true`;
-  }
-  
-  return checkinURL;
+  return buildCheckInURL(eventId, token);
 }
 
-// New function: Validate geofence for check-in
+// Unified geofence validation for check-in
 export async function validateGeofenceForCheckIn(
   eventId: string,
   userLat: number,
@@ -237,12 +248,17 @@ export async function validateGeofenceForCheckIn(
     // Fetch event details including coordinates and geofence radius
     const { data: event, error } = await supabase
       .from('events')
-      .select('latitude, longitude, geofence_radius')
+      .select('latitude, longitude, geofence_radius, name, location')
       .eq('id', eventId)
       .single();
     
     if (error || !event) {
       return { valid: false, error: 'Event not found' };
+    }
+    
+    // If event has no coordinates, skip geofence check
+    if (!event.latitude || !event.longitude) {
+      return { valid: true };
     }
     
     const distance = calculateDistance(
@@ -257,10 +273,51 @@ export async function validateGeofenceForCheckIn(
     return {
       valid: withinGeofence,
       distance: Math.round(distance),
-      error: withinGeofence ? undefined : `You are ${Math.round(distance)}m away from the event venue. Please move within ${event.geofence_radius || 50}m to check in.`
+      error: withinGeofence ? undefined : `You are ${Math.round(distance)}m away from "${event.name}". Please move within ${event.geofence_radius || 50}m of ${event.location} to check in.`
     };
   } catch (error) {
     console.error('Error validating geofence:', error);
     return { valid: false, error: 'Failed to validate location' };
   }
+}
+
+// New: Get user location with permission handling
+export async function getUserLocation(options?: PositionOptions): Promise<{ latitude: number; longitude: number; accuracy: number }> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation is not supported by your browser'));
+      return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        });
+      },
+      (error) => {
+        let errorMessage = 'Failed to get location';
+        switch (error.code) {
+          case 1:
+            errorMessage = 'Location permission denied. Please enable location access in your browser settings.';
+            break;
+          case 2:
+            errorMessage = 'Location unavailable. Please try again.';
+            break;
+          case 3:
+            errorMessage = 'Location request timed out. Please try again.';
+            break;
+        }
+        reject(new Error(errorMessage));
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 30000,
+        ...options
+      }
+    );
+  });
 }
