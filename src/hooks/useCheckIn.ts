@@ -9,6 +9,8 @@ export interface CheckInResult {
   message?: string;
   eventId?: string;
   checkInId?: string;
+  isWithinGeofence?: boolean;
+  distance?: number;
 }
 
 export interface GeolocationResult {
@@ -93,7 +95,9 @@ export function useCheckIn(userId?: string) {
         const distanceInMeters = Math.round(distance);
         return {
           success: false,
-          error: `You are ${distanceInMeters}m away from the event. Please move within ${event.geofenceRadius}m of the venue to check in.`,
+          error: `You need to be inside the event's geofence to proceed. You are ${distanceInMeters}m away from the event. Please move within ${event.geofenceRadius}m of the venue to check in.`,
+          isWithinGeofence: false,
+          distance: distanceInMeters
         };
       }
 
@@ -156,6 +160,8 @@ export function useCheckIn(userId?: string) {
         message: `Welcome to ${event.name}!`,
         eventId: event.id,
         checkInId: data.id,
+        isWithinGeofence: true,
+        distance: Math.round(distance)
       };
     } catch (err: any) {
       const message = err?.message || 'Check-in failed';
@@ -276,6 +282,125 @@ export function useCheckIn(userId?: string) {
     }
   }, []);
 
+  // Unified QR code scanning flow with geofence check
+  const processQRCodeScan = useCallback(async (
+    qrData: string,
+    visibilityMode: 'public' | 'private' = 'public',
+    verificationPhoto?: string
+  ): Promise<CheckInResult> => {
+    if (!userId) {
+      return { success: false, error: 'You must be logged in to check in' };
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // First validate the QR code
+      const validationResult = await validateQRCode(qrData);
+      
+      if (!validationResult.valid || !validationResult.event) {
+        return { success: false, error: validationResult.error || 'Invalid QR code' };
+      }
+
+      const event = validationResult.event;
+      
+      // Get user's location for geofence check
+      const location = await getUserLocation();
+      
+      // Calculate distance to venue
+      const distance = calculateDistance(
+        location.latitude,
+        location.longitude,
+        event.coordinates.lat,
+        event.coordinates.lng
+      );
+
+      // Check if within geofence
+      const withinGeofence = distance <= event.geofenceRadius;
+
+      if (!withinGeofence) {
+        const distanceInMeters = Math.round(distance);
+        return {
+          success: false,
+          error: `You need to be inside the event's geofence to proceed. You are ${distanceInMeters}m away from the event. Please move within ${event.geofenceRadius}m of the venue to check in.`,
+          isWithinGeofence: false,
+          distance: distanceInMeters,
+          eventId: event.id
+        };
+      }
+
+      // Create check-in record
+      const { data, error: insertError } = await supabase
+        .from('check_ins')
+        .insert({
+          user_id: userId,
+          event_id: event.id,
+          check_in_latitude: location.latitude,
+          check_in_longitude: location.longitude,
+          within_geofence: true,
+          distance_from_venue: distance,
+          visibility_mode: visibilityMode,
+          verification_method: verificationPhoto ? 'photo' : 'qr_scan',
+          verification_photo: verificationPhoto || null,
+          checked_in_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Check-in error:', insertError);
+        return { success: false, error: 'Failed to record check-in. Please try again.' };
+      }
+
+      // If public, create match profile
+      if (visibilityMode === 'public') {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('name, age, bio, interests, profile_photo, location, occupation, gender')
+          .eq('id', userId)
+          .single();
+
+        if (profileData) {
+          await supabase.from('match_profiles').insert({
+            user_id: userId,
+            event_id: event.id,
+            check_in_id: data.id,
+            display_name: profileData.name || 'Anonymous',
+            age: profileData.age,
+            bio: profileData.bio,
+            interests: profileData.interests || [],
+            profile_photos: verificationPhoto 
+              ? [verificationPhoto] 
+              : profileData.profile_photo 
+                ? [profileData.profile_photo] 
+                : [],
+            location: profileData.location,
+            occupation: profileData.occupation,
+            gender: profileData.gender,
+            is_active: true,
+            is_public: true,
+          });
+        }
+      }
+
+      return {
+        success: true,
+        message: `Welcome to ${event.name}!`,
+        eventId: event.id,
+        checkInId: data.id,
+        isWithinGeofence: true,
+        distance: Math.round(distance)
+      };
+    } catch (err: any) {
+      const message = err?.message || 'Check-in failed';
+      setError(message);
+      return { success: false, error: message };
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userId, validateQRCode, getUserLocation]);
+
   // Check if user has already checked in to an event
   const hasCheckedIn = useCallback(async (eventId: string): Promise<boolean> => {
     if (!userId) return false;
@@ -297,5 +422,6 @@ export function useCheckIn(userId?: string) {
     validateQRCode,
     hasCheckedIn,
     getUserLocation,
+    processQRCodeScan, // Add unified scanning method
   };
 }
