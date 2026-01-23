@@ -87,11 +87,10 @@ const presetColors = [
   '#10B981', '#F59E0B', '#EF4444', '#6366F1', '#06B6D4'
 ];
 
-// Function to generate QR code URL that links to event check-in
+// Function to generate QR code URL that links to event details
 const generateQRCodeUrl = (eventId: string, qrCode: string): string => {
-  // Generate check-in URL that can be parsed by the QR scanner
-  const checkInUrl = `${window.location.origin}/event/${eventId}/checkin`;
-  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(checkInUrl)}&format=png&bgcolor=ffffff&color=000000&qzone=1&margin=10&ecc=H`;
+  const eventDetailsUrl = `${window.location.origin}/event/${eventId}`;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(eventDetailsUrl)}&format=png&bgcolor=ffffff&color=000000&qzone=1&margin=10&ecc=H`;
 };
 
 // Helper function to convert File to Base64 for persistent storage
@@ -916,7 +915,7 @@ export function EventWizardModal({ isOpen, onClose, editingEvent }: EventWizardM
       const hasVideo = eventData.videos.length > 0;
       const mediaType = hasVideo ? 'video' : 'carousel';
       
-      // Generate QR code that links to the event check-in page
+      // Generate QR code that links to the event details page
       const qrCodeUrl = generateQRCodeUrl(eventId, qrCode);
       
       // Use base64 images and videos for persistent storage
@@ -2424,7 +2423,7 @@ export function EventWizardModal({ isOpen, onClose, editingEvent }: EventWizardM
                     )}
                   </div>
                   <p className="text-xs mt-3 text-center" style={{ color: DESIGN.colors.textSecondary }}>
-                    QR code links to: {window.location.origin}/event/{createdEvent.id}/checkin
+                    QR code links to: {window.location.origin}/event/{createdEvent.id}
                   </p>
                 </div>
 

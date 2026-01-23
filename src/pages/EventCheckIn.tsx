@@ -20,6 +20,8 @@ export default function EventCheckIn() {
   const [success, setSuccess] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
+  const token = searchParams.get('token');
+
   useEffect(() => {
     const fetchEvent = async () => {
       if (!id) {
@@ -87,7 +89,7 @@ export default function EventCheckIn() {
     setError(null);
 
     try {
-      // Use the checkIn method from useCheckIn hook
+      // Use the unified checkIn method from useCheckIn hook
       const result = await checkIn(event, 'public');
       
       if (result.success) {
@@ -96,8 +98,6 @@ export default function EventCheckIn() {
         // Check if error is specifically about geofence
         if (result.error?.includes('inside the event\'s geofence')) {
           setLocationError(result.error);
-        } else if (result.error?.includes('already checked in')) {
-          setError('You have already checked in to this event');
         } else {
           setError(result.error || 'Failed to check in');
         }
@@ -199,7 +199,7 @@ export default function EventCheckIn() {
             <div className="flex gap-3">
               <Button
                 className="flex-1"
-                onClick={() => navigate(`/auth?redirect=/event/${event.id}/checkin`)}
+                onClick={() => navigate(`/auth?redirect=/event/${event.id}/checkin${token ? `?token=${token}` : ''}`)}
               >
                 Sign In
               </Button>
@@ -272,26 +272,13 @@ export default function EventCheckIn() {
             </div>
           </div>
 
-          {/* Error Message */}
-          {error && (
-            <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 mb-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-destructive">Check-In Failed</p>
-                  <p className="text-sm text-muted-foreground mt-1">{error}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Location Error */}
           {locationError && (
-            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-4">
+            <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 mb-4">
               <div className="flex items-start gap-3">
-                <MapPin className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                <MapPin className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-medium text-yellow-600 dark:text-yellow-400">Location Check Required</p>
+                  <p className="font-medium text-destructive">Location Check Failed</p>
                   <p className="text-sm text-muted-foreground mt-1">{locationError}</p>
                 </div>
               </div>
