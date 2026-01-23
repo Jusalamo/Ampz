@@ -19,7 +19,7 @@ type ScannerStep = 'scan' | 'code' | 'verifying' | 'geofence' | 'success' | 'err
 
 export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QRScannerModalProps) {
   const navigate = useNavigate();
-  const { validateQRCode, checkIn, isLoading, getUserLocation } = useCheckIn(userId);
+  const { processQRCodeScan, isLoading } = useCheckIn(userId);
   
   const [step, setStep] = useState<ScannerStep>('scan');
   const [manualCode, setManualCode] = useState('');
@@ -45,64 +45,33 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
     }
   }, [isOpen]);
 
-  // Perform geofence check
-  const performGeofenceCheck = useCallback(async (event: Event) => {
-    setStep('geofence');
-    
-    try {
-      const location = await getUserLocation();
-      
-      const R = 6371e3;
-      const φ1 = (location.latitude * Math.PI) / 180;
-      const φ2 = (event.coordinates.lat * Math.PI) / 180;
-      const Δφ = ((event.coordinates.lat - location.latitude) * Math.PI) / 180;
-      const Δλ = ((event.coordinates.lng - location.longitude) * Math.PI) / 180;
-      const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const distanceMeters = R * c;
-      
-      setDistance(Math.round(distanceMeters));
-
-      if (distanceMeters <= event.geofenceRadius) {
-        const checkInResult = await checkIn(event, 'public');
-        
-        if (checkInResult.success) {
-          setSuccessMessage(`Welcome to ${event.name}!`);
-          setStep('success');
-          onCheckInSuccess?.(event.id);
-        } else {
-          setErrorMessage(checkInResult.error || 'Check-in failed');
-          setStep('error');
-        }
-      } else {
-        setErrorMessage(
-          `You are ${Math.round(distanceMeters)}m away from the event. ` +
-          `Please move within ${event.geofenceRadius}m of the venue to check in.`
-        );
-        setStep('error');
-      }
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Failed to verify location');
-      setStep('error');
-    }
-  }, [getUserLocation, checkIn, onCheckInSuccess]);
-
-  // Handle code validation
-  const handleCodeValidation = useCallback(async (code: string) => {
+  // Unified QR code processing function
+  const processQRCode = useCallback(async (code: string) => {
     setStep('verifying');
     
-    const result = await validateQRCode(code.trim().toUpperCase());
-    
-    if (!result.valid || !result.event) {
-      setErrorMessage(result.error || 'Invalid code');
+    try {
+      // Use the unified processQRCodeScan method that handles validation, geofence check, and check-in
+      const result = await processQRCodeScan(code, 'public');
+      
+      if (result.success) {
+        setSuccessMessage(result.message || 'Check-in successful!');
+        setStep('success');
+        onCheckInSuccess?.(result.eventId || '');
+      } else {
+        // Check if the error is specifically about geofence
+        if (result.error?.includes('inside the event\'s geofence')) {
+          setErrorMessage(result.error);
+          setDistance(result.distance || null);
+        } else {
+          setErrorMessage(result.error || 'Check-in failed');
+        }
+        setStep('error');
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Failed to process QR code');
       setStep('error');
-      return;
     }
-
-    setScannedEvent(result.event);
-    await performGeofenceCheck(result.event);
-  }, [validateQRCode, performGeofenceCheck]);
+  }, [processQRCodeScan, onCheckInSuccess]);
 
   // Stop scanning
   const stopScanning = useCallback(() => {
@@ -141,11 +110,8 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
           if (result) {
             stopScanning();
             const code = result.getText();
-
-            // IMPORTANT: pass the full scanned string into validateQRCode.
-            // It supports both full check-in URLs and legacy access/QR codes.
             setManualCode(code);
-            await handleCodeValidation(code);
+            await processQRCode(code);
           }
         }
       );
@@ -156,7 +122,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
     } finally {
       isStartingRef.current = false;
     }
-  }, [stopScanning, handleCodeValidation]);
+  }, [stopScanning, processQRCode]);
 
   // Start/stop scanning based on step
   useEffect(() => {
@@ -172,7 +138,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
   // Handle manual code submission
   const handleCodeSubmit = async () => {
     if (!manualCode.trim()) return;
-    await handleCodeValidation(manualCode);
+    await processQRCode(manualCode);
   };
 
   const handleClose = () => {
@@ -284,7 +250,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 <Loader2 className="absolute -bottom-2 -right-2 w-8 h-8 text-primary animate-spin" />
               </div>
               <h3 className="text-xl font-bold mb-2">Checking Your Location</h3>
-              <p className="text-muted-foreground text-center">Verifying you're at {scannedEvent?.name}...</p>
+              <p className="text-muted-foreground text-center">Verifying you're at the event location...</p>
             </>
           )}
 
@@ -306,6 +272,14 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
               </div>
               <h3 className="text-xl font-bold mb-2">Check-In Failed</h3>
               <p className="text-muted-foreground text-center mb-6 max-w-xs">{errorMessage}</p>
+              {distance && (
+                <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                    <MapPin className="w-4 h-4 inline mr-1" />
+                    You need to be inside the event's geofence to proceed.
+                  </p>
+                </div>
+              )}
               <div className="flex gap-3">
                 <Button variant="outline" className="h-12" onClick={() => setStep('code')}>Try Again</Button>
                 <Button className="h-12" onClick={handleClose}>Close</Button>
