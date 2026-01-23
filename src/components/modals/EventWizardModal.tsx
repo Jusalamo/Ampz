@@ -846,6 +846,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       // Generate QR code that links to the event details page
       const qrCodeUrl = generateQRCodeUrl(eventId, qrCode);
       
+      // Convert blob URLs to persistent URLs or keep as blob URLs for demo
+      const images = eventData.images;
+      const videos = eventData.videos;
+      
       // Create event data
       const newEvent: Event = {
         id: eventId,
@@ -866,9 +870,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         qrCodeUrl: qrCodeUrl, // This is the actual QR code image URL
         geofenceRadius: eventData.geofenceRadius,
         customTheme: eventData.themeColor,
-        coverImage: eventData.images[0] || `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=800&auto=format&fit=crop`,
-        images: eventData.images,
-        videos: eventData.videos,
+        coverImage: eventData.images[0] || '',
+        images: images,
+        videos: videos,
         tags: [eventData.category],
         isFeatured: user?.subscription?.tier === 'max',
         hasVideo: eventData.videos.length > 0,
