@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, QrCode, Keyboard, Loader2, MapPin, AlertCircle, Check, ExternalLink, Navigation } from 'lucide-react';
+import { X, QrCode, Keyboard, Loader2, MapPin, Check, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
@@ -7,8 +7,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCheckIn } from '@/hooks/useCheckIn';
 import { Event } from '@/lib/types';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { validateGeofenceForCheckIn } from '@/lib/qr-utils';
-import { supabase } from '@/integrations/supabase/client';
 
 interface QRScannerModalProps {
   isOpen: boolean;
@@ -17,295 +15,186 @@ interface QRScannerModalProps {
   onCheckInSuccess?: (eventId: string) => void;
 }
 
-type ScannerStep = 'scan' | 'code' | 'verifying' | 'geofence_check' | 'success' | 'error' | 'outside_geofence';
+type ScannerStep = 'scan' | 'code' | 'processing' | 'success' | 'error';
 
 export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QRScannerModalProps) {
   const navigate = useNavigate();
-  const { processQRCodeScan, isLoading, validateQRCode, getUserLocation } = useCheckIn(userId);
+  const { processQRCodeScan, isLoading } = useCheckIn(userId);
   
   const [step, setStep] = useState<ScannerStep>('scan');
   const [manualCode, setManualCode] = useState('');
-  const [scannedEvent, setScannedEvent] = useState<Event | null>(null);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-  const [distance, setDistance] = useState<number | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string>('');
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [resultMessage, setResultMessage] = useState('');
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [eventName, setEventName] = useState('');
+  const [eventId, setEventId] = useState<string>('');
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
-  const controlsRef = useRef<{ stop: () => void } | null>(null);
-  const isStartingRef = useRef(false);
+  const isScanningRef = useRef(false);
 
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
       setStep('scan');
       setManualCode('');
-      setScannedEvent(null);
-      setErrorMessage('');
-      setSuccessMessage('');
-      setDistance(null);
-      setDebugInfo('');
-      setUserLocation(null);
+      setResultMessage('');
+      setIsSuccess(false);
+      setEventName('');
+      setEventId('');
+      isScanningRef.current = false;
     }
   }, [isOpen]);
 
-  // Fetch event details by ID
-  const fetchEventDetails = useCallback(async (eventId: string): Promise<Event | null> => {
-    try {
-      const { data: eventData, error } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', eventId)
-        .single();
-
-      if (error || !eventData) {
-        return null;
-      }
-
-      return {
-        id: eventData.id,
-        name: eventData.name,
-        description: eventData.description || '',
-        category: eventData.category,
-        location: eventData.location,
-        address: eventData.address,
-        coordinates: { lat: eventData.latitude, lng: eventData.longitude },
-        date: eventData.date,
-        time: eventData.time,
-        price: eventData.price || 0,
-        currency: eventData.currency || 'NAD',
-        maxAttendees: eventData.max_attendees || 500,
-        attendees: eventData.attendees_count || 0,
-        organizerId: eventData.organizer_id,
-        qrCode: eventData.qr_code,
-        qrCodeUrl: eventData.qr_code_url,
-        geofenceRadius: eventData.geofence_radius || 50,
-        customTheme: eventData.custom_theme || '#8B5CF6',
-        coverImage: eventData.cover_image || '',
-        images: eventData.images || [],
-        videos: eventData.videos || [],
-        tags: eventData.tags || [],
-        isFeatured: eventData.is_featured || false,
-        isDemo: eventData.is_demo || false,
-        isActive: eventData.is_active ?? true,
-      };
-    } catch (error) {
-      console.error('Error fetching event details:', error);
-      return null;
-    }
-  }, []);
-
-  // Check geofence function
-  const checkGeofence = useCallback(async (event: Event): Promise<{ withinGeofence: boolean; distance?: number; error?: string }> => {
-    try {
-      const location = await getUserLocation();
-      setUserLocation({ lat: location.latitude, lng: location.longitude });
-      
-      const geofenceCheck = await validateGeofenceForCheckIn(
-        event.id,
-        location.latitude,
-        location.longitude
-      );
-      
-      return {
-        withinGeofence: geofenceCheck.valid,
-        distance: geofenceCheck.distance,
-        error: geofenceCheck.error
-      };
-    } catch (err: any) {
-      console.error('Geofence check error:', err);
-      return {
-        withinGeofence: false,
-        error: err.message || 'Failed to check location'
-      };
-    }
-  }, [getUserLocation]);
-
-  // Process QR code with proper validation
+  // Process QR code - INSTANT version
   const processQRCode = useCallback(async (code: string) => {
-    setStep('verifying');
-    setDebugInfo(`Processing QR code...`);
+    if (!code.trim()) return;
+    
+    setStep('processing');
     
     try {
-      // First, validate the QR code to get event info
-      const validationResult = await validateQRCode(code);
+      // Show immediate feedback
+      setResultMessage('Checking in...');
       
-      if (!validationResult.valid || !validationResult.event) {
-        setErrorMessage(validationResult.error || 'Invalid QR code');
-        setStep('error');
-        return;
-      }
-      
-      const event = validationResult.event;
-      setScannedEvent(event);
-      setDebugInfo(`Event found: ${event.name}`);
-      
-      // Check if user has already checked in
-      if (userId) {
-        const { data: existingCheckIn } = await supabase
-          .from('check_ins')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('event_id', event.id)
-          .limit(1);
-
-        if (existingCheckIn && existingCheckIn.length > 0) {
-          setSuccessMessage(`Already checked in to ${event.name}!`);
-          setStep('success');
-          return;
-        }
-      }
-      
-      // Check geofence if required
-      if (validationResult.requiresGeofence !== false) {
-        setStep('geofence_check');
-        setDebugInfo('Checking your location...');
-        
-        const geofenceResult = await checkGeofence(event);
-        
-        if (!geofenceResult.withinGeofence) {
-          setDistance(geofenceResult.distance || null);
-          setErrorMessage(geofenceResult.error || 'You are not within the event geofence');
-          setStep('outside_geofence');
-          return;
-        }
-        
-        setDistance(geofenceResult.distance || null);
-        setDebugInfo(`Within geofence! Distance: ${geofenceResult.distance}m`);
-      }
-      
-      // Now perform the actual check-in
-      setDebugInfo('Processing check-in...');
       const result = await processQRCodeScan(code, 'public');
       
       if (result.success) {
-        setSuccessMessage(result.message || 'Check-in successful!');
+        setResultMessage(result.message || 'Checked in successfully!');
+        setEventName(result.message?.replace('Checked in to ', '').replace('!', '') || 'Event');
+        setEventId(result.eventId || '');
+        setIsSuccess(true);
         setStep('success');
-        onCheckInSuccess?.(result.eventId || '');
+        
+        // Call success callback
+        if (result.eventId) {
+          onCheckInSuccess?.(result.eventId);
+        }
+        
+        // Auto-close after success (like WhatsApp)
+        setTimeout(() => {
+          if (isSuccess) {
+            onClose();
+            if (result.eventId) {
+              navigate(`/event/${result.eventId}`);
+            }
+          }
+        }, 2000);
       } else {
-        setErrorMessage(result.error || 'Check-in failed');
+        setResultMessage(result.error || 'Check-in failed');
+        setIsSuccess(false);
         setStep('error');
       }
     } catch (err: any) {
-      console.error('Error processing QR code:', err);
-      setErrorMessage(err?.message || 'Failed to process QR code');
+      console.error('QR processing error:', err);
+      setResultMessage('Scan failed. Please try again.');
+      setIsSuccess(false);
       setStep('error');
     }
-  }, [validateQRCode, checkGeofence, processQRCodeScan, userId, onCheckInSuccess]);
+  }, [processQRCodeScan, onCheckInSuccess, onClose, navigate, isSuccess]);
 
-  // Stop scanning
-  const stopScanning = useCallback(() => {
-    if (controlsRef.current) {
-      controlsRef.current.stop();
-      controlsRef.current = null;
-    }
-    codeReaderRef.current = null;
-    isStartingRef.current = false;
-  }, []);
-
-  // Start QR code scanning
+  // Start scanning
   const startScanning = useCallback(async () => {
-    if (!videoRef.current) return;
-    if (isStartingRef.current) return;
-    isStartingRef.current = true;
+    if (!videoRef.current || isScanningRef.current) return;
+    
+    isScanningRef.current = true;
     
     try {
       codeReaderRef.current = new BrowserMultiFormatReader();
-
-      // Try to get the environment/rear camera
-      let preferredDeviceId: string | undefined;
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoInputs = devices.filter((d) => d.kind === 'videoinput');
-        const env = videoInputs.find((d) => /back|rear|environment/i.test(d.label));
-        preferredDeviceId = env?.deviceId || videoInputs[0]?.deviceId;
-      } catch {
-        // ignore; decoder will pick a default device
+      
+      // Get camera (fast, no device enumeration for speed)
+      const devices = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+      const videoInputs = devices.filter(d => d.kind === 'videoinput');
+      const rearCamera = videoInputs.find(d => /back|rear|environment/i.test(d.label));
+      
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          deviceId: rearCamera?.deviceId ? { exact: rearCamera.deviceId } : undefined,
+          facingMode: rearCamera ? undefined : 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
       }
       
-      controlsRef.current = await codeReaderRef.current.decodeFromVideoDevice(
-        preferredDeviceId,
+      // Start decoding
+      codeReaderRef.current.decodeFromVideoDevice(
+        undefined,
         videoRef.current,
-        async (result, error) => {
-          if (result) {
+        (result, error) => {
+          if (result && isScanningRef.current) {
+            isScanningRef.current = false;
             stopScanning();
-            const code = result.getText();
-            setManualCode(code);
-            await processQRCode(code);
+            processQRCode(result.getText());
           }
         }
       );
     } catch (err) {
-      console.error('Camera access error:', err);
-      setErrorMessage('Unable to access camera. Please use manual code entry.');
-      setStep('code');
-    } finally {
-      isStartingRef.current = false;
+      console.error('Camera error:', err);
+      setStep('code'); // Fallback to manual entry
+      isScanningRef.current = false;
     }
-  }, [stopScanning, processQRCode]);
+  }, [processQRCode]);
 
-  // Start/stop scanning based on step
+  // Stop scanning
+  const stopScanning = useCallback(() => {
+    if (codeReaderRef.current) {
+      codeReaderRef.current.reset();
+      codeReaderRef.current = null;
+    }
+    
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    
+    isScanningRef.current = false;
+  }, []);
+
+  // Handle manual code entry
+  const handleCodeSubmit = useCallback(() => {
+    if (!manualCode.trim()) return;
+    processQRCode(manualCode);
+  }, [manualCode, processQRCode]);
+
+  // Handle modal close
+  const handleClose = useCallback(() => {
+    stopScanning();
+    onClose();
+    
+    // Navigate to event if we checked in
+    if (isSuccess && eventId) {
+      navigate(`/event/${eventId}`);
+    }
+  }, [stopScanning, onClose, isSuccess, eventId, navigate]);
+
+  // Start/stop camera
   useEffect(() => {
     if (isOpen && step === 'scan') {
       startScanning();
     } else {
       stopScanning();
     }
-
+    
     return () => stopScanning();
   }, [isOpen, step, startScanning, stopScanning]);
 
-  // Handle manual code submission
-  const handleCodeSubmit = async () => {
-    if (!manualCode.trim()) return;
-    await processQRCode(manualCode);
-  };
-
-  const handleClose = () => {
-    stopScanning();
-    onClose();
-    
-    if (step === 'success' && scannedEvent) {
-      navigate(`/event/${scannedEvent.id}`);
-    }
-  };
-
-  const handleViewEvent = () => {
-    if (scannedEvent) {
-      navigate(`/event/${scannedEvent.id}`);
-    }
-    onClose();
-  };
-
-  const handleRetryGeofence = async () => {
-    if (!scannedEvent) return;
-    
-    setStep('geofence_check');
-    setErrorMessage('');
-    
-    const geofenceResult = await checkGeofence(scannedEvent);
-    
-    if (geofenceResult.withinGeofence) {
-      // Retry check-in now that we're within geofence
-      const code = manualCode || `${window.location.origin}/event/${scannedEvent.id}/checkin?checkGeofence=true`;
-      const result = await processQRCodeScan(code, 'public');
-      
-      if (result.success) {
-        setSuccessMessage(result.message || 'Check-in successful!');
-        setStep('success');
-        onCheckInSuccess?.(result.eventId || '');
-      } else {
-        setErrorMessage(result.error || 'Check-in failed');
-        setStep('error');
+  // Handle Enter key in manual code input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && step === 'code' && manualCode.trim()) {
+        handleCodeSubmit();
       }
-    } else {
-      setDistance(geofenceResult.distance || null);
-      setErrorMessage(geofenceResult.error || 'You are still not within the event geofence');
-      setStep('outside_geofence');
-    }
-  };
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [step, manualCode, handleCodeSubmit, handleClose]);
 
   if (!isOpen) return null;
 
@@ -315,33 +204,32 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-background flex flex-col"
+        className="fixed inset-0 z-50 bg-black flex flex-col"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="text-xl font-bold text-foreground">
-            {step === 'scan' && 'Scan QR Code'}
-            {step === 'code' && 'Enter Event Code'}
-            {step === 'verifying' && 'Verifying...'}
-            {step === 'geofence_check' && 'Checking Location'}
-            {step === 'success' && 'Check-In Complete!'}
-            {step === 'error' && 'Check-In Failed'}
-            {step === 'outside_geofence' && 'Outside Event Area'}
-          </h2>
-          <button
-            onClick={handleClose}
-            className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-accent transition-colors"
-            disabled={isLoading}
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        {/* Minimal Header */}
+        {step !== 'success' && (
+          <div className="flex items-center justify-between p-4">
+            <h2 className="text-lg font-semibold text-white">
+              {step === 'scan' && 'Scan QR Code'}
+              {step === 'code' && 'Enter Code'}
+              {step === 'processing' && 'Checking In'}
+              {step === 'error' && 'Error'}
+            </h2>
+            <button
+              onClick={handleClose}
+              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
+        )}
 
         {/* Content */}
-        <div className="flex-1 flex flex-col items-center justify-center p-6">
+        <div className="flex-1 flex flex-col items-center justify-center p-4">
+          {/* SCAN MODE */}
           {step === 'scan' && (
             <>
-              <div className="relative w-64 h-64 mb-6 rounded-3xl overflow-hidden">
+              <div className="relative w-72 h-72 mb-8 rounded-2xl overflow-hidden">
                 <video
                   ref={videoRef}
                   autoPlay
@@ -349,245 +237,175 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                   muted
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 border-2 border-primary rounded-3xl">
-                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-2xl" />
-                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-2xl" />
-                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-2xl" />
-                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-2xl" />
+                {/* Scanner frame overlay */}
+                <div className="absolute inset-0">
+                  {/* Corner markers */}
+                  <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-green-400 rounded-tl-xl" />
+                  <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-green-400 rounded-tr-xl" />
+                  <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-green-400 rounded-bl-xl" />
+                  <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-green-400 rounded-br-xl" />
+                  
+                  {/* Scanning line */}
+                  <div className="absolute top-1/2 left-2 right-2 h-1">
+                    <div className="h-full w-full bg-gradient-to-r from-transparent via-green-400 to-transparent animate-pulse" />
+                  </div>
                 </div>
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full">
-                  SCANNING...
+                
+                {/* Hint text */}
+                <div className="absolute bottom-4 left-0 right-0 text-center">
+                  <p className="text-white/80 text-sm font-medium">
+                    Point camera at event QR code
+                  </p>
                 </div>
               </div>
-              <p className="text-muted-foreground text-center mb-6">
-                Point your camera at the event's QR code
-              </p>
-              <Button 
-                variant="outline" 
-                className="h-12"
+              
+              {/* Manual entry button */}
+              <Button
+                variant="ghost"
+                className="text-white hover:bg-white/10"
                 onClick={() => setStep('code')}
                 disabled={isLoading}
               >
                 <Keyboard className="w-4 h-4 mr-2" />
-                Enter Code Manually
+                Enter code manually
               </Button>
             </>
           )}
 
+          {/* MANUAL CODE ENTRY */}
           {step === 'code' && (
-            <>
-              <QrCode className="w-16 h-16 text-primary mb-6" />
-              <h3 className="text-xl font-bold mb-2">Enter Event Code</h3>
-              <p className="text-muted-foreground text-center mb-6">
-                Ask the event organizer for the check-in code or enter the full event URL
-              </p>
+            <div className="w-full max-w-sm">
+              <div className="text-center mb-8">
+                <QrCode className="w-16 h-16 text-white mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-white mb-2">Enter Event Code</h3>
+                <p className="text-white/70">Enter the code from the event organizer</p>
+              </div>
+              
               <Input
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
-                placeholder="Enter code or event URL..."
-                className="text-center text-lg font-medium h-14 max-w-xs mb-6"
-                onKeyDown={(e) => e.key === 'Enter' && handleCodeSubmit()}
+                placeholder="Paste code here..."
+                className="text-center text-lg font-medium h-14 mb-6 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                autoFocus
               />
-              <div className="flex gap-3 w-full max-w-xs">
-                <Button 
-                  variant="outline" 
-                  className="flex-1 h-12" 
+              
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 h-12 border-white/20 text-white hover:bg-white/10"
                   onClick={() => setStep('scan')}
                   disabled={isLoading}
                 >
                   Back
                 </Button>
-                <Button 
-                  className="flex-1 h-12" 
-                  onClick={handleCodeSubmit} 
+                <Button
+                  className="flex-1 h-12 bg-green-500 hover:bg-green-600 text-white"
+                  onClick={handleCodeSubmit}
                   disabled={!manualCode.trim() || isLoading}
                 >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit'}
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Check In'
+                  )}
                 </Button>
               </div>
-            </>
+            </div>
           )}
 
-          {step === 'verifying' && (
-            <>
-              <Loader2 className="w-16 h-16 text-primary animate-spin mb-6" />
-              <h3 className="text-xl font-bold mb-2">Verifying Code</h3>
-              <p className="text-muted-foreground text-center mb-4">Please wait...</p>
-              {debugInfo && (
-                <p className="text-xs text-muted-foreground text-center max-w-xs break-all">
-                  {debugInfo}
-                </p>
-              )}
-            </>
-          )}
-
-          {step === 'geofence_check' && (
-            <>
-              <div className="relative">
-                <Navigation className="w-16 h-16 text-primary mb-6" />
-                <Loader2 className="absolute -bottom-2 -right-2 w-8 h-8 text-primary animate-spin" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">Checking Your Location</h3>
-              <p className="text-muted-foreground text-center mb-4">
-                Verifying you're at the event location...
-              </p>
-              {scannedEvent && (
-                <p className="text-sm text-muted-foreground text-center">
-                  Event: <span className="font-medium">{scannedEvent.name}</span>
-                </p>
-              )}
-              {debugInfo && (
-                <p className="text-xs text-muted-foreground text-center mt-2">
-                  {debugInfo}
-                </p>
-              )}
-            </>
-          )}
-
-          {step === 'success' && (
-            <>
-              <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mb-6">
-                <Check className="w-10 h-10 text-green-500" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">{successMessage}</h3>
-              <p className="text-muted-foreground text-center mb-6">You're now checked in!</p>
-              {distance !== null && (
-                <div className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                  <p className="text-sm text-green-600 dark:text-green-400">
-                    <MapPin className="w-4 h-4 inline mr-1" />
-                    You checked in from {distance}m away
-                  </p>
+          {/* PROCESSING */}
+          {step === 'processing' && (
+            <div className="text-center">
+              <div className="relative inline-block mb-6">
+                <Loader2 className="w-16 h-16 text-green-400 animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-black/50" />
                 </div>
-              )}
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Checking In</h3>
+              <p className="text-white/70">{resultMessage}</p>
+            </div>
+          )}
+
+          {/* SUCCESS */}
+          {step === 'success' && (
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="text-center"
+            >
+              <div className="w-24 h-24 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-6">
+                <Check className="w-12 h-12 text-green-400" />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-2">Checked In!</h3>
+              <p className="text-white/70 text-lg mb-2">{eventName}</p>
+              <p className="text-green-400 font-medium mb-8">✓ Successfully checked in</p>
+              
               <div className="flex gap-3">
-                <Button 
-                  className="h-12 px-6" 
+                <Button
+                  className="flex-1 h-12 bg-green-500 hover:bg-green-600 text-white"
+                  onClick={() => navigate(`/event/${eventId}`)}
+                >
+                  View Event
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 h-12 border-white/20 text-white hover:bg-white/10"
                   onClick={handleClose}
                 >
-                  Close
+                  Done
                 </Button>
-                {scannedEvent && (
-                  <Button 
-                    variant="outline" 
-                    className="h-12 px-6"
-                    onClick={handleViewEvent}
-                  >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    View Event
-                  </Button>
-                )}
               </div>
-            </>
+            </motion.div>
           )}
 
+          {/* ERROR */}
           {step === 'error' && (
-            <>
-              <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center mb-6">
-                <AlertCircle className="w-10 h-10 text-red-500" />
+            <div className="text-center max-w-sm">
+              <div className="w-24 h-24 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-6">
+                <AlertCircle className="w-12 h-12 text-red-400" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Check-In Failed</h3>
-              <p className="text-muted-foreground text-center mb-6 max-w-xs">{errorMessage}</p>
-              {debugInfo && (
-                <p className="text-xs text-muted-foreground text-center mb-4 max-w-xs break-all">
-                  {debugInfo}
-                </p>
-              )}
+              <h3 className="text-xl font-bold text-white mb-2">Check-in Failed</h3>
+              <p className="text-white/70 mb-6">{resultMessage}</p>
+              
+              {/* Location-specific error */}
+              {resultMessage.includes('move closer') || resultMessage.includes('location') ? (
+                <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MapPin className="w-5 h-5 text-yellow-400" />
+                    <span className="text-yellow-400 font-medium">Location Issue</span>
+                  </div>
+                  <p className="text-yellow-300/80 text-sm">
+                    Make sure you're at the event location and location services are enabled.
+                  </p>
+                </div>
+              ) : null}
+              
               <div className="flex gap-3">
-                <Button 
-                  variant="outline" 
-                  className="h-12" 
+                <Button
+                  variant="outline"
+                  className="flex-1 h-12 border-white/20 text-white hover:bg-white/10"
                   onClick={() => setStep('scan')}
-                  disabled={isLoading}
                 >
                   Try Again
                 </Button>
-                <Button 
-                  className="h-12" 
+                <Button
+                  className="flex-1 h-12 bg-gray-700 hover:bg-gray-600 text-white"
                   onClick={handleClose}
-                  disabled={isLoading}
                 >
-                  Close
+                  Cancel
                 </Button>
               </div>
-            </>
-          )}
-
-          {step === 'outside_geofence' && (
-            <>
-              <div className="w-20 h-20 rounded-full bg-yellow-500/20 flex items-center justify-center mb-6">
-                <MapPin className="w-10 h-10 text-yellow-500" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">Outside Event Area</h3>
-              <p className="text-muted-foreground text-center mb-4 max-w-xs">{errorMessage}</p>
-              
-              {scannedEvent && (
-                <div className="w-full max-w-xs mb-6">
-                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-4">
-                    <h4 className="font-medium text-yellow-600 dark:text-yellow-400 mb-2">
-                      Event Details
-                    </h4>
-                    <p className="text-sm text-foreground mb-1">
-                      <span className="font-medium">Event:</span> {scannedEvent.name}
-                    </p>
-                    <p className="text-sm text-foreground mb-1">
-                      <span className="font-medium">Location:</span> {scannedEvent.location}
-                    </p>
-                    <p className="text-sm text-foreground">
-                      <span className="font-medium">Required Radius:</span> {scannedEvent.geofenceRadius}m
-                    </p>
-                  </div>
-                  
-                  {distance !== null && (
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                      <p className="text-sm text-red-600 dark:text-red-400">
-                        <MapPin className="w-4 h-4 inline mr-1" />
-                        You are {distance}m away from the event
-                      </p>
-                      <p className="text-xs text-red-500/80 mt-1">
-                        You need to be within {scannedEvent.geofenceRadius}m to check in
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              <div className="flex flex-col gap-3 w-full max-w-xs">
-                <Button 
-                  className="h-12 w-full" 
-                  onClick={handleRetryGeofence}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Navigation className="w-4 h-4 mr-2" />
-                  )}
-                  Check Location Again
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="h-12 w-full" 
-                  onClick={() => setStep('scan')}
-                  disabled={isLoading}
-                >
-                  Scan Different QR Code
-                </Button>
-                <Button 
-                  className="h-12 w-full" 
-                  onClick={handleClose}
-                  disabled={isLoading}
-                >
-                  Close
-                </Button>
-              </div>
-            </>
+            </div>
           )}
         </div>
 
-        {/* Debug info (visible only in development) */}
-        {process.env.NODE_ENV === 'development' && debugInfo && (
-          <div className="p-2 bg-gray-900 text-gray-300 text-xs">
-            <p className="font-mono">{debugInfo}</p>
+        {/* Quick tips */}
+        {step === 'scan' && (
+          <div className="p-4 text-center border-t border-white/10">
+            <p className="text-white/60 text-sm">
+              Ensure good lighting and hold steady
+            </p>
           </div>
         )}
       </motion.div>
