@@ -4,7 +4,7 @@ import {
   ArrowLeft, Calendar, MapPin, Users, Clock, Share2, Bookmark, 
   Ticket, ExternalLink, MessageCircle, Image, ChevronDown, ChevronUp,
   Play, Pause, Volume2, VolumeX, Maximize2, Grid3x3, ChevronLeft, ChevronRight,
-  X, Film
+  X
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { CommunityComments } from '@/components/CommunityComments';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
-// Design Constants - Updated with better spacing
+// Design Constants
 const DESIGN = {
   colors: {
     primary: '#C4B5FD',
@@ -619,7 +619,7 @@ export default function EventDetail() {
       className="min-h-screen"
       style={{ background: DESIGN.colors.background }}
     >
-      {/* Fixed Header - Cleaner spacing */}
+      {/* Fixed Header */}
       <header 
         className={cn(
           'fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-4 pt-safe',
@@ -708,8 +708,8 @@ export default function EventDetail() {
       {/* Hero Media Section - YouTube-like aspect ratio (16:9) */}
       <div className="relative w-full pt-[56.25%] bg-black overflow-hidden">
         {event.mediaType === 'video' && event.videos && event.videos.length > 0 ? (
-          /* Video Player - Fixed aspect ratio */
-          <div className="absolute inset-0 group">
+          /* Video Player - Fixed aspect ratio with controls at the ends */
+          <div className="absolute inset-0">
             {/* Video Element */}
             <video
               ref={videoRef}
@@ -727,128 +727,67 @@ export default function EventDetail() {
               }}
             />
             
-            {/* Media Type Badge - Video */}
-            <div 
-              className="absolute top-4 left-4 px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-2 z-10"
-              style={{
-                background: 'rgba(0, 0, 0, 0.7)'
-              }}
-            >
-              <Film className="w-3.5 h-3.5 text-white" />
-              <span className="text-xs text-white font-medium">Video</span>
-            </div>
-            
-            {/* Always visible minimal controls */}
-            <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between pointer-events-none">
-              <div className="pointer-events-auto">
+            {/* Controls at the ends of the screen */}
+            <div className="absolute inset-0">
+              {/* Left side controls - Play/Pause */}
+              <div className="absolute left-4 bottom-4">
                 <button
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     toggleVideoPlay();
                   }}
-                  className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all duration-200 opacity-80 hover:opacity-100 backdrop-blur-sm cursor-pointer"
+                  className="w-12 h-12 rounded-full flex items-center justify-center bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-all duration-200 cursor-pointer group"
                   style={{
                     color: DESIGN.colors.textPrimary
                   }}
                   aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
                 >
                   {isVideoPlaying ? (
-                    <Pause className="w-4 h-4" />
+                    <Pause className="w-5 h-5 group-hover:scale-110 transition-transform" />
                   ) : (
-                    <Play className="w-4 h-4 ml-0.5" />
+                    <Play className="w-5 h-5 ml-0.5 group-hover:scale-110 transition-transform" />
                   )}
                 </button>
               </div>
               
-              <div className="pointer-events-auto">
+              {/* Right side controls - Mute and Expand */}
+              <div className="absolute right-4 bottom-4 flex items-center gap-3">
+                {/* Mute button */}
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleVideoMute();
+                  }}
+                  className="w-12 h-12 rounded-full flex items-center justify-center bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-all duration-200 cursor-pointer group"
+                  style={{
+                    color: DESIGN.colors.textPrimary
+                  }}
+                  aria-label={isVideoMuted ? 'Unmute video' : 'Mute video'}
+                >
+                  {isVideoMuted ? (
+                    <VolumeX className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  ) : (
+                    <Volume2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  )}
+                </button>
+                
+                {/* Expand button */}
                 <button
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     openVideoModal();
                   }}
-                  className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all duration-200 opacity-80 hover:opacity-100 backdrop-blur-sm cursor-pointer"
+                  className="w-12 h-12 rounded-full flex items-center justify-center bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-all duration-200 cursor-pointer group"
                   style={{
                     color: DESIGN.colors.textPrimary
                   }}
                   aria-label="Open video in fullscreen"
                 >
-                  <Maximize2 className="w-4 h-4" />
+                  <Maximize2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
                 </button>
-              </div>
-            </div>
-            
-            {/* Expanded controls on hover */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-              <div 
-                className="absolute bottom-0 left-0 right-0"
-                style={{
-                  background: 'linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 100%)',
-                  padding: '16px',
-                  paddingBottom: '32px'
-                }}
-              >
-                <div className="flex items-center justify-between max-w-5xl mx-auto">
-                  <div className="flex items-center gap-3 pointer-events-auto">
-                    {/* Play/Pause Button */}
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        toggleVideoPlay();
-                      }}
-                      className="w-11 h-11 rounded-full flex items-center justify-center bg-white/90 hover:bg-white transition-all duration-200 cursor-pointer"
-                      style={{
-                        color: DESIGN.colors.background,
-                        transform: 'scale(1)'
-                      }}
-                      aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
-                    >
-                      {isVideoPlaying ? (
-                        <Pause className="w-5 h-5" />
-                      ) : (
-                        <Play className="w-5 h-5 ml-0.5" />
-                      )}
-                    </button>
-                    
-                    {/* Volume Control */}
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        toggleVideoMute();
-                      }}
-                      className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all duration-200 cursor-pointer backdrop-blur-sm"
-                      style={{
-                        color: DESIGN.colors.textPrimary
-                      }}
-                      aria-label={isVideoMuted ? 'Unmute video' : 'Mute video'}
-                    >
-                      {isVideoMuted ? (
-                        <VolumeX className="w-5 h-5" />
-                      ) : (
-                        <Volume2 className="w-5 h-5" />
-                      )}
-                    </button>
-                  </div>
-                  
-                  {/* Expand Button */}
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      openVideoModal();
-                    }}
-                    className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all duration-200 cursor-pointer backdrop-blur-sm pointer-events-auto"
-                    style={{
-                      color: DESIGN.colors.textPrimary
-                    }}
-                    aria-label="Open video in fullscreen"
-                  >
-                    <Maximize2 className="w-5 h-5" />
-                  </button>
-                </div>
               </div>
             </div>
             
@@ -873,7 +812,7 @@ export default function EventDetail() {
             )}
           </div>
         ) : (
-          /* Image Carousel */
+          /* Image Carousel with controls at the ends */
           <div className="absolute inset-0">
             {eventImages && eventImages.length > 0 ? (
               <>
@@ -888,56 +827,61 @@ export default function EventDetail() {
                   }}
                 />
                 
-                {/* Media Type Badge - Carousel */}
-                <div 
-                  className="absolute top-4 left-4 px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-2 z-10"
-                  style={{
-                    background: 'rgba(0, 0, 0, 0.7)'
-                  }}
-                >
-                  <Grid3x3 className="w-3.5 h-3.5 text-white" />
-                  <span className="text-xs text-white font-medium">
-                    {currentImageIndex + 1}/{eventImages.length}
-                  </span>
-                </div>
-                
                 {/* Carousel Controls */}
                 {eventImages.length > 1 && (
                   <>
-                    {/* Navigation Buttons */}
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        prevImage();
-                      }}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-all hover:scale-105 active:scale-95 z-10 opacity-80 hover:opacity-100"
-                      style={{
-                        background: 'rgba(0, 0, 0, 0.7)',
-                        color: DESIGN.colors.textPrimary
-                      }}
-                      aria-label="Previous image"
-                    >
-                      <ChevronLeft className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        nextImage();
-                      }}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-all hover:scale-105 active:scale-95 z-10 opacity-80 hover:opacity-100"
-                      style={{
-                        background: 'rgba(0, 0, 0, 0.7)',
-                        color: DESIGN.colors.textPrimary
-                      }}
-                      aria-label="Next image"
-                    >
-                      <ChevronRight className="w-5 h-5" />
-                    </button>
+                    {/* Left side control - Previous */}
+                    <div className="absolute left-4 bottom-4">
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          prevImage();
+                        }}
+                        className="w-12 h-12 rounded-full flex items-center justify-center bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-all duration-200 cursor-pointer group"
+                        style={{
+                          color: DESIGN.colors.textPrimary
+                        }}
+                        aria-label="Previous image"
+                      >
+                        <ChevronLeft className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                      </button>
+                    </div>
                     
-                    {/* Carousel Dots - YouTube-style */}
-                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+                    {/* Right side controls - Next and carousel indicator */}
+                    <div className="absolute right-4 bottom-4 flex items-center gap-3">
+                      {/* Image counter */}
+                      <div 
+                        className="px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-2"
+                        style={{
+                          background: 'rgba(0, 0, 0, 0.7)'
+                        }}
+                      >
+                        <Grid3x3 className="w-3.5 h-3.5 text-white" />
+                        <span className="text-xs text-white font-medium">
+                          {currentImageIndex + 1}/{eventImages.length}
+                        </span>
+                      </div>
+                      
+                      {/* Next button */}
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          nextImage();
+                        }}
+                        className="w-12 h-12 rounded-full flex items-center justify-center bg-white/10 backdrop-blur-sm hover:bg-white/20 transition-all duration-200 cursor-pointer group"
+                        style={{
+                          color: DESIGN.colors.textPrimary
+                        }}
+                        aria-label="Next image"
+                      >
+                        <ChevronRight className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                      </button>
+                    </div>
+                    
+                    {/* Carousel Dots - Bottom center */}
+                    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-2 z-10">
                       {eventImages.map((_, index) => (
                         <button
                           key={index}
@@ -983,7 +927,7 @@ export default function EventDetail() {
       >
         {/* Event Info Section - Better spacing */}
         <div className="px-4 py-6">
-          {/* Title and Price */}
+          {/* Title and Price - Removed redundant category tag from header */}
           <div className="mb-5">
             <h1 
               className="font-bold mb-3"
@@ -1021,7 +965,7 @@ export default function EventDetail() {
                 </div>
               </div>
               
-              {/* Category Tag */}
+              {/* Category Tag - Only shown here, removed from header */}
               <span 
                 className="px-3 py-1.5 text-sm font-medium rounded-lg"
                 style={{
@@ -1119,7 +1063,7 @@ export default function EventDetail() {
             {/* Details Tab */}
             {activeTab === 'details' && (
               <div className="space-y-8">
-                {/* Info Cards Grid - Better spacing */}
+                {/* Info Cards Grid */}
                 <div className="grid grid-cols-2 gap-4">
                   {/* Date Card */}
                   <div 
@@ -1424,7 +1368,7 @@ export default function EventDetail() {
         </div>
       </main>
 
-      {/* Sticky Bottom CTA - Better spacing */}
+      {/* Sticky Bottom CTA */}
       <footer 
         className="fixed bottom-0 left-0 right-0 backdrop-blur-xl border-t z-50"
         style={{
@@ -1483,7 +1427,7 @@ export default function EventDetail() {
         </div>
       </footer>
 
-      {/* Video Modal - Improved */}
+      {/* Video Modal */}
       {isVideoModalOpen && event.mediaType === 'video' && event.videos && event.videos.length > 0 && (
         <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center">
           <div className="relative w-full h-full">
