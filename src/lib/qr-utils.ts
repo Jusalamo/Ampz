@@ -1,187 +1,107 @@
-import QRCode from 'qrcode';
 import { supabase } from '@/integrations/supabase/client';
 
-// Generate a SHA-256 hash for secure token storage
-async function hashToken(token: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(token);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// Generate a unique access token for an event
-export function generateEventToken(eventId: string): string {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 15);
-  const raw = `${eventId}-${timestamp}-${random}`;
-  // Simple encoding for URL-safe token
-  return btoa(raw).replace(/[+/=]/g, (c) => 
-    c === '+' ? '-' : c === '/' ? '_' : ''
-  );
-}
-
-// Generate a cryptographically secure token and store hash server-side
-export async function generateSecureEventToken(
-  eventId: string,
-  expiresAt?: Date
-): Promise<{ token: string; tokenId: string } | null> {
+// Parse check-in URL from QR code
+export const parseCheckInURL = (url: string): { eventId: string; token?: string } | null => {
   try {
-    // Generate secure random token
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-    const token = Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
-    
-    // Hash the token for storage
-    const tokenHash = await hashToken(token);
-    
-    // Store hash server-side via RPC
-    const { data, error } = await supabase.rpc('create_event_token', {
-      p_event_id: eventId,
-      p_token_hash: tokenHash,
-      p_expires_at: expiresAt?.toISOString() || null,
-    });
-    
-    if (error) {
-      console.error('Error creating event token:', error);
+    // Try to parse as URL first
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      // If not a valid URL, try to extract event ID directly
+      const eventIdMatch = url.match(/event\/([^/]+)/);
+      if (eventIdMatch) {
+        return { eventId: eventIdMatch[1] };
+      }
       return null;
     }
+
+    // Check if it's a check-in URL
+    const pathParts = parsedUrl.pathname.split('/');
+    const eventIndex = pathParts.indexOf('event');
     
-    return { token, tokenId: data };
-  } catch (error) {
-    console.error('Error generating secure token:', error);
-    return null;
-  }
-}
-
-// Generate a unique access code (human readable)
-export function generateAccessCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed ambiguous chars
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
-}
-
-// Generate QR code data URL
-export async function generateQRCodeDataURL(data: string): Promise<string> {
-  try {
-    const qrDataUrl = await QRCode.toDataURL(data, {
-      width: 512,
-      margin: 2,
-      color: {
-        dark: '#000000',
-        light: '#FFFFFF',
-      },
-      errorCorrectionLevel: 'H',
-    });
-    return qrDataUrl;
-  } catch (error) {
-    console.error('Error generating QR code:', error);
-    throw error;
-  }
-}
-
-// Build check-in URL for an event
-export function buildCheckInURL(eventId: string, token: string): string {
-  const baseURL = window.location.origin + window.location.pathname.replace(/\/$/, '');
-  return `${baseURL}#/event/${eventId}/checkin?token=${token}`;
-}
-
-// Parse check-in URL and extract event ID and token
-export function parseCheckInURL(url: string): { eventId: string; token: string } | null {
-  try {
-    // Handle both regular URLs and hash-based URLs
-    const hashMatch = url.match(/\/event\/([^/]+)\/checkin\?token=([^&]+)/);
-    if (hashMatch) {
-      return { eventId: hashMatch[1], token: hashMatch[2] };
+    if (eventIndex !== -1 && pathParts.length > eventIndex + 1) {
+      const eventId = pathParts[eventIndex + 1];
+      const token = parsedUrl.searchParams.get('token') || undefined;
+      
+      return { eventId, token };
     }
+    
     return null;
-  } catch (error) {
-    console.error('Error parsing check-in URL:', error);
+  } catch {
     return null;
   }
-}
+};
 
-// Client-side token validation (for backwards compatibility and basic checks)
-export function validateEventToken(token: string, eventId: string): boolean {
+// Validate event token (legacy client-side validation)
+export const validateEventToken = (token: string, eventId: string): boolean => {
   try {
-    // Reverse the encoding
-    const padded = token.replace(/-/g, '+').replace(/_/g, '/');
-    const decoded = atob(padded);
-    return decoded.startsWith(eventId);
-  } catch (error) {
+    // Legacy token format: simple hash of eventId + secret
+    const expectedToken = btoa(eventId + '-amps-checkin').slice(0, 8);
+    return token === expectedToken;
+  } catch {
     return false;
   }
-}
+};
 
-// Server-side secure token validation
-export async function validateSecureEventToken(
-  token: string,
-  eventId: string
-): Promise<boolean> {
+// Validate secure event token (server-side)
+export const validateSecureEventToken = async (token: string, eventId: string): Promise<boolean> => {
   try {
-    // Hash the token to compare with stored hash
-    const tokenHash = await hashToken(token);
-    
-    // Validate server-side
-    const { data, error } = await supabase.rpc('validate_event_token', {
-      p_token_hash: tokenHash,
-      p_event_id: eventId,
-    });
-    
-    if (error) {
-      console.error('Error validating token:', error);
+    const { data, error } = await supabase
+      .from('event_tokens')
+      .select('id, expires_at')
+      .eq('token', token)
+      .eq('event_id', eventId)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !data) {
       return false;
     }
-    
-    return data === true;
-  } catch (error) {
-    console.error('Error in secure token validation:', error);
+
+    // Check if token is expired
+    if (data.expires_at) {
+      const expiresAt = new Date(data.expires_at);
+      if (expiresAt < new Date()) {
+        return false;
+      }
+    }
+
+    return true;
+  } catch {
     return false;
   }
-}
+};
 
-// Calculate distance between two coordinates in meters (Haversine formula)
-export function calculateDistance(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-): number {
+// Calculate distance between two coordinates in meters
+export const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371e3; // Earth's radius in meters
   const φ1 = (lat1 * Math.PI) / 180;
   const φ2 = (lat2 * Math.PI) / 180;
   const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lng2 - lng1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
 
-  const a =
-    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-  return R * c;
-}
+  return R * c; // Distance in meters
+};
 
-// Check if user is within geofence
-export function isWithinGeofence(
+// Check if coordinates are within geofence
+export const isWithinGeofence = (
   userLat: number,
   userLng: number,
   eventLat: number,
   eventLng: number,
-  radiusMeters: number
-): boolean {
+  radius: number
+): boolean => {
   const distance = calculateDistance(userLat, userLng, eventLat, eventLng);
-  return distance <= radiusMeters;
-}
+  return distance <= radius;
+};
 
-// Download QR code as image
-export async function downloadQRCode(eventName: string, qrDataUrl: string): Promise<void> {
-  const link = document.createElement('a');
-  link.download = `${eventName.replace(/[^a-zA-Z0-9]/g, '-')}-qr-code.png`;
-  link.href = qrDataUrl;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
+// Generate check-in URL for QR code
+export const generateCheckInURL = (eventId: string, token?: string): string => {
+  const baseUrl = `${window.location.origin}/event/${eventId}/checkin`;
+  return token ? `${baseUrl}?token=${token}` : baseUrl;
+};
