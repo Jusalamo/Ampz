@@ -93,21 +93,49 @@ function QuickAddModal({
   onSendRequest: (userId: string) => void;
 }) {
   const [searchQuery, setSearchQuery] = useState('');
-  const { connectionProfiles = [], friends = [], sentRequests = [] } = useApp();
-  
-  // Filter out already friends and people with pending requests
-  const availableProfiles = connectionProfiles.filter(profile => 
-    !friends.some(friend => friend.id === profile.id) &&
-    !sentRequests.some(request => request.toUserId === profile.id)
-  );
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<ConnectionProfile[]>([]);
+  const { 
+    friends = [], 
+    sentRequests = [], 
+    searchUsers 
+  } = useApp();
 
-  // Filter profiles based on search
-  const searchResults = availableProfiles.filter(p => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ).slice(0, 5);
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
 
-  // Suggestions - people from same events, mutual connections
-  const suggestions = availableProfiles.slice(0, 4);
+    setIsSearching(true);
+    try {
+      // Call the searchUsers function from context which should query the database
+      const results = await searchUsers(query);
+      // Filter out already friends and people with pending requests
+      const filteredResults = results.filter(profile => 
+        !friends.some(friend => friend.id === profile.id) &&
+        !sentRequests.some(request => request.toUserId === profile.id)
+      );
+      setSearchResults(filteredResults.slice(0, 10)); // Limit to 10 results
+    } catch (error) {
+      console.error('Error searching users:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleSearch(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Get suggestions - you might want to replace this with actual suggestions from your backend
+  const suggestions = searchResults.slice(0, 4);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -132,7 +160,7 @@ function QuickAddModal({
             style={{ color: DESIGN.colors.textSecondary }} />
           <Input
             type="text"
-            placeholder="Search by username..."
+            placeholder="Search by name or username..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -143,6 +171,12 @@ function QuickAddModal({
               color: DESIGN.colors.textPrimary
             }}
           />
+          {isSearching && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <div className="w-4 h-4 border-2 border-transparent border-t-current rounded-full animate-spin"
+                style={{ color: DESIGN.colors.primary }} />
+            </div>
+          )}
         </div>
 
         {/* Search Results */}
@@ -152,87 +186,78 @@ function QuickAddModal({
               Search Results
             </p>
             {searchResults.length > 0 ? (
-              searchResults.map(user => (
-                <div key={user.id} className="flex items-center gap-3 p-3 rounded-xl"
-                  style={{
-                    background: DESIGN.colors.card,
-                    border: `1px solid ${DESIGN.colors.card}`,
-                    borderRadius: DESIGN.borderRadius.card
-                  }}>
-                  <img src={user.photo} alt={user.name} 
-                    className="w-10 h-10 rounded-full object-cover" 
-                    style={{ border: `2px solid ${DESIGN.colors.background}` }} />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm" style={{ color: DESIGN.colors.textPrimary }}>
-                      {user.name}
-                    </p>
-                    <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                      {user.location}
-                    </p>
-                  </div>
-                  <Button 
-                    size="sm" 
-                    onClick={() => onSendRequest(user.id)}
-                    className="h-8 rounded-[8px]"
+              <div className="space-y-2">
+                {searchResults.map(user => (
+                  <div key={user.id} className="flex items-center gap-3 p-3 rounded-xl"
                     style={{
-                      background: DESIGN.colors.primary,
-                      color: DESIGN.colors.background,
-                      borderRadius: DESIGN.borderRadius.smallPill
-                    }}
-                  >
-                    <UserPlus className="w-4 h-4 mr-1" />
-                    Add
-                  </Button>
-                </div>
-              ))
-            ) : (
+                      background: DESIGN.colors.card,
+                      border: `1px solid ${DESIGN.colors.card}`,
+                      borderRadius: DESIGN.borderRadius.card
+                    }}>
+                    <img src={user.photo} alt={user.name} 
+                      className="w-10 h-10 rounded-full object-cover" 
+                      style={{ border: `2px solid ${DESIGN.colors.background}` }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm" style={{ color: DESIGN.colors.textPrimary }}>
+                        {user.name}
+                      </p>
+                      <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                        {user.username || user.location || 'User'}
+                      </p>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      onClick={() => onSendRequest(user.id)}
+                      className="h-8 rounded-[8px]"
+                      style={{
+                        background: DESIGN.colors.primary,
+                        color: DESIGN.colors.background,
+                        borderRadius: DESIGN.borderRadius.smallPill
+                      }}
+                    >
+                      <UserPlus className="w-4 h-4 mr-1" />
+                      Add
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : !isSearching ? (
               <p className="text-sm text-center py-4" style={{ color: DESIGN.colors.textSecondary }}>
                 No users found
               </p>
-            )}
+            ) : null}
           </div>
         )}
 
-        {/* Suggestions */}
+        {/* Suggestions - Show when no search query */}
         {!searchQuery && (
           <div className="space-y-2">
             <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-              Suggestions
+              Start typing to search for users
             </p>
-            {suggestions.map(user => (
-              <div key={user.id} className="flex items-center gap-3 p-3 rounded-xl"
+            <div className="text-center py-8">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
                 style={{
-                  background: DESIGN.colors.card,
-                  border: `1px solid ${DESIGN.colors.card}`,
-                  borderRadius: DESIGN.borderRadius.card
+                  background: `${DESIGN.colors.primary}10`,
+                  borderRadius: DESIGN.borderRadius.roundButton
                 }}>
-                <img src={user.photo} alt={user.name} 
-                  className="w-10 h-10 rounded-full object-cover"
-                  style={{ border: `2px solid ${DESIGN.colors.background}` }} />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm" style={{ color: DESIGN.colors.textPrimary }}>
-                    {user.name}
-                  </p>
-                  <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                    {Math.floor(Math.random() * 5)} mutual friends
-                  </p>
-                </div>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => onSendRequest(user.id)}
-                  className="h-8 rounded-[8px]"
-                  style={{
-                    borderColor: DESIGN.colors.primary,
-                    color: DESIGN.colors.textPrimary,
-                    borderRadius: DESIGN.borderRadius.smallPill
-                  }}
-                >
-                  <UserPlus className="w-4 h-4 mr-1" />
-                  Add
-                </Button>
+                <Search className="w-8 h-8" style={{ color: DESIGN.colors.primary }} />
               </div>
-            ))}
+              <p className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
+                Type a name or username to find people
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {isSearching && searchQuery && (
+          <div className="text-center py-8">
+            <div className="w-8 h-8 border-2 border-transparent border-t-current rounded-full animate-spin mx-auto mb-4"
+              style={{ color: DESIGN.colors.primary }} />
+            <p className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
+              Searching users...
+            </p>
           </div>
         )}
       </DialogContent>
@@ -1326,28 +1351,16 @@ export default function Chats() {
                   <p className="text-sm mb-6 max-w-xs mx-auto" style={{ color: DESIGN.colors.textSecondary }}>
                     Add friends to see their event plans, chat anytime, and make the most of your social experiences!
                   </p>
-                  <div className="flex gap-3">
+                  <div className="flex justify-center">
                     <Button onClick={() => setShowQuickAdd(true)} 
-                      className="flex-1 rounded-xl"
+                      className="rounded-xl w-full max-w-xs"
                       style={{
                         background: DESIGN.colors.primary,
                         color: DESIGN.colors.background,
                         borderRadius: DESIGN.borderRadius.button
                       }}>
                       <UserPlus className="w-4 h-4 mr-2" />
-                      Quick Add
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={() => navigate('/connect')} 
-                      className="flex-1 rounded-xl"
-                      style={{
-                        borderColor: DESIGN.colors.card,
-                        color: DESIGN.colors.textPrimary,
-                        borderRadius: DESIGN.borderRadius.button
-                      }}>
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Connect
+                      Quick Add Friends
                     </Button>
                   </div>
                 </div>
