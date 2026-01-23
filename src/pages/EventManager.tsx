@@ -35,13 +35,17 @@ import {
   Smartphone,
   Globe,
   Shield,
-  Key
+  Key,
+  MapPin,
+  Navigation
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Event as EventType } from '@/lib/types';
 import { EditEventModal } from '@/components/modals/EditEventModal';
+import { supabase } from '@/integrations/supabase/client';
+import QRCode from 'qrcode';
 
 // Type alias to avoid conflict with DOM Event
 type AppEvent = EventType;
@@ -126,7 +130,7 @@ function ToggleSwitch({ enabled, onChange, label }: ToggleSwitchProps) {
   );
 }
 
-// QR Code Modal - FIXED VERSION
+// QR Code Modal - UPDATED VERSION WITH PROPER QR GENERATION
 interface QRCodeModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -135,53 +139,145 @@ interface QRCodeModalProps {
 
 function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [qrCodeURL, setQrCodeURL] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
-    if (isOpen && event?.qrCodeUrl) {
-      setQrDataUrl(event.qrCodeUrl);
-    } else if (isOpen && event) {
-      // Generate QR code if not already in event
-      const generateQR = () => {
-        try {
-          const qrUrl = `${window.location.origin}/event/${event.id}`;
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            canvas.width = 400;
-            canvas.height = 400;
-            
-            // White background
-            ctx.fillStyle = 'white';
-            ctx.fillRect(0, 0, 400, 400);
-            
-            // QR code pattern (simplified - in production use a QR library)
-            ctx.fillStyle = 'black';
-            
-            // Border
-            ctx.fillRect(20, 20, 360, 360);
-            ctx.fillStyle = 'white';
-            ctx.fillRect(40, 40, 320, 320);
-            
-            // Event name text
-            ctx.fillStyle = 'black';
-            ctx.font = 'bold 16px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(event.name.substring(0, 30), 200, 30);
-            
-            // Event ID
-            ctx.font = '12px Arial';
-            ctx.fillText(`ID: ${event.id.substring(0, 12)}`, 200, 385);
-            
-            setQrDataUrl(canvas.toDataURL());
-          }
-        } catch (error) {
-          console.error('QR generation error:', error);
-        }
-      };
-      generateQR();
+    if (isOpen && event) {
+      generateQRCode();
     }
   }, [isOpen, event]);
+
+  const generateQRCode = async () => {
+    if (!event) return;
+    
+    setLoading(true);
+    try {
+      // Generate the check-in URL with geofence check parameter
+      const checkinURL = `${window.location.origin}/event/${event.id}/checkin?checkGeofence=true`;
+      setQrCodeURL(checkinURL);
+      
+      // Generate QR code using QRCode library
+      const qrUrl = await QRCode.toDataURL(checkinURL, {
+        width: 400,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF',
+        },
+        errorCorrectionLevel: 'H',
+      });
+      
+      setQrDataUrl(qrUrl);
+      
+      // Update event with QR code URL if not already set
+      if (!event.qrCodeUrl) {
+        const { error } = await supabase
+          .from('events')
+          .update({ 
+            qr_code_url: qrUrl,
+            qr_code: event.id // Use event ID as QR code identifier
+          })
+          .eq('id', event.id);
+        
+        if (error) {
+          console.error('Error saving QR code:', error);
+        }
+      }
+    } catch (error) {
+      console.error('QR generation error:', error);
+      // Fallback to simple QR code
+      generateFallbackQR();
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const generateFallbackQR = () => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    canvas.width = 400;
+    canvas.height = 400;
+    
+    // White background
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, 400, 400);
+    
+    // QR code pattern (simplified for fallback)
+    ctx.fillStyle = '#000000';
+    
+    // Border
+    ctx.fillRect(20, 20, 360, 360);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(40, 40, 320, 320);
+    
+    // Add some QR-like pattern
+    ctx.fillStyle = '#000000';
+    
+    // Position markers
+    const markerSize = 60;
+    const markerPositions = [
+      [40, 40],
+      [320 - markerSize, 40],
+      [40, 320 - markerSize]
+    ];
+    
+    markerPositions.forEach(([x, y]) => {
+      // Outer square
+      ctx.fillRect(x, y, markerSize, markerSize);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(x + 10, y + 10, markerSize - 20, markerSize - 20);
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(x + 20, y + 20, markerSize - 40, markerSize - 40);
+    });
+    
+    // Event info text
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(event.name.substring(0, 25), 200, 30);
+    
+    // Event details
+    ctx.font = '12px Arial';
+    ctx.fillText(`ID: ${event.id.substring(0, 8)}...`, 200, 365);
+    ctx.fillText(`📍 Geofence: ${event.geofenceRadius}m radius`, 200, 385);
+    
+    setQrDataUrl(canvas.toDataURL());
+  };
+
+  const handleDownload = () => {
+    if (!qrDataUrl) return;
+    
+    const link = document.createElement('a');
+    link.href = qrDataUrl;
+    link.download = `qr-${event.name.replace(/[^a-zA-Z0-9]/g, '-')}-checkin.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({ 
+      title: 'Downloaded!', 
+      description: 'QR code saved to device',
+      duration: 3000
+    });
+  };
+
+  const handleCopyURL = () => {
+    navigator.clipboard.writeText(qrCodeURL)
+      .then(() => {
+        toast({
+          title: 'Copied!',
+          description: 'Check-in URL copied to clipboard',
+          duration: 3000
+        });
+      })
+      .catch(err => {
+        console.error('Failed to copy:', err);
+      });
+  };
 
   if (!isOpen) return null;
 
@@ -204,7 +300,7 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
         background: DESIGN.colors.card,
         borderRadius: DESIGN.borderRadius.card,
         width: '100%',
-        maxWidth: '360px',
+        maxWidth: '420px',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -218,9 +314,27 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
           alignItems: 'center',
           justifyContent: 'space-between'
         }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: DESIGN.colors.textPrimary }}>
-            Event QR Code
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: DESIGN.borderRadius.roundButton,
+              background: `${DESIGN.colors.primary}20`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <QrCode className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+            </div>
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: DESIGN.colors.textPrimary }}>
+                Event QR Code
+              </h2>
+              <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
+                Scan to check in at event
+              </p>
+            </div>
+          </div>
           <button 
             onClick={onClose} 
             style={{
@@ -241,42 +355,105 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
 
         {/* Content */}
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-          <div style={{
-            width: '240px',
-            height: '240px',
-            background: 'white',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
-          }}>
-            {qrDataUrl ? (
-              <img
-                src={qrDataUrl}
-                alt="QR Code"
-                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-              />
-            ) : (
-              <div style={{ textAlign: 'center' }}>
-                <QrCode className="w-16 h-16" style={{ color: DESIGN.colors.textSecondary, margin: '0 auto' }} />
-                <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '8px' }}>Generating QR...</p>
+          {loading ? (
+            <div style={{ height: '260px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <>
+              <div style={{
+                width: '260px',
+                height: '260px',
+                background: 'white',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '16px',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+                position: 'relative'
+              }}>
+                {qrDataUrl ? (
+                  <img
+                    src={qrDataUrl}
+                    alt="QR Code"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
+                ) : (
+                  <div style={{ textAlign: 'center' }}>
+                    <QrCode className="w-16 h-16" style={{ color: DESIGN.colors.textSecondary, margin: '0 auto' }} />
+                    <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginTop: '8px' }}>Generating QR...</p>
+                  </div>
+                )}
+                
+                {/* Event logo/icon overlay */}
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  width: '48px',
+                  height: '48px',
+                  background: DESIGN.colors.background,
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '2px solid white'
+                }}>
+                  <Calendar className="w-6 h-6" style={{ color: DESIGN.colors.primary }} />
+                </div>
               </div>
-            )}
-          </div>
-          
-          <div style={{ textAlign: 'center' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: DESIGN.colors.textPrimary, marginBottom: '4px' }}>
-              {event?.name || 'Event'}
-            </h3>
-            <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginBottom: '8px' }}>
-              Scan to view event details
-            </p>
-            <p style={{ fontSize: '11px', color: DESIGN.colors.textSecondary }}>
-              Links to: {window.location.origin}/event/{event?.id}
-            </p>
-          </div>
+              
+              <div style={{ textAlign: 'center', width: '100%' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: DESIGN.colors.textPrimary, marginBottom: '4px' }}>
+                  {event?.name || 'Event'}
+                </h3>
+                <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary, marginBottom: '12px' }}>
+                  Scan this QR code to check in at the event
+                </p>
+                
+                {/* Geofence Information */}
+                <div style={{
+                  background: `${DESIGN.colors.primary}15`,
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginBottom: '12px',
+                  border: `1px solid ${DESIGN.colors.primary}30`
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <Navigation className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
+                    <span style={{ fontSize: '13px', color: DESIGN.colors.primary, fontWeight: '500' }}>
+                      Geofence Check Required
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
+                    Attendees must be within {event?.geofenceRadius || 50}m of the venue to check in
+                  </p>
+                </div>
+                
+                {/* Check-in URL */}
+                <div style={{
+                  background: DESIGN.colors.background,
+                  borderRadius: '8px',
+                  padding: '10px',
+                  marginTop: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  overflow: 'hidden'
+                }}>
+                  <p style={{ 
+                    fontSize: '11px', 
+                    color: DESIGN.colors.textSecondary,
+                    fontFamily: 'monospace',
+                    wordBreak: 'break-all',
+                    textAlign: 'left'
+                  }}>
+                    {qrCodeURL}
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Footer */}
@@ -287,33 +464,29 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
           gap: '12px'
         }}>
           <button
-            onClick={onClose}
+            onClick={handleCopyURL}
             style={{
               flex: 1,
               padding: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
+              border: `1px solid ${DESIGN.colors.primary}`,
               borderRadius: DESIGN.borderRadius.button,
               background: 'transparent',
-              color: DESIGN.colors.textPrimary,
+              color: DESIGN.colors.primary,
               fontSize: '14px',
               fontWeight: '500',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
             }}
           >
-            Close
+            <ExternalLink className="w-4 h-4" />
+            Copy URL
           </button>
           <button
-            onClick={() => {
-              if (qrDataUrl) {
-                const link = document.createElement('a');
-                link.href = qrDataUrl;
-                link.download = `qr-${event?.id || 'event'}.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                toast({ title: 'Downloaded!', description: 'QR code saved to device' });
-              }
-            }}
+            onClick={handleDownload}
+            disabled={!qrDataUrl}
             style={{
               flex: 1,
               padding: '12px',
@@ -323,7 +496,8 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
               color: DESIGN.colors.background,
               fontSize: '14px',
               fontWeight: '500',
-              cursor: 'pointer',
+              cursor: qrDataUrl ? 'pointer' : 'not-allowed',
+              opacity: qrDataUrl ? 1 : 0.5,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -724,7 +898,7 @@ function NotificationModal({ isOpen, onClose, events, selectedEventId }: Notific
                       borderColor: selectedEvent === event.id ? DESIGN.colors.primary : 'rgba(255, 255, 255, 0.1)',
                       cursor: 'pointer',
                       transition: 'all 0.2s'
-                    }}
+                  }}
                   >
                     {event.name} ({event.attendees})
                   </button>
@@ -1517,7 +1691,24 @@ export default function EventManager() {
                       {event.date} • {event.attendees} attendees
                     </p>
 
-                    {/* Media and Radius Info */}
+                    {/* Geofence Info */}
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px',
+                      marginBottom: '12px',
+                      padding: '8px',
+                      background: `${DESIGN.colors.primary}10`,
+                      borderRadius: DESIGN.borderRadius.small,
+                      border: `1px solid ${DESIGN.colors.primary}20`
+                    }}>
+                      <Navigation className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
+                      <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>
+                        Geofence: {event.geofenceRadius}m radius
+                      </span>
+                    </div>
+
+                    {/* Media Info */}
                     <div style={{ 
                       display: 'flex', 
                       alignItems: 'center', 
@@ -1525,23 +1716,19 @@ export default function EventManager() {
                       marginBottom: '20px',
                       flexWrap: 'wrap'
                     }}>
-                      {event.mediaType === 'video' ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Film className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
-                          <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>Video</span>
-                        </div>
-                      ) : (
+                      {event.images?.length > 0 ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Grid3x3 className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
                           <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>
                             {event.images?.length || 0} photos
                           </span>
                         </div>
-                      )}
-                      <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>•</span>
-                      <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>
-                        Radius: {event.geofenceRadius}m
-                      </span>
+                      ) : event.videos?.length > 0 ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Film className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
+                          <span style={{ fontSize: '13px', color: DESIGN.colors.textSecondary }}>Video content</span>
+                        </div>
+                      ) : null}
                     </div>
 
                     {/* Action Buttons */}
@@ -2161,7 +2348,7 @@ export default function EventManager() {
                         {event.name}
                       </p>
                       <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>
-                        {event.attendees} attendees • {event.mediaType === 'video' ? 'Video' : 'Carousel'}
+                        {event.attendees} attendees • Geofence: {event.geofenceRadius}m
                       </p>
                     </div>
                   </div>
@@ -2205,6 +2392,12 @@ export default function EventManager() {
                   enabled={true}
                   onChange={() => {}}
                   label="Automatically generate QR codes for new events"
+                />
+                
+                <ToggleSwitch
+                  enabled={true}
+                  onChange={() => {}}
+                  label="Require geofence verification for check-ins"
                 />
                 
                 <ToggleSwitch
@@ -2289,6 +2482,24 @@ export default function EventManager() {
                   <div>
                     <p style={{ fontSize: '14px', fontWeight: '500', color: DESIGN.colors.textPrimary }}>Secure Access</p>
                     <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>All data is encrypted</p>
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: DESIGN.borderRadius.roundButton,
+                    background: `${DESIGN.colors.primary}20`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Navigation className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '14px', fontWeight: '500', color: DESIGN.colors.textPrimary }}>Geofence Security</p>
+                    <p style={{ fontSize: '12px', color: DESIGN.colors.textSecondary }}>Location-based check-in verification</p>
                   </div>
                 </div>
               </div>
