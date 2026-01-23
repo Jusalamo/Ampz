@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Search, SlidersHorizontal, Plus, MapPin, Calendar, Star, ChevronRight } from 'lucide-react';
+import { Search, SlidersHorizontal, Plus, MapPin, Calendar, Star, ChevronRight, Layers, X } from 'lucide-react';
 
 // Mock data and hooks for demo
 const mockEvents = [
@@ -68,11 +68,14 @@ export default function MapDrawer() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [mapView, setMapView] = useState('3d'); // '2d' or '3d'
+  const [isDrawerDragging, setIsDrawerDragging] = useState(false);
   
   const mapContainer = useRef(null);
   const drawerRef = useRef(null);
   const dragStartY = useRef(0);
   const currentTranslate = useRef(0);
+  const mapInteractionRef = useRef(false);
 
   const categories = ['All', 'Music', 'Tech', 'Party', 'Art', 'Food', 'Sports'];
 
@@ -98,6 +101,7 @@ export default function MapDrawer() {
 
   const handleDragStart = (clientY) => {
     setIsDragging(true);
+    setIsDrawerDragging(true);
     dragStartY.current = clientY;
     currentTranslate.current = SNAP_POSITIONS[drawerPosition] * getDrawerHeight();
   };
@@ -123,6 +127,7 @@ export default function MapDrawer() {
     setDrawerPosition(newPosition);
     setDragOffset(0);
     setIsDragging(false);
+    setTimeout(() => setIsDrawerDragging(false), 100);
   };
 
   const handleTouchStart = (e) => {
@@ -158,21 +163,45 @@ export default function MapDrawer() {
     };
   }, [isDragging, dragOffset]);
 
+  // Handle clicks on map to deselect event
+  const handleMapClick = (e) => {
+    // Only deselect if not clicking on event marker or card
+    if (!e.target.closest('.event-marker') && 
+        !e.target.closest('.event-card-3d') &&
+        !isDrawerDragging) {
+      setSelectedEvent(null);
+    }
+  };
+
+  const toggleMapView = () => {
+    setMapView(prev => prev === '2d' ? '3d' : '2d');
+  };
+
   const translateY = SNAP_POSITIONS[drawerPosition] * getDrawerHeight() + dragOffset;
 
   return (
     <div className="h-screen w-full relative overflow-hidden bg-gray-900">
-      {/* Map Container - Always visible, full screen */}
+      {/* Map Container - Fully interactive, always visible */}
       <div 
         ref={mapContainer}
         className="absolute inset-0 w-full h-full"
         style={{ 
           zIndex: 1,
-          background: 'linear-gradient(135deg, #1e3a8a 0%, #312e81 100%)'
+          background: 'linear-gradient(135deg, #1e3a8a 0%, #312e81 100%)',
+          cursor: isDrawerDragging ? 'default' : 'grab',
+          pointerEvents: 'auto' // Map is always interactive
         }}
+        onClick={handleMapClick}
       >
-        {/* Mock Map Content */}
-        <div className="w-full h-full relative flex items-center justify-center">
+        {/* Mock Map Content - Interactive */}
+        <div 
+          className="w-full h-full relative flex items-center justify-center"
+          style={{
+            transform: mapView === '3d' ? 'perspective(1000px) rotateX(45deg)' : 'none',
+            transformStyle: 'preserve-3d',
+            transition: 'transform 0.5s ease'
+          }}
+        >
           <div className="absolute inset-0 opacity-20">
             <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
               <defs>
@@ -184,60 +213,93 @@ export default function MapDrawer() {
             </svg>
           </div>
           
-          {/* Mock Event Markers */}
+          {/* Mock Event Markers - Interactive */}
           {filteredEvents.map((event, idx) => (
             <div
               key={event.id}
-              className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer hover:scale-110 transition-transform"
+              className="event-marker absolute cursor-pointer hover:scale-110 transition-transform"
               style={{
                 left: `${45 + idx * 10}%`,
                 top: `${40 + idx * 8}%`,
-                zIndex: 2
+                zIndex: 50,
+                transform: mapView === '3d' 
+                  ? `translateZ(${selectedEvent?.id === event.id ? '100px' : '50px'}) translate(-50%, -50%)`
+                  : 'translate(-50%, -50%)',
+                transformStyle: 'preserve-3d',
+                pointerEvents: 'auto'
               }}
-              onClick={() => setSelectedEvent(event)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedEvent(event);
+              }}
             >
               <div 
-                className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-2 border-white"
-                style={{ backgroundColor: event.customTheme }}
+                className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-2 border-white relative"
+                style={{ 
+                  backgroundColor: event.customTheme,
+                  boxShadow: selectedEvent?.id === event.id 
+                    ? `0 0 30px ${event.customTheme}, 0 8px 16px rgba(0,0,0,0.4)`
+                    : '0 4px 8px rgba(0,0,0,0.3)'
+                }}
               >
                 {event.isFeatured ? (
                   <Star className="w-6 h-6 text-yellow-300 fill-yellow-300" />
                 ) : (
                   <div className="w-5 h-5 bg-white/40 rounded-full" />
                 )}
+                
+                {/* Pulsing ring for selected */}
+                {selectedEvent?.id === event.id && (
+                  <div 
+                    className="absolute inset-0 rounded-full animate-ping"
+                    style={{ 
+                      backgroundColor: event.customTheme,
+                      opacity: 0.4
+                    }}
+                  />
+                )}
               </div>
-              
-              {/* Event Label */}
-              <div 
-                className="absolute top-full mt-2 px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap"
-                style={{ 
-                  backgroundColor: DESIGN.colors.card,
-                  color: DESIGN.colors.textPrimary,
-                  boxShadow: DESIGN.shadows.card
-                }}
-              >
-                {event.name}
-              </div>
+
+              {/* Geofence Circle - Only for selected event */}
+              {selectedEvent?.id === event.id && (
+                <div
+                  className="absolute top-1/2 left-1/2 rounded-full border-2 border-dashed pointer-events-none"
+                  style={{
+                    width: '200px',
+                    height: '200px',
+                    transform: 'translate(-50%, -50%)',
+                    borderColor: event.customTheme,
+                    backgroundColor: `${event.customTheme}15`,
+                    animation: 'pulse 2s infinite'
+                  }}
+                />
+              )}
             </div>
           ))}
 
-          {/* Selected Event Card on Map */}
+          {/* Selected Event 3D Card - Floats above marker in 3D space */}
           {selectedEvent && (
             <div
-              className="absolute transform -translate-x-1/2 -translate-y-full"
+              className="event-card-3d absolute pointer-events-auto"
               style={{
-                left: '50%',
-                top: '45%',
-                zIndex: 100,
-                width: '280px'
+                left: `${45 + filteredEvents.findIndex(e => e.id === selectedEvent.id) * 10}%`,
+                top: `${40 + filteredEvents.findIndex(e => e.id === selectedEvent.id) * 8}%`,
+                zIndex: 200,
+                width: '300px',
+                transform: mapView === '3d'
+                  ? 'translateZ(150px) translate(-50%, -120%)'
+                  : 'translate(-50%, -120%)',
+                transformStyle: 'preserve-3d',
+                transition: 'transform 0.3s ease'
               }}
+              onClick={(e) => e.stopPropagation()}
             >
               <div 
-                className="rounded-2xl shadow-2xl border overflow-hidden"
+                className="rounded-2xl shadow-2xl border overflow-hidden backdrop-blur-md"
                 style={{
-                  background: DESIGN.colors.card,
-                  borderColor: `${DESIGN.colors.primary}40`,
-                  boxShadow: DESIGN.shadows.card
+                  background: `${DESIGN.colors.card}f0`,
+                  borderColor: `${selectedEvent.customTheme}60`,
+                  boxShadow: `0 20px 60px rgba(0,0,0,0.5), 0 0 40px ${selectedEvent.customTheme}40`
                 }}
               >
                 <div className="flex items-start gap-3 p-3">
@@ -245,7 +307,7 @@ export default function MapDrawer() {
                     src={selectedEvent.coverImage} 
                     alt={selectedEvent.name}
                     className="w-20 h-20 rounded-xl object-cover flex-shrink-0"
-                    style={{ border: `2px solid ${DESIGN.colors.primary}` }}
+                    style={{ border: `2px solid ${selectedEvent.customTheme}` }}
                   />
                   <div className="flex-1 min-w-0 py-1">
                     <div className="flex items-start justify-between gap-2">
@@ -255,13 +317,16 @@ export default function MapDrawer() {
                       <button 
                         className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 hover:scale-110 transition-transform"
                         style={{ 
-                          background: DESIGN.colors.card, 
+                          background: DESIGN.colors.background, 
                           color: DESIGN.colors.textSecondary,
-                          border: `1px solid ${DESIGN.colors.textSecondary}20`
+                          border: `1px solid ${DESIGN.colors.textSecondary}40`
                         }}
-                        onClick={() => setSelectedEvent(null)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedEvent(null);
+                        }}
                       >
-                        ×
+                        <X className="w-3 h-3" />
                       </button>
                     </div>
                     <div className="text-xs mt-1 text-gray-400">
@@ -285,6 +350,10 @@ export default function MapDrawer() {
                           background: selectedEvent.customTheme, 
                           color: DESIGN.colors.background 
                         }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          alert('Navigate to event details');
+                        }}
                       >
                         View Event
                       </button>
@@ -294,6 +363,34 @@ export default function MapDrawer() {
               </div>
             </div>
           )}
+        </div>
+        
+        {/* Map Controls - Top Right */}
+        <div className="absolute top-4 right-4 flex flex-col gap-2" style={{ zIndex: 100 }}>
+          <button
+            onClick={toggleMapView}
+            className="w-10 h-10 rounded-lg flex items-center justify-center backdrop-blur-md hover:scale-105 transition-transform"
+            style={{
+              background: 'rgba(45, 45, 45, 0.9)',
+              border: `1px solid ${DESIGN.colors.textSecondary}40`,
+              color: DESIGN.colors.textPrimary,
+              boxShadow: DESIGN.shadows.button
+            }}
+            title={`Switch to ${mapView === '2d' ? '3D' : '2D'} view`}
+          >
+            <Layers className="w-5 h-5" />
+          </button>
+          
+          <div 
+            className="px-2 py-1 rounded-lg text-xs font-medium backdrop-blur-md"
+            style={{
+              background: 'rgba(45, 45, 45, 0.9)',
+              color: DESIGN.colors.primary,
+              border: `1px solid ${DESIGN.colors.primary}40`
+            }}
+          >
+            {mapView.toUpperCase()}
+          </div>
         </div>
         
         {/* Map Attribution */}
@@ -317,7 +414,7 @@ export default function MapDrawer() {
           position: 'absolute',
           left: 0,
           right: 0,
-          zIndex: 10,
+          zIndex: 300, // Higher than map elements
           height: '100%',
           transform: `translateY(${translateY}px)`,
           touchAction: 'none',
@@ -327,12 +424,14 @@ export default function MapDrawer() {
           borderTop: `1px solid ${DESIGN.colors.textSecondary}20`,
           boxShadow: '0 -4px 32px rgba(0, 0, 0, 0.6)',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          pointerEvents: 'auto' // Drawer captures events
         }}
       >
-        {/* Drawer Handle */}
+        {/* Drawer Handle - Capture drag events */}
         <div
           className="flex flex-col items-center pt-3 pb-2 cursor-grab active:cursor-grabbing select-none"
+          style={{ pointerEvents: 'auto' }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleDragEnd}
@@ -350,7 +449,7 @@ export default function MapDrawer() {
         </div>
 
         {/* Drawer Content */}
-        <div className="flex-1 flex flex-col px-4 overflow-hidden">
+        <div className="flex-1 flex flex-col px-4 overflow-hidden" style={{ pointerEvents: 'auto' }}>
           {/* Search and Filters */}
           <div className="flex items-center gap-2 mb-3">
             <div className="relative flex-1">
@@ -426,8 +525,12 @@ export default function MapDrawer() {
                 className="rounded-xl overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform"
                 style={{
                   background: DESIGN.colors.card,
-                  border: `1px solid ${DESIGN.colors.textSecondary}20`,
-                  boxShadow: DESIGN.shadows.card
+                  border: selectedEvent?.id === event.id 
+                    ? `2px solid ${event.customTheme}`
+                    : `1px solid ${DESIGN.colors.textSecondary}20`,
+                  boxShadow: selectedEvent?.id === event.id
+                    ? `0 0 20px ${event.customTheme}40`
+                    : DESIGN.shadows.card
                 }}
                 onClick={() => setSelectedEvent(event)}
               >
@@ -470,6 +573,15 @@ export default function MapDrawer() {
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 0.3; transform: translate(-50%, -50%) scale(1); }
+          50% { opacity: 0.1; transform: translate(-50%, -50%) scale(1.1); }
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
     </div>
   );
 }
