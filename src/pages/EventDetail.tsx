@@ -603,6 +603,15 @@ export default function EventDetail() {
     }
   }, [event.date]);
 
+  // Ensure images are properly loaded from event creation inputs
+  const eventImages = useMemo(() => {
+    if (event.images && event.images.length > 0) {
+      return event.images;
+    }
+    // Fallback to coverImage if no images array exists
+    return event.coverImage ? [event.coverImage] : [];
+  }, [event.images, event.coverImage]);
+
   return (
     <div 
       className="min-h-screen"
@@ -830,21 +839,21 @@ export default function EventDetail() {
         ) : (
           /* Image Carousel with Auto-rotation */
           <div className="relative w-full h-full">
-            {event.images && event.images.length > 0 ? (
+            {eventImages && eventImages.length > 0 ? (
               <>
                 <img
-                  src={event.images[currentImageIndex]}
+                  src={eventImages[currentImageIndex]}
                   alt={`Event image ${currentImageIndex + 1}`}
                   className="w-full h-full object-cover"
                   loading="eager"
                   decoding="async"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x256?text=Event+Image';
+                    (e.target as HTMLImageElement).src = `https://via.placeholder.com/400x256/2D2D2D/FFFFFF?text=${encodeURIComponent(event.name.substring(0, 30))}`;
                   }}
                 />
                 
                 {/* Carousel Controls */}
-                {event.images.length > 1 && (
+                {eventImages.length > 1 && (
                   <>
                     <button
                       onClick={(e) => {
@@ -879,7 +888,7 @@ export default function EventDetail() {
                     
                     {/* Carousel Dots */}
                     <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-                      {event.images.map((_, index) => (
+                      {eventImages.map((_, index) => (
                         <button
                           key={index}
                           onClick={(e) => {
@@ -908,7 +917,7 @@ export default function EventDetail() {
                       <div className="flex items-center gap-1">
                         <Grid3x3 className="w-3 h-3 text-white" />
                         <span className="text-xs text-white">
-                          {currentImageIndex + 1}/{event.images.length}
+                          {currentImageIndex + 1}/{eventImages.length}
                         </span>
                       </div>
                     </div>
@@ -932,19 +941,7 @@ export default function EventDetail() {
           }}
         />
         
-        {/* Event Date Badge - Removed Live status */}
-        <div className="absolute top-16 left-4 z-10">
-          <span className="px-3 py-1.5 text-xs font-semibold rounded-full flex items-center gap-1.5 backdrop-blur-sm"
-          style={{
-            borderRadius: DESIGN.borderRadius.roundButton,
-            background: `${DESIGN.colors.card}E6`,
-            color: DESIGN.colors.textPrimary,
-            border: `1px solid ${DESIGN.colors.textSecondary}40`
-          }}>
-            <Calendar className="w-3.5 h-3.5" aria-hidden="true" />
-            {formattedDate}
-          </span>
-        </div>
+        {/* REMOVED: Event Date Badge - Was redundant since we have date in description */}
       </div>
 
       {/* Main Content */}
