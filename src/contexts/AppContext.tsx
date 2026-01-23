@@ -184,7 +184,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const storedCurrency = localStorage.getItem('amps_currency');
     if (storedTheme) {
       setTheme(storedTheme);
-      document.documentElement.classList.toggle('light', storedTheme === 'light');
+      // Apply the correct class for Tailwind - .dark for dark mode, remove for light
+      document.documentElement.classList.toggle('dark', storedTheme === 'dark');
+    } else {
+      // Default to dark mode
+      document.documentElement.classList.add('dark');
     }
     if (storedCurrency) setCurrencyState(storedCurrency);
 
@@ -402,7 +406,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
-    document.documentElement.classList.toggle('light', newTheme === 'light');
+    // Apply the correct class for Tailwind - .dark for dark mode, remove for light
+    document.documentElement.classList.toggle('dark', newTheme === 'dark');
     localStorage.setItem('amps_theme', newTheme);
   };
 
