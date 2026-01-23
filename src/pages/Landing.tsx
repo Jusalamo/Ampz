@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Zap, Users, Calendar, MapPin, QrCode, MessageCircle, ChevronRight } from 'lucide-react';
+import { Zap, Users, Calendar, MapPin, QrCode, MessageCircle, ChevronRight, Sparkles, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ColorBends from '@/components/ColorBends';
 import { useApp } from '@/contexts/AppContext';
@@ -10,9 +10,9 @@ import { useState, useEffect, useRef } from 'react';
 // Design Constants with Purple as Primary
 const DESIGN = {
   colors: {
-    primary: '#C4B5FD', // Purple
-    primaryLight: '#E9D5FF', // Light purple
-    primaryDark: '#8B5CF6', // Darker purple
+    primary: '#C4B5FD',
+    primaryLight: '#E9D5FF',
+    primaryDark: '#8B5CF6',
     accentPink: '#FFB8E6',
     background: '#1A1A1A',
     card: '#2D2D2D',
@@ -77,13 +77,30 @@ export default function Landing() {
   const featuredEvents = events.filter(e => e.isFeatured).slice(0, 4);
   const isHeaderSolid = scrollY > 50;
 
-  // Features in grid format
+  // Simplified features array for cleaner layout
   const features = [
-    { icon: Calendar, label: 'Discover', description: 'Find events happening near you' },
-    { icon: Users, label: 'Match', description: 'Connect with people at events' },
-    { icon: MessageCircle, label: 'Connect', description: 'Chat and plan together' },
-    { icon: MapPin, label: 'Nearby', description: 'See who\'s going and what\'s happening' },
-    { icon: QrCode, label: 'Instant Check-in', description: 'Scan to check in instantly' },
+    { icon: Calendar, label: 'Discover Events', description: 'Find events tailored to your interests' },
+    { icon: Users, label: 'Smart Matching', description: 'Connect with like-minded people' },
+    { icon: MessageCircle, label: 'Real-time Chat', description: 'Chat before and during events' },
+  ];
+
+  // Testimonials for social proof
+  const testimonials = [
+    {
+      text: "Met my best friend at a concert through Amps!",
+      author: "Sarah M.",
+      role: "Music Lover"
+    },
+    {
+      text: "Found amazing local events I never would have discovered.",
+      author: "James T.",
+      role: "Community Member"
+    },
+    {
+      text: "The check-in system makes networking so easy.",
+      author: "Priya K.",
+      role: "Professional"
+    }
   ];
 
   // Auto-play carousel
@@ -101,7 +118,6 @@ export default function Landing() {
     };
   }, [isAutoPlaying, featuredEvents.length]);
 
-  // Handle manual slide change
   const goToSlide = (index: number) => {
     setCurrentSlide(index);
     if (isAutoPlaying) {
@@ -209,27 +225,40 @@ export default function Landing() {
       <div className="relative z-10">
         {/* Hero Section */}
         <section className="min-h-[85vh] flex flex-col items-center justify-center px-4 pt-12 pb-8">
-          <div className="text-center max-w-2xl mx-auto px-4">
+          <div className="text-center max-w-3xl mx-auto px-4">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6"
+              style={{ 
+                background: DESIGN.colors.primaryDark,
+                borderRadius: DESIGN.borderRadius.roundButton
+              }}
+            >
+              <Sparkles className="w-4 h-4" style={{ color: DESIGN.colors.primaryLight }} />
+              <span className="text-sm font-medium" style={{ color: DESIGN.colors.primaryLight }}>
+                Join 10,000+ people connecting now
+              </span>
+            </div>
+
             <h1 
-              className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-tight mb-4 tracking-tight"
+              className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-tight mb-6 tracking-tight"
               style={{ color: DESIGN.colors.textPrimary }}
             >
-              Real events.
+              Where events meet
               <br />
-              <span style={{ color: DESIGN.colors.primary }}>Real connections.</span>
+              <span style={{ color: DESIGN.colors.primary }}>meaningful connections</span>
             </h1>
             <p 
-              className="text-base sm:text-lg md:text-xl mb-8 leading-relaxed max-w-xl mx-auto"
+              className="text-lg sm:text-xl md:text-2xl mb-8 leading-relaxed max-w-2xl mx-auto"
               style={{ color: DESIGN.colors.textSecondary }}
             >
-              Discover events near you. Meet people. Connect instantly.
+              Discover amazing events and connect with people who share your passions
             </p>
 
             {/* CTA Buttons */}
-            <div className="space-y-3 mb-8 max-w-sm mx-auto">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12 max-w-md mx-auto">
               <Button
                 onClick={() => navigate('/auth')}
-                className="w-full h-12 font-semibold transition-all"
+                className="h-12 px-8 font-semibold transition-all hover:scale-105"
                 style={{
                   fontSize: DESIGN.typography.button.size,
                   background: DESIGN.colors.gradientPurple,
@@ -238,12 +267,12 @@ export default function Landing() {
                   boxShadow: DESIGN.shadows.purpleGlow
                 }}
               >
-                Get Started
+                Get Started Free
               </Button>
               <Button
                 onClick={() => navigate('/auth?mode=login')}
                 variant="outline"
-                className="w-full h-12 font-semibold backdrop-blur-sm hover:bg-white/10 transition-all"
+                className="h-12 px-8 font-semibold backdrop-blur-sm hover:bg-white/10 transition-all"
                 style={{
                   fontSize: DESIGN.typography.button.size,
                   color: DESIGN.colors.primary,
@@ -251,110 +280,115 @@ export default function Landing() {
                   borderRadius: DESIGN.borderRadius.button
                 }}
               >
-                I already have an account
+                Sign In
               </Button>
             </div>
-          </div>
 
-          {/* Scroll Indicator */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 animate-bounce">
-            <div 
-              className="w-6 h-10 rounded-full border-2 flex items-start justify-center p-2"
-              style={{ borderColor: DESIGN.colors.primary }}
-            >
-              <div 
-                className="w-1.5 h-3 rounded-full"
-                style={{ background: DESIGN.colors.primary }}
-              />
+            {/* Trust Indicators */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
+              <div className="text-center">
+                <div className="text-2xl font-bold mb-1" style={{ color: DESIGN.colors.primary }}>
+                  10K+
+                </div>
+                <div className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
+                  Active Users
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold mb-1" style={{ color: DESIGN.colors.primary }}>
+                  500+
+                </div>
+                <div className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
+                  Events Monthly
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold mb-1" style={{ color: DESIGN.colors.primary }}>
+                  95%
+                </div>
+                <div className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
+                  Satisfaction Rate
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* How Amps Works - Grid format */}
-        <section className="py-10 px-4">
+        {/* Features Section - Clean 3-column layout */}
+        <section className="py-16 px-4">
           <div className="max-w-6xl mx-auto">
-            <h2 
-              className="text-2xl sm:text-3xl font-bold text-center mb-6"
-              style={{ color: DESIGN.colors.primary }}
-            >
-              How Amps Works
-            </h2>
+            <div className="text-center mb-12">
+              <h2 
+                className="text-3xl sm:text-4xl font-bold mb-4"
+                style={{ color: DESIGN.colors.primary }}
+              >
+                How it works
+              </h2>
+              <p 
+                className="text-lg max-w-2xl mx-auto"
+                style={{ color: DESIGN.colors.textSecondary }}
+              >
+                Simple steps to find events and connect with amazing people
+              </p>
+            </div>
             
-            {/* Grid layout for features */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Clean 3-column grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {features.map(({ icon: Icon, label, description }, index) => (
                 <div
                   key={label}
-                  className={cn(
-                    "p-4 flex flex-col items-center gap-3 hover:scale-105 transition-all text-center backdrop-blur-xl border",
-                    index === 4 ? "sm:col-span-2 lg:col-span-1 lg:col-start-3" : ""
-                  )}
+                  className="p-6 flex flex-col items-center text-center hover:scale-[1.02] transition-all duration-300"
                   style={{ 
                     background: DESIGN.colors.card,
                     borderRadius: DESIGN.borderRadius.card,
-                    borderColor: DESIGN.colors.primary,
+                    border: `1px solid ${DESIGN.colors.primary}20`,
                     boxShadow: DESIGN.shadows.card
                   }}
                 >
                   <div 
-                    className="w-12 h-12 flex items-center justify-center"
+                    className="w-16 h-16 flex items-center justify-center mb-4"
                     style={{ 
                       background: DESIGN.colors.primary,
                       borderRadius: DESIGN.borderRadius.card
                     }}
                   >
-                    <Icon className="w-6 h-6" style={{ color: DESIGN.colors.background }} />
+                    <Icon className="w-8 h-8" style={{ color: DESIGN.colors.background }} />
                   </div>
-                  <span 
-                    className="text-sm font-bold"
+                  <h3 
+                    className="text-lg font-bold mb-2"
                     style={{ color: DESIGN.colors.textPrimary }}
                   >
                     {label}
-                  </span>
-                  <span 
-                    className="text-xs leading-relaxed"
+                  </h3>
+                  <p 
+                    className="text-sm leading-relaxed"
                     style={{ color: DESIGN.colors.textSecondary }}
                   >
                     {description}
-                  </span>
+                  </p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* Featured Events - Carousel format */}
+        {/* Featured Events - Carousel */}
         {featuredEvents.length > 0 && (
-          <section className="py-12 px-4">
+          <section className="py-16 px-4 bg-black/30">
             <div className="max-w-6xl mx-auto">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
-                <div className="mb-4 sm:mb-0">
-                  <h2 
-                    className="text-2xl font-bold"
-                    style={{ color: DESIGN.colors.primary }}
-                  >
-                    Featured Events
-                  </h2>
-                  <p 
-                    className="mt-1"
-                    style={{ 
-                      color: DESIGN.colors.textSecondary,
-                      fontSize: DESIGN.typography.body.size
-                    }}
-                  >
-                    Discover what's happening
-                  </p>
-                </div>
-                <button 
-                  onClick={() => navigate('/events')}
-                  className="font-medium flex items-center gap-1 hover:underline"
-                  style={{ 
-                    color: DESIGN.colors.primary,
-                    fontSize: DESIGN.typography.body.size
-                  }}
+              <div className="text-center mb-12">
+                <h2 
+                  className="text-3xl sm:text-4xl font-bold mb-4"
+                  style={{ color: DESIGN.colors.primary }}
                 >
-                  See All <ChevronRight className="w-4 h-4" />
-                </button>
+                  Popular Events
+                </h2>
+                <p 
+                  className="text-lg max-w-2xl mx-auto"
+                  style={{ color: DESIGN.colors.textSecondary }}
+                >
+                  Check out what's trending in your area
+                </p>
               </div>
 
               {/* Carousel Container */}
@@ -407,14 +441,14 @@ export default function Landing() {
                         </div>
                         
                         {/* Event Info */}
-                        <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <div className="absolute bottom-0 left-0 right-0 p-6">
                           <h3 
-                            className="font-bold text-xl mb-2 line-clamp-1"
+                            className="font-bold text-2xl mb-2 line-clamp-1"
                             style={{ color: DESIGN.colors.textPrimary }}
                           >
                             {event.name}
                           </h3>
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-sm">
                             <span 
                               className="flex items-center gap-2"
                               style={{ color: DESIGN.colors.textSecondary }}
@@ -435,7 +469,7 @@ export default function Landing() {
                             </span>
                             {event.price > 0 && (
                               <span 
-                                className="font-semibold"
+                                className="font-semibold text-lg"
                                 style={{ color: DESIGN.colors.primary }}
                               >
                                 N${event.price}
@@ -453,7 +487,7 @@ export default function Landing() {
                   {/* Previous Button */}
                   <button
                     onClick={prevSlide}
-                    className="w-8 h-8 flex items-center justify-center transition-all"
+                    className="w-10 h-10 flex items-center justify-center transition-all hover:scale-110"
                     style={{ 
                       background: DESIGN.colors.primary,
                       color: DESIGN.colors.background,
@@ -461,11 +495,11 @@ export default function Landing() {
                       boxShadow: DESIGN.shadows.purpleGlow
                     }}
                   >
-                    <ChevronRight className="w-4 h-4 rotate-180" />
+                    <ChevronRight className="w-5 h-5 rotate-180" />
                   </button>
 
                   {/* Dots Navigation */}
-                  <div className="flex items-center gap-2 mx-2">
+                  <div className="flex items-center gap-2 mx-4">
                     {featuredEvents.slice(0, 3).map((_, index) => (
                       <button
                         key={index}
@@ -488,7 +522,7 @@ export default function Landing() {
                   {/* Next Button */}
                   <button
                     onClick={nextSlide}
-                    className="w-8 h-8 flex items-center justify-center transition-all"
+                    className="w-10 h-10 flex items-center justify-center transition-all hover:scale-110"
                     style={{ 
                       background: DESIGN.colors.primary,
                       color: DESIGN.colors.background,
@@ -496,7 +530,7 @@ export default function Landing() {
                       boxShadow: DESIGN.shadows.purpleGlow
                     }}
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-5 h-5" />
                   </button>
                 </div>
               </div>
@@ -504,69 +538,181 @@ export default function Landing() {
           </section>
         )}
 
-        {/* Footer CTA */}
-        <section className="py-12 px-4 text-center">
-          <div className="max-w-4xl mx-auto">
+        {/* Social Proof Section */}
+        <section className="py-16 px-4">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-12">
+              <h2 
+                className="text-3xl sm:text-4xl font-bold mb-4"
+                style={{ color: DESIGN.colors.primary }}
+              >
+                Loved by thousands
+              </h2>
+              <p 
+                className="text-lg max-w-2xl mx-auto"
+                style={{ color: DESIGN.colors.textSecondary }}
+              >
+                Join our community of event lovers
+              </p>
+            </div>
+
+            {/* Testimonials Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {testimonials.map((testimonial, index) => (
+                <div
+                  key={index}
+                  className="p-6"
+                  style={{ 
+                    background: DESIGN.colors.card,
+                    borderRadius: DESIGN.borderRadius.card,
+                    border: `1px solid ${DESIGN.colors.primary}20`,
+                    boxShadow: DESIGN.shadows.card
+                  }}
+                >
+                  <div className="flex items-center gap-1 mb-4">
+                    {[...Array(5)].map((_, i) => (
+                      <div 
+                        key={i}
+                        className="w-4 h-4"
+                        style={{ color: DESIGN.colors.primary }}
+                      >
+                        ★
+                      </div>
+                    ))}
+                  </div>
+                  <p 
+                    className="mb-4 italic"
+                    style={{ color: DESIGN.colors.textPrimary }}
+                  >
+                    "{testimonial.text}"
+                  </p>
+                  <div>
+                    <div 
+                      className="font-bold"
+                      style={{ color: DESIGN.colors.textPrimary }}
+                    >
+                      {testimonial.author}
+                    </div>
+                    <div 
+                      className="text-sm"
+                      style={{ color: DESIGN.colors.textSecondary }}
+                    >
+                      {testimonial.role}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Final CTA Section */}
+        <section className="py-20 px-4 text-center">
+          <div 
+            className="max-w-4xl mx-auto p-8 rounded-3xl"
+            style={{ 
+              background: `linear-gradient(135deg, ${DESIGN.colors.primaryDark}20 0%, ${DESIGN.colors.primary}20 100%)`,
+              border: `1px solid ${DESIGN.colors.primary}30`,
+              boxShadow: DESIGN.shadows.card
+            }}
+          >
             <h2 
-              className="text-2xl font-bold mb-4"
+              className="text-3xl sm:text-4xl font-bold mb-4"
               style={{ color: DESIGN.colors.primary }}
             >
-              Ready to connect?
+              Start your journey today
             </h2>
             <p 
-              className="mb-6"
-              style={{ 
-                color: DESIGN.colors.textSecondary,
-                fontSize: DESIGN.typography.body.size
-              }}
+              className="text-lg mb-8 max-w-2xl mx-auto"
+              style={{ color: DESIGN.colors.textSecondary }}
             >
-              Join 10,000+ people connecting at events
+              Join thousands of people discovering events and making meaningful connections
             </p>
-            <Button
-              onClick={() => navigate('/auth')}
-              className="h-12 px-8 font-semibold transition-all"
-              style={{
-                fontSize: DESIGN.typography.button.size,
-                background: DESIGN.colors.gradientPurple,
-                color: DESIGN.colors.background,
-                borderRadius: DESIGN.borderRadius.button,
-                boxShadow: DESIGN.shadows.purpleGlow
-              }}
-            >
-              Get Started Free
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button
+                onClick={() => navigate('/auth')}
+                className="h-12 px-8 font-semibold transition-all hover:scale-105"
+                style={{
+                  fontSize: DESIGN.typography.button.size,
+                  background: DESIGN.colors.gradientPurple,
+                  color: DESIGN.colors.background,
+                  borderRadius: DESIGN.borderRadius.button,
+                  boxShadow: DESIGN.shadows.purpleGlow
+                }}
+              >
+                Create Free Account
+              </Button>
+              <Button
+                onClick={() => navigate('/events')}
+                variant="outline"
+                className="h-12 px-8 font-semibold backdrop-blur-sm hover:bg-white/10 transition-all"
+                style={{
+                  fontSize: DESIGN.typography.button.size,
+                  color: DESIGN.colors.primary,
+                  borderColor: DESIGN.colors.primary,
+                  borderRadius: DESIGN.borderRadius.button
+                }}
+              >
+                Browse Events
+              </Button>
+            </div>
           </div>
         </section>
 
         {/* Footer */}
         <footer 
-          className="py-8 px-4"
+          className="py-12 px-4"
           style={{ 
-            borderTop: `1px solid ${DESIGN.colors.primary}`,
+            borderTop: `1px solid ${DESIGN.colors.primary}20`,
             background: DESIGN.colors.background
           }}
         >
           <div className="max-w-6xl mx-auto">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <div 
-                className="w-8 h-8 flex items-center justify-center"
-                style={{ 
-                  background: DESIGN.colors.primary,
-                  borderRadius: DESIGN.borderRadius.button,
-                  boxShadow: DESIGN.shadows.purpleGlow
-                }}
-              >
-                <Zap className="w-4 h-4" style={{ color: DESIGN.colors.background }} />
+            <div className="flex flex-col md:flex-row justify-between items-center mb-8">
+              <div className="flex items-center gap-2 mb-4 md:mb-0">
+                <div 
+                  className="w-10 h-10 flex items-center justify-center"
+                  style={{ 
+                    background: DESIGN.colors.primary,
+                    borderRadius: DESIGN.borderRadius.button,
+                    boxShadow: DESIGN.shadows.purpleGlow
+                  }}
+                >
+                  <Zap className="w-5 h-5" style={{ color: DESIGN.colors.background }} />
+                </div>
+                <span 
+                  className="text-xl font-bold"
+                  style={{ color: DESIGN.colors.primary }}
+                >
+                  Amps
+                </span>
               </div>
-              <span 
-                className="text-lg font-bold"
-                style={{ color: DESIGN.colors.primary }}
-              >
-                Amps
-              </span>
+              <div className="flex gap-6">
+                <button 
+                  onClick={() => navigate('/terms')}
+                  className="text-sm hover:underline"
+                  style={{ color: DESIGN.colors.textSecondary }}
+                >
+                  Terms
+                </button>
+                <button 
+                  onClick={() => navigate('/privacy')}
+                  className="text-sm hover:underline"
+                  style={{ color: DESIGN.colors.textSecondary }}
+                >
+                  Privacy
+                </button>
+                <button 
+                  onClick={() => navigate('/contact')}
+                  className="text-sm hover:underline"
+                  style={{ color: DESIGN.colors.textSecondary }}
+                >
+                  Contact
+                </button>
+              </div>
             </div>
             <p 
-              className="text-center text-xs mb-4"
+              className="text-center text-sm mb-4"
               style={{ color: DESIGN.colors.textSecondary }}
             >
               By continuing, you agree to our Terms of Service and Privacy Policy
