@@ -95,11 +95,17 @@ function QuickAddModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<ConnectionProfile[]>([]);
-  const { 
-    friends = [], 
-    sentRequests = [], 
-    searchUsers 
-  } = useApp();
+  const { connectionProfiles = [] } = useApp();
+  
+  // Stub implementations - friend features not yet implemented
+  const friends: ConnectionProfile[] = [];
+  const sentRequests: { toUserId: string }[] = [];
+  const searchUsers = async (query: string): Promise<ConnectionProfile[]> => {
+    // Filter connectionProfiles by name
+    return connectionProfiles.filter(p => 
+      p.name.toLowerCase().includes(query.toLowerCase())
+    );
+  };
 
   const handleSearch = async (query: string) => {
     if (!query.trim()) {
@@ -202,7 +208,7 @@ function QuickAddModal({
                         {user.name}
                       </p>
                       <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                        {user.username || user.location || 'User'}
+                        {user.location || 'User'}
                       </p>
                     </div>
                     <Button 
@@ -275,28 +281,34 @@ function FriendRequestsModal({
 }) {
   const [activeTab, setActiveTab] = useState<'received' | 'sent'>('received');
   const { toast } = useToast();
-  const { 
-    friendRequests = [], 
-    sentRequests = [], 
-    acceptFriendRequest, 
-    declineFriendRequest, 
-    cancelFriendRequest,
-    connectionProfiles = []
-  } = useApp();
+  const { connectionProfiles = [] } = useApp();
+  
+  // Stub implementations - friend request features not yet implemented
+  const friendRequests: FriendRequest[] = [];
+  const sentRequests: FriendRequest[] = [];
+  const acceptFriendRequest = async (requestId: string): Promise<void> => {
+    console.log('Accept friend request:', requestId);
+  };
+  const declineFriendRequest = async (requestId: string): Promise<void> => {
+    console.log('Decline friend request:', requestId);
+  };
+  const cancelFriendRequest = async (requestId: string): Promise<void> => {
+    console.log('Cancel friend request:', requestId);
+  };
 
   // Safe default functions
-  const safeAcceptFriendRequest = acceptFriendRequest || (() => Promise.resolve());
-  const safeDeclineFriendRequest = declineFriendRequest || (() => Promise.resolve());
-  const safeCancelFriendRequest = cancelFriendRequest || (() => Promise.resolve());
+  const safeAcceptFriendRequest = acceptFriendRequest;
+  const safeDeclineFriendRequest = declineFriendRequest;
+  const safeCancelFriendRequest = cancelFriendRequest;
 
   // Enrich requests with user data
   const enrichedReceivedRequests = friendRequests.map(request => {
-    const user = connectionProfiles.find(p => p.id === request.fromUserId);
+    const user = connectionProfiles.find(p => p.id === request.fromUser?.id);
     return {
       ...request,
-      name: user?.name || 'Unknown User',
-      photo: user?.photo || 'https://i.pravatar.cc/100?img=0',
-      mutualFriends: Math.floor(Math.random() * 5)
+      name: user?.name || request.fromUser?.name || 'Unknown User',
+      photo: user?.photo || request.fromUser?.photo || 'https://i.pravatar.cc/100?img=0',
+      mutualFriends: request.mutualFriends || Math.floor(Math.random() * 5)
     };
   });
 
@@ -469,7 +481,7 @@ function FriendRequestsModal({
                         {request.mutualFriends} mutual friends
                       </p>
                       <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>
-                        {formatTime(request.createdAt || request.timestamp || new Date().toISOString())}
+                        {formatTime(request.timestamp || new Date().toISOString())}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -539,7 +551,7 @@ function FriendRequestsModal({
                       <div className="flex items-center gap-1 mt-1">
                         <Clock className="w-3 h-3" style={{ color: DESIGN.colors.textSecondary }} />
                         <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                          {formatTime(request.createdAt || request.timestamp || new Date().toISOString())}
+                          {formatTime(request.timestamp || new Date().toISOString())}
                         </p>
                       </div>
                     </div>
@@ -594,12 +606,17 @@ export default function Chats() {
     matches = [], 
     user, 
     isDemo, 
-    friends = [], 
-    friendRequests = [], 
-    sentRequests = [], 
-    sendFriendRequest,
     connectionProfiles = [] 
   } = useApp();
+  
+  // Stub implementations - friend features not yet implemented
+  const friends: ConnectionProfile[] = [];
+  const friendRequests: FriendRequest[] = [];
+  const sentRequests: FriendRequest[] = [];
+  const sendFriendRequest = async (userId: string): Promise<void> => {
+    console.log('Send friend request to:', userId);
+  };
+  
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('matches');
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
@@ -1309,7 +1326,7 @@ export default function Chats() {
                         className="w-14 h-14 rounded-full object-cover"
                         style={{ border: `2px solid ${DESIGN.colors.background}` }}
                       />
-                      {friend.online && (
+                      {friend.isPublic && (
                         <span className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full"
                           style={{ border: `2px solid ${DESIGN.colors.background}` }} />
                       )}
@@ -1321,11 +1338,11 @@ export default function Chats() {
                           {friend.name}
                         </h3>
                         <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                          {friend.lastActive ? formatTime(friend.lastActive) : ''}
+                          {friend.location || ''}
                         </span>
                       </div>
                       <p className="text-sm truncate" style={{ color: DESIGN.colors.textSecondary }}>
-                        {friend.lastMessage || 'Start a conversation'}
+                        {friend.bio || 'Start a conversation'}
                       </p>
                     </div>
                   </button>

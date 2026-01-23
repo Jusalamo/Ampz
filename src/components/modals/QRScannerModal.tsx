@@ -21,7 +21,7 @@ type ScannerStep = 'scan' | 'code' | 'verifying' | 'geofence_check' | 'success' 
 
 export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QRScannerModalProps) {
   const navigate = useNavigate();
-  const { processQRCodeScan, isLoading, validateQRCode, getUserLocation } = useCheckIn(userId);
+  const { processQRCodeScan, isLoading, validateQRCode } = useCheckIn(userId);
   
   const [step, setStep] = useState<ScannerStep>('scan');
   const [manualCode, setManualCode] = useState('');
@@ -80,7 +80,6 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
         attendees: eventData.attendees_count || 0,
         organizerId: eventData.organizer_id,
         qrCode: eventData.qr_code,
-        qrCodeUrl: eventData.qr_code_url,
         geofenceRadius: eventData.geofence_radius || 50,
         customTheme: eventData.custom_theme || '#8B5CF6',
         coverImage: eventData.cover_image || '',
@@ -95,6 +94,26 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       console.error('Error fetching event details:', error);
       return null;
     }
+  }, []);
+
+  // Get user location helper
+  const getUserLocation = useCallback((): Promise<{ latitude: number; longitude: number }> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation not supported'));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        },
+        (err) => reject(new Error('Location access needed')),
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 30000 }
+      );
+    });
   }, []);
 
   // Check geofence function
@@ -158,8 +177,8 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
         }
       }
       
-      // Check geofence if required
-      if (validationResult.requiresGeofence !== false) {
+      // Check geofence - always required for check-in
+      if (event.geofenceRadius && event.geofenceRadius > 0) {
         setStep('geofence_check');
         setDebugInfo('Checking your location...');
         

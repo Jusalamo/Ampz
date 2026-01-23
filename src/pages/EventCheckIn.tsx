@@ -13,7 +13,7 @@ export default function EventCheckIn() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading: authLoading } = useApp();
-  const { checkIn, isLoading: checkInLoading } = useCheckIn(user?.id);
+  const { processQRCodeScan, checkInToEventFast, isLoading: checkInLoading } = useCheckIn(user?.id);
   
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,7 +65,6 @@ export default function EventCheckIn() {
           attendees: data.attendees_count || 0,
           organizerId: data.organizer_id,
           qrCode: data.qr_code,
-          qrCodeUrl: data.qr_code_url,
           geofenceRadius: data.geofence_radius || 50,
           customTheme: data.custom_theme || '#8B5CF6',
           coverImage: data.cover_image || '',
@@ -168,8 +167,8 @@ export default function EventCheckIn() {
     }
 
     try {
-      // Use the unified checkIn method from useCheckIn hook
-      const result = await checkIn(event, 'public');
+      // Use the checkInToEventFast method from useCheckIn hook
+      const result = await checkInToEventFast(event.id, 'public');
       
       if (result.success) {
         setSuccess(true);

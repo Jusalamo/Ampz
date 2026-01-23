@@ -79,7 +79,8 @@ const DESIGN = {
     button: '12px',
     roundButton: '50%',
     modalTop: '20px',
-    smallPill: '8px'
+    smallPill: '8px',
+    small: '8px'
   },
   shadows: {
     card: '0 8px 32px rgba(0, 0, 0, 0.4)',

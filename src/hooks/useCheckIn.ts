@@ -19,6 +19,9 @@ export interface GeolocationResult {
   accuracy: number;
 }
 
+// Type for the secure_check_in RPC response
+type SecureCheckInResponse = string | null;
+
 export function useCheckIn(userId?: string) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -215,44 +218,76 @@ export function useCheckIn(userId?: string) {
         }
       }
       
-      // STEP 3: Create check-in record (FAST - minimal data)
-      console.time('CreateCheckIn');
-      const { data: checkInData, error: checkInError } = await supabase
-        .from('check_ins')
-        .insert({
-          user_id: userId,
-          event_id: event.id,
-          check_in_latitude: location?.latitude || null,
-          check_in_longitude: location?.longitude || null,
-          within_geofence: geofenceResult.withinGeofence,
-          distance_from_venue: (geofenceResult as any).distance || null,
-          visibility_mode: visibilityMode,
-          verification_method: location ? 'geolocation' : 'qr_scan',
-          checked_in_at: new Date().toISOString(),
-        })
-        .select('id')
-        .single();
-      console.timeEnd('CreateCheckIn');
+      // STEP 3: Use secure server-side check-in function for proper geofence validation
+      // This prevents clients from bypassing geofence validation
+      console.time('SecureCheckIn');
       
-      if (checkInError) {
-        console.error('Check-in error:', checkInError);
-        return { success: false, error: 'Check-in failed. Please try again.' };
+      if (location) {
+        // Use secure server-side check-in with proper geofence validation
+        const { data: checkInId, error: rpcError } = await supabase.rpc('secure_check_in', {
+          p_event_id: event.id,
+          p_user_lat: location.latitude,
+          p_user_lng: location.longitude,
+          p_visibility_mode: visibilityMode,
+          p_verification_method: 'geolocation'
+        }) as { data: SecureCheckInResponse; error: any };
+        
+        console.timeEnd('SecureCheckIn');
+        
+        if (rpcError) {
+          console.error('Secure check-in error:', rpcError);
+          // Extract user-friendly message from error
+          const errorMessage = rpcError.message || 'Check-in failed';
+          if (errorMessage.includes('meters')) {
+            return { success: false, error: errorMessage, eventId: event.id, isWithinGeofence: false };
+          }
+          return { success: false, error: 'Check-in failed. Please try again.' };
+        }
+        
+        console.timeEnd('TotalCheckInTime');
+        
+        return {
+          success: true,
+          message: `Checked in to ${event.name}!`,
+          eventId: event.id,
+          checkInId: checkInId || undefined,
+          isWithinGeofence: true,
+          distance: (geofenceResult as any).distance
+        };
+      } else {
+        // Fallback for when location is not available
+        const { data: checkInData, error: checkInError } = await supabase
+          .from('check_ins')
+          .insert({
+            user_id: userId,
+            event_id: event.id,
+            check_in_latitude: null,
+            check_in_longitude: null,
+            within_geofence: true, // Allow if no location available
+            visibility_mode: visibilityMode,
+            verification_method: 'qr_scan',
+            checked_in_at: new Date().toISOString(),
+          })
+          .select('id')
+          .single();
+        
+        console.timeEnd('SecureCheckIn');
+        
+        if (checkInError) {
+          console.error('Check-in error:', checkInError);
+          return { success: false, error: 'Check-in failed. Please try again.' };
+        }
+        
+        console.timeEnd('TotalCheckInTime');
+        
+        return {
+          success: true,
+          message: `Checked in to ${event.name}!`,
+          eventId: event.id,
+          checkInId: checkInData.id,
+          isWithinGeofence: true
+        };
       }
-      
-      // STEP 4: Update attendee count (non-blocking, fire-and-forget)
-      supabase.rpc('increment_event_attendees', { event_id: event.id })
-        .catch(err => console.error('Failed to update attendee count:', err));
-      
-      console.timeEnd('TotalCheckInTime');
-      
-      return {
-        success: true,
-        message: `Checked in to ${event.name}!`,
-        eventId: event.id,
-        checkInId: checkInData.id,
-        isWithinGeofence: geofenceResult.withinGeofence,
-        distance: (geofenceResult as any).distance
-      };
     } catch (err: any) {
       console.error('Fast check-in error:', err);
       const message = err?.message || 'Check-in failed';
@@ -321,8 +356,16 @@ export function useCheckIn(userId?: string) {
       }
 
       // Update count (async)
-      supabase.rpc('increment_event_attendees', { event_id: eventId })
-        .catch(console.error);
+      (async () => {
+        try {
+          await supabase
+            .from('events')
+            .update({ attendees_count: 1 })
+            .eq('id', eventId);
+        } catch (err) {
+          console.error('Failed to update attendee count:', err);
+        }
+      })();
 
       return {
         success: true,
