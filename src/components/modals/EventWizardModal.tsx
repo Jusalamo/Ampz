@@ -6,7 +6,7 @@ import {
   Brush, Globe, Camera, Map as MapIcon, Radio, Eye, Utensils,
   Coffee, Beer, Hotel, ShoppingBag, Trees, School, Hospital,
   Building, Navigation, Home, Landmark, Play, Pause,
-  Film, Grid3x3, Link as LinkIcon, Ticket
+  Film, Grid3x3, Link as LinkIcon, Ticket, Trash2, EyeOff
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Input } from '@/components/ui/input';
@@ -59,6 +59,7 @@ const DESIGN = {
 interface EventWizardModalProps {
   isOpen: boolean;
   onClose: () => void;
+  editingEvent?: Event | null;
 }
 
 const categories = [
@@ -89,12 +90,26 @@ const presetColors = [
 // Function to generate QR code URL that links to event details
 const generateQRCodeUrl = (eventId: string, qrCode: string): string => {
   const eventDetailsUrl = `${window.location.origin}/event/${eventId}`;
-  // Use a QR code generation service that encodes the event details URL
   return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(eventDetailsUrl)}&format=png&bgcolor=ffffff&color=000000&qzone=1&margin=10&ecc=H`;
 };
 
-export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
-  const { addEvent, user } = useApp();
+// Helper function to convert File to Base64 for persistent storage
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
+};
+
+// Helper function to check if a string is a base64 image
+const isBase64Image = (str: string): boolean => {
+  return str.startsWith('data:image/') || str.startsWith('data:video/');
+};
+
+export function EventWizardModal({ isOpen, onClose, editingEvent }: EventWizardModalProps) {
+  const { addEvent, updateEvent, user } = useApp();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [mediaType, setMediaType] = useState<'video' | 'carousel'>('carousel');
@@ -110,8 +125,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     streetName: '',
     coordinates: { lat: -22.5609, lng: 17.0658 },
     geofenceRadius: 50,
-    images: [] as string[],
+    images: [] as string[], // Store base64 strings or URLs
     videos: [] as string[],
+    imageFiles: [] as File[], // Store actual File objects for new uploads
     videoFiles: [] as File[],
     themeColor: '#8B5CF6',
     isFree: true,
@@ -121,8 +137,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     qrCodeUrl: '',
   });
   const [createdEvent, setCreatedEvent] = useState<Event | null>(null);
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [videoDuration, setVideoDuration] = useState<string>('0:00');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -139,6 +153,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   const [imagePosition, setImagePosition] = useState({ x: 50, y: 50 });
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const [imageZoom, setImageZoom] = useState(100);
+  const [editingMedia, setEditingMedia] = useState(false);
 
   const mapContainer1 = useRef<HTMLDivElement>(null);
   const mapContainer2 = useRef<HTMLDivElement>(null);
@@ -174,12 +189,50 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     }
   }, []);
 
+  // Load editing event data if provided
+  useEffect(() => {
+    if (editingEvent && isOpen) {
+      // Convert existing event to form data
+      setEventData({
+        name: editingEvent.name || '',
+        description: editingEvent.description || '',
+        category: editingEvent.category || '',
+        price: editingEvent.price?.toString() || '',
+        date: editingEvent.date || '',
+        time: editingEvent.time || '',
+        location: editingEvent.location || '',
+        address: editingEvent.address || '',
+        streetName: '',
+        coordinates: editingEvent.coordinates || { lat: -22.5609, lng: 17.0658 },
+        geofenceRadius: editingEvent.geofenceRadius || 50,
+        images: editingEvent.images || [],
+        videos: editingEvent.videos || [],
+        imageFiles: [], // Start with empty files array
+        videoFiles: [],
+        themeColor: editingEvent.customTheme || '#8B5CF6',
+        isFree: editingEvent.price === 0,
+        mediaType: editingEvent.mediaType || 'carousel',
+        selectedVideoIndex: editingEvent.selectedVideoIndex || 0,
+        webTicketsLink: editingEvent.webTicketsLink || '',
+        qrCodeUrl: editingEvent.qrCodeUrl || '',
+      });
+      
+      setMediaType(editingEvent.mediaType || 'carousel');
+      
+      // Preselect category if it exists in our categories list
+      if (editingEvent.category && categories.find(c => c.value === editingEvent.category)) {
+        setEventData(prev => ({ ...prev, category: editingEvent.category! }));
+      }
+    }
+  }, [editingEvent, isOpen]);
+
   // Cleanup URLs when component unmounts or images/videos change
   useEffect(() => {
     const currentImages = eventData.images;
     const currentVideos = eventData.videos;
     
     return () => {
+      // Only revoke blob URLs, not base64 or external URLs
       currentImages.forEach(url => {
         if (url.startsWith('blob:')) {
           URL.revokeObjectURL(url);
@@ -191,11 +244,11 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         }
       });
     };
-  }, []);
+  }, [eventData.images, eventData.videos]);
 
   // Reset form when modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !editingEvent) {
       setStep(1);
       setMediaType('carousel');
       setEventData({
@@ -212,6 +265,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         geofenceRadius: 50,
         images: [],
         videos: [],
+        imageFiles: [],
         videoFiles: [],
         themeColor: '#8B5CF6',
         isFree: true,
@@ -220,8 +274,6 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         webTicketsLink: '',
         qrCodeUrl: '',
       });
-      setImageFiles([]);
-      setVideoFile(null);
       setCreatedEvent(null);
       setIsSubmitting(false);
       setLocationSuggestions([]);
@@ -235,8 +287,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       setImageZoom(100);
       setIsVideoPlaying(false);
       setVideoDuration('0:00');
+      setEditingMedia(false);
     }
-  }, [isOpen]);
+  }, [isOpen, editingEvent]);
 
   // Cleanup maps ONLY when modal closes
   useEffect(() => {
@@ -564,13 +617,13 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     setEventData(prev => ({ ...prev, geofenceRadius: newRadius }));
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const newImages = Array.from(files).slice(0, 5 - imageFiles.length);
+    const newFiles = Array.from(files).slice(0, 5 - eventData.imageFiles.length);
     
-    const validImages = newImages.filter(file => {
+    const validFiles = newFiles.filter(file => {
       const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
       const maxSize = 10 * 1024 * 1024;
       
@@ -595,23 +648,38 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       return true;
     });
     
-    if (validImages.length === 0) {
+    if (validFiles.length === 0) {
       e.target.value = '';
       return;
     }
     
-    setImageFiles(prev => [...prev, ...validImages]);
-    
-    const imageUrls = validImages.map(file => URL.createObjectURL(file));
+    // Add to files array
     setEventData(prev => ({
       ...prev,
-      images: [...prev.images, ...imageUrls]
+      imageFiles: [...prev.imageFiles, ...validFiles]
     }));
+    
+    // Convert files to base64 for preview
+    const base64Promises = validFiles.map(file => fileToBase64(file));
+    try {
+      const base64Images = await Promise.all(base64Promises);
+      setEventData(prev => ({
+        ...prev,
+        images: [...prev.images, ...base64Images]
+      }));
+    } catch (error) {
+      console.error('Error converting images to base64:', error);
+      toast({
+        title: 'Upload Error',
+        description: 'Failed to process uploaded images. Please try again.',
+        variant: 'destructive'
+      });
+    }
     
     e.target.value = '';
   };
 
-  const handlePrimaryPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePrimaryPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -640,27 +708,36 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       return;
     }
     
-    if (imageFiles.length > 0 && eventData.images[0]) {
-      URL.revokeObjectURL(eventData.images[0]);
+    try {
+      const base64Image = await fileToBase64(newFile);
+      
+      if (eventData.images.length > 0) {
+        // Replace the first image
+        setEventData(prev => ({
+          ...prev,
+          images: [base64Image, ...prev.images.slice(1)],
+          imageFiles: [newFile, ...prev.imageFiles.slice(1)]
+        }));
+      } else {
+        // Add as first image
+        setEventData(prev => ({
+          ...prev,
+          images: [base64Image],
+          imageFiles: [newFile]
+        }));
+      }
+      
+      setImagePosition({ x: 50, y: 50 });
+      setImageZoom(100);
+      e.target.value = '';
+    } catch (error) {
+      console.error('Error converting image to base64:', error);
+      toast({
+        title: 'Upload Error',
+        description: 'Failed to process uploaded image. Please try again.',
+        variant: 'destructive'
+      });
     }
-    
-    if (imageFiles.length === 0) {
-      setImageFiles([newFile]);
-      setEventData(prev => ({
-        ...prev,
-        images: [URL.createObjectURL(newFile)]
-      }));
-    } else {
-      setImageFiles(prev => [newFile, ...prev.slice(1)]);
-      setEventData(prev => ({
-        ...prev,
-        images: [URL.createObjectURL(newFile), ...prev.images.slice(1)]
-      }));
-    }
-    
-    setImagePosition({ x: 50, y: 50 });
-    setImageZoom(100);
-    e.target.value = '';
   };
 
   const handleImagePositionChange = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -676,7 +753,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     });
   };
 
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -705,22 +782,26 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       return;
     }
     
-    if (videoFile && eventData.videos[0]) {
-      URL.revokeObjectURL(eventData.videos[0]);
+    try {
+      const base64Video = await fileToBase64(newVideoFile);
+      
+      setEventData(prev => ({
+        ...prev,
+        videos: [base64Video],
+        videoFiles: [newVideoFile],
+        mediaType: 'video'
+      }));
+      
+      setMediaType('video');
+      e.target.value = '';
+    } catch (error) {
+      console.error('Error converting video to base64:', error);
+      toast({
+        title: 'Upload Error',
+        description: 'Failed to process uploaded video. Please try again.',
+        variant: 'destructive'
+      });
     }
-    
-    const videoUrl = URL.createObjectURL(newVideoFile);
-    
-    setEventData(prev => ({
-      ...prev,
-      videos: [videoUrl],
-      videoFiles: [newVideoFile],
-      mediaType: 'video'
-    }));
-    
-    setVideoFile(newVideoFile);
-    setMediaType('video');
-    e.target.value = '';
   };
 
   const toggleVideoPlay = () => {
@@ -745,34 +826,25 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   };
 
   const removeImage = (index: number) => {
-    if (eventData.images[index]) {
-      URL.revokeObjectURL(eventData.images[index]);
-    }
-    
     setEventData(prev => ({
       ...prev,
-      images: prev.images.filter((_, i) => i !== index)
+      images: prev.images.filter((_, i) => i !== index),
+      imageFiles: prev.imageFiles.filter((_, i) => i !== index)
     }));
-    setImageFiles(prev => prev.filter((_, i) => i !== index));
     
-    if (index === 0 && imageFiles.length > 1) {
+    if (index === 0 && eventData.images.length > 1) {
       setImagePosition({ x: 50, y: 50 });
       setImageZoom(100);
     }
   };
 
   const removeVideo = () => {
-    if (eventData.videos[0]) {
-      URL.revokeObjectURL(eventData.videos[0]);
-    }
-    
     setEventData(prev => ({
       ...prev,
       videos: [],
       videoFiles: [],
       mediaType: 'carousel'
     }));
-    setVideoFile(null);
     setMediaType('carousel');
     setIsVideoPlaying(false);
     setVideoDuration('0:00');
@@ -792,9 +864,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     if (!eventData.time) errors.push('Time is required');
     if (!eventData.location.trim()) errors.push('Location name is required');
     if (!eventData.address.trim()) errors.push('Address is required');
-    if (imageFiles.length === 0) errors.push('Primary photo is required');
+    if (eventData.images.length === 0) errors.push('Primary photo is required');
     
-    if (eventData.mediaType === 'video' && !videoFile) {
+    if (eventData.mediaType === 'video' && eventData.videos.length === 0) {
       errors.push('Video is required for video type');
     }
     
@@ -835,8 +907,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
     setIsSubmitting(true);
     
     try {
-      const eventId = crypto.randomUUID();
-      const qrCode = `${eventData.name.replace(/\s+/g, '-').toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
+      const eventId = editingEvent?.id || crypto.randomUUID();
+      const qrCode = editingEvent?.qrCode || `${eventData.name.replace(/\s+/g, '-').toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
       
       const price = eventData.isFree ? 0 : parseFloat(eventData.price) || 0;
       
@@ -846,7 +918,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
       // Generate QR code that links to the event details page
       const qrCodeUrl = generateQRCodeUrl(eventId, qrCode);
       
-      // Convert blob URLs to persistent URLs or keep as blob URLs for demo
+      // Use base64 images and videos for persistent storage
       const images = eventData.images;
       const videos = eventData.videos;
       
@@ -864,10 +936,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         price: price,
         currency: 'NAD',
         maxAttendees: 500,
-        attendees: 0,
+        attendees: editingEvent?.attendees || 0,
         organizerId: user.id,
-        qrCode: qrCode, // This is the check-in code
-        qrCodeUrl: qrCodeUrl, // This is the actual QR code image URL
+        qrCode: qrCode,
+        qrCodeUrl: qrCodeUrl,
         geofenceRadius: eventData.geofenceRadius,
         customTheme: eventData.themeColor,
         coverImage: eventData.images[0] || '',
@@ -879,28 +951,34 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         mediaType: mediaType,
         selectedVideoIndex: 0,
         webTicketsLink: eventData.webTicketsLink,
-        createdAt: new Date().toISOString(),
+        createdAt: editingEvent?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      if (addEvent) {
+      if (editingEvent && updateEvent) {
+        await updateEvent(newEvent);
+        toast({
+          title: 'Event updated!',
+          description: 'Your event has been updated successfully.',
+        });
+      } else if (addEvent) {
         await addEvent(newEvent);
+        toast({
+          title: 'Event created!',
+          description: 'Your event has been published successfully.',
+        });
       } else {
-        throw new Error('addEvent function not available');
+        throw new Error('Event function not available');
       }
       
       setCreatedEvent(newEvent);
       setStep(6);
       
-      toast({
-        title: 'Event created!',
-        description: 'Your event has been published successfully.',
-      });
     } catch (error) {
-      console.error('Error creating event:', error);
+      console.error('Error creating/updating event:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to create event. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to create/update event. Please try again.',
         variant: 'destructive'
       });
     } finally {
@@ -948,7 +1026,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
   };
 
   const isStep1Valid = eventData.name.trim() && eventData.category && eventData.date && eventData.time;
-  const isStep2Valid = imageFiles.length > 0 && (eventData.mediaType === 'carousel' || (eventData.mediaType === 'video' && videoFile));
+  const isStep2Valid = eventData.images.length > 0 && (eventData.mediaType === 'carousel' || (eventData.mediaType === 'video' && eventData.videos.length > 0));
   const isStep3Valid = eventData.coordinates.lat !== 0 && eventData.location.trim() && eventData.address.trim();
 
   if (!isOpen) return null;
@@ -975,7 +1053,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
         <div style={{ borderBottom: `1px solid ${DESIGN.colors.border}`, flexShrink: 0 }}>
           <div className="flex items-center justify-between px-6 h-14">
             <h2 className="text-[28px] font-bold" style={{ color: DESIGN.colors.textPrimary }}>
-              Create Event
+              {editingEvent ? 'Edit Event' : 'Create Event'}
             </h2>
             <button 
               onClick={onClose} 
@@ -1454,17 +1532,17 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     className={cn(
                       "border-2 flex flex-col items-center justify-center cursor-pointer transition-colors overflow-hidden",
                       "hover:border-primary",
-                      imageFiles.length > 0 ? "border-solid" : "border-dashed"
+                      eventData.images.length > 0 ? "border-solid" : "border-dashed"
                     )}
                     style={{
                       borderRadius: DESIGN.borderRadius.card,
-                      borderColor: imageFiles.length > 0 ? DESIGN.colors.border : DESIGN.colors.muted,
+                      borderColor: eventData.images.length > 0 ? DESIGN.colors.border : DESIGN.colors.muted,
                       height: '192px',
-                      background: imageFiles.length > 0 ? 'transparent' : `${DESIGN.colors.primary}10`
+                      background: eventData.images.length > 0 ? 'transparent' : `${DESIGN.colors.primary}10`
                     }}
-                    onClick={() => !imageFiles.length && primaryPhotoRef.current?.click()}
+                    onClick={() => !eventData.images.length && primaryPhotoRef.current?.click()}
                     onMouseDown={(e) => {
-                      if (imageFiles.length > 0) {
+                      if (eventData.images.length > 0) {
                         e.preventDefault();
                         setIsDraggingImage(true);
                       }
@@ -1473,7 +1551,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     onMouseUp={() => setIsDraggingImage(false)}
                     onMouseLeave={() => setIsDraggingImage(false)}
                   >
-                    {imageFiles.length > 0 ? (
+                    {eventData.images.length > 0 ? (
                       <div className="relative w-full h-full">
                         <img
                           src={eventData.images[0]}
@@ -1546,7 +1624,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                             color: DESIGN.colors.textPrimary
                           }}
                         >
-                          <X className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs px-3 py-1.5 backdrop-blur-sm"
                              style={{
@@ -1569,8 +1647,8 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                     )}
                   </div>
                   <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                    {imageFiles.length > 0 
-                      ? 'Click and drag to reposition • Use +/− to zoom' 
+                    {eventData.images.length > 0 
+                      ? 'Click and drag to reposition • Use +/− to zoom • Click trash to remove' 
                       : 'This photo appears on event cards'}
                   </p>
                   <input
@@ -1591,15 +1669,15 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         Additional Photos (Optional)
                       </label>
                       <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                        {imageFiles.length - 1}/4
+                        {eventData.images.length - 1}/4
                       </span>
                     </div>
                     <div className="grid grid-cols-4 gap-2">
-                      {imageFiles.slice(1).map((_, index) => (
+                      {eventData.images.slice(1).map((image, index) => (
                         <div key={index} className="relative aspect-square overflow-hidden"
                              style={{ borderRadius: DESIGN.borderRadius.button }}>
                           <img
-                            src={eventData.images[index + 1]}
+                            src={image}
                             alt={`Additional photo ${index + 1}`}
                             className="w-full h-full object-cover"
                           />
@@ -1616,7 +1694,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                           </button>
                         </div>
                       ))}
-                      {imageFiles.length < 5 && (
+                      {eventData.images.length < 5 && (
                         <div 
                           className="aspect-square flex items-center justify-center cursor-pointer"
                           style={{
@@ -1639,6 +1717,9 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       className="hidden"
                       disabled={isSubmitting}
                     />
+                    <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                      Upload up to 4 additional photos for the carousel
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -1648,24 +1729,24 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                         Event Video *
                       </label>
                       <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                        {videoFile ? '1/1' : '0/1'}
+                        {eventData.videos.length > 0 ? '1/1' : '0/1'}
                       </span>
                     </div>
                     <div 
                       className={cn(
                         "border-2 flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden",
                         "hover:border-primary",
-                        videoFile ? "border-solid" : "border-dashed"
+                        eventData.videos.length > 0 ? "border-solid" : "border-dashed"
                       )}
                       style={{
                         borderRadius: DESIGN.borderRadius.card,
-                        borderColor: videoFile ? DESIGN.colors.border : DESIGN.colors.muted,
+                        borderColor: eventData.videos.length > 0 ? DESIGN.colors.border : DESIGN.colors.muted,
                         height: '192px',
-                        background: videoFile ? 'transparent' : `${DESIGN.colors.primary}10`
+                        background: eventData.videos.length > 0 ? 'transparent' : `${DESIGN.colors.primary}10`
                       }}
-                      onClick={() => !videoFile && videoInputRef.current?.click()}
+                      onClick={() => !eventData.videos.length && videoInputRef.current?.click()}
                     >
-                      {videoFile ? (
+                      {eventData.videos.length > 0 ? (
                         <div className="relative w-full h-full group">
                           <video
                             ref={videoRef}
@@ -1720,7 +1801,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                                }}>
                             <Video className="w-3 h-3 text-white" />
                             <span className="text-xs text-white">
-                              {videoFile.type.split('/')[1].toUpperCase()}
+                              {eventData.videoFiles[0]?.type.split('/')[1].toUpperCase() || 'VIDEO'}
                             </span>
                           </div>
                           
@@ -1736,7 +1817,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                               color: DESIGN.colors.textPrimary
                             }}
                           >
-                            <X className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       ) : (
@@ -1758,7 +1839,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       disabled={isSubmitting}
                     />
                     <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                      {videoFile 
+                      {eventData.videos.length > 0 
                         ? 'Click play/pause to preview • Video will auto-play muted on event details page' 
                         : 'Video will auto-play muted on loop in event details page'}
                     </p>
@@ -2110,7 +2191,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       <div className="overflow-hidden" style={{ borderRadius: DESIGN.borderRadius.button, border: `1px solid ${DESIGN.colors.border}` }}>
                         <div className="h-32 flex items-center justify-center relative overflow-hidden"
                              style={{ background: `linear-gradient(to right, ${eventData.themeColor}10, ${eventData.themeColor}5)` }}>
-                          {imageFiles.length > 0 ? (
+                          {eventData.images.length > 0 ? (
                             <img
                               src={eventData.images[0]}
                               alt="Event preview"
@@ -2179,7 +2260,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                           <span style={{ color: DESIGN.colors.textPrimary }}>
                             {eventData.mediaType === 'video' 
                               ? 'Video will auto-play muted' 
-                              : `Carousel with ${imageFiles.length} image${imageFiles.length !== 1 ? 's' : ''}`}
+                              : `Carousel with ${eventData.images.length} image${eventData.images.length !== 1 ? 's' : ''}`}
                           </span>
                         </div>
                         {eventData.webTicketsLink && (
@@ -2250,11 +2331,11 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                       </div>
                       <div className="space-y-1 text-sm">
                         <p><span style={{ color: DESIGN.colors.textSecondary }}>Type:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.mediaType === 'video' ? 'Video' : 'Image Carousel'}</span></p>
-                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Primary Photo:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{imageFiles.length > 0 ? 'Uploaded' : 'Required'}</span></p>
+                        <p><span style={{ color: DESIGN.colors.textSecondary }}>Primary Photo:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.images.length > 0 ? 'Uploaded' : 'Required'}</span></p>
                         {eventData.mediaType === 'video' ? (
-                          <p><span style={{ color: DESIGN.colors.textSecondary }}>Video:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{videoFile ? 'Uploaded (auto-plays muted)' : 'Required'}</span></p>
+                          <p><span style={{ color: DESIGN.colors.textSecondary }}>Video:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.videos.length > 0 ? 'Uploaded (auto-plays muted)' : 'Required'}</span></p>
                         ) : (
-                          <p><span style={{ color: DESIGN.colors.textSecondary }}>Additional Photos:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{imageFiles.length - 1}</span></p>
+                          <p><span style={{ color: DESIGN.colors.textSecondary }}>Additional Photos:</span> <span style={{ color: DESIGN.colors.textPrimary }}>{eventData.images.length - 1}</span></p>
                         )}
                       </div>
                     </div>
@@ -2295,10 +2376,10 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   <Check className="w-12 h-12" style={{ color: eventData.themeColor }} />
                 </div>
                 <h3 className="text-[28px] font-bold mb-2 text-center" style={{ color: DESIGN.colors.textPrimary }}>
-                  Event Created Successfully!
+                  {editingEvent ? 'Event Updated Successfully!' : 'Event Created Successfully!'}
                 </h3>
                 <p className="text-center mb-8 max-w-md" style={{ color: DESIGN.colors.textSecondary }}>
-                  Your event "<span className="font-semibold" style={{ color: DESIGN.colors.textPrimary }}>{createdEvent.name}</span>" is now live! Share the QR code below for attendees to check in.
+                  Your event "<span className="font-semibold" style={{ color: DESIGN.colors.textPrimary }}>{createdEvent.name}</span>" is now {editingEvent ? 'updated' : 'live'}! Share the QR code below for attendees to check in.
                 </p>
 
                 <div className="w-full max-w-sm flex flex-col items-center justify-center mb-6 border-2 p-6"
@@ -2422,12 +2503,12 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Publishing...
+                      {editingEvent ? 'Updating...' : 'Publishing...'}
                     </>
                   ) : (
                     <>
                       <Check className="w-4 h-4 mr-2" />
-                      Create Event
+                      {editingEvent ? 'Update Event' : 'Create Event'}
                     </>
                   )}
                 </Button>
@@ -2449,7 +2530,7 @@ export function EventWizardModal({ isOpen, onClose }: EventWizardModalProps) {
               }}
             >
               <Check className="w-4 h-4 mr-2" />
-              Go to Event Dashboard
+              {editingEvent ? 'Close' : 'Go to Event Dashboard'}
             </Button>
           </div>
         )}
