@@ -1,5 +1,26 @@
 import { supabase } from '@/integrations/supabase/client';
 
+// Generate a random access code
+export const generateAccessCode = (): string => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789'; // Removed I, O for clarity
+  let result = '';
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
+
+// Generate a simple event token (legacy)
+export const generateEventToken = (eventId: string): string => {
+  return btoa(eventId + '-amps-checkin').slice(0, 8);
+};
+
+// Build check-in URL for QR code
+export const buildCheckInURL = (eventId: string, token?: string): string => {
+  const baseUrl = `${window.location.origin}/event/${eventId}/checkin`;
+  return token ? `${baseUrl}?token=${token}` : baseUrl;
+};
+
 // Parse check-in URL from QR code
 export const parseCheckInURL = (url: string): { eventId: string; token?: string } | null => {
   try {
@@ -104,4 +125,10 @@ export const isWithinGeofence = (
 export const generateCheckInURL = (eventId: string, token?: string): string => {
   const baseUrl = `${window.location.origin}/event/${eventId}/checkin`;
   return token ? `${baseUrl}?token=${token}` : baseUrl;
+};
+
+// Generate QR code URL for an event
+export const generateQRCodeUrl = (eventId: string, qrCode: string): string => {
+  const checkInUrl = buildCheckInURL(eventId);
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(checkInUrl)}&format=png&bgcolor=ffffff&color=000000&qzone=1&margin=10&ecc=H`;
 };
