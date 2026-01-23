@@ -64,7 +64,7 @@ export function generateAccessCode(): string {
   return code;
 }
 
-// Generate QR code data URL
+// Generate QR code data URL with geofence check endpoint
 export async function generateQRCodeDataURL(data: string): Promise<string> {
   try {
     const qrDataUrl = await QRCode.toDataURL(data, {
@@ -83,10 +83,10 @@ export async function generateQRCodeDataURL(data: string): Promise<string> {
   }
 }
 
-// Build check-in URL for an event
+// Build check-in URL for an event with geofence validation
 export function buildCheckInURL(eventId: string, token: string): string {
   const baseURL = window.location.origin;
-  return `${baseURL}/event/${eventId}/checkin?token=${token}`;
+  return `${baseURL}/event/${eventId}/checkin?token=${token}&checkGeofence=true`;
 }
 
 // Parse check-in URL and extract event ID and token
@@ -143,12 +143,12 @@ export function validateEventToken(token: string, eventId: string): boolean {
   }
 }
 
-// Server-side secure token validation
+// Server-side secure token validation with geofence check
 export async function validateSecureEventToken(
   token: string,
   eventId: string
-): Promise<boolean> {
-  if (!token) return false;
+): Promise<{ valid: boolean; requiresGeofence?: boolean }> {
+  if (!token) return { valid: false };
   
   try {
     // Hash the token to compare with stored hash
@@ -162,13 +162,13 @@ export async function validateSecureEventToken(
     
     if (error) {
       console.error('Error validating token:', error);
-      return false;
+      return { valid: false };
     }
     
-    return data === true;
+    return { valid: data === true, requiresGeofence: true };
   } catch (error) {
     console.error('Error in secure token validation:', error);
-    return false;
+    return { valid: false };
   }
 }
 
@@ -213,4 +213,54 @@ export async function downloadQRCode(eventName: string, qrDataUrl: string): Prom
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+// New function: Generate QR code URL that includes geofence check
+export function generateEventQRCodeURL(eventId: string, token?: string): string {
+  const baseURL = window.location.origin;
+  const checkinURL = `${baseURL}/event/${eventId}/checkin`;
+  
+  if (token) {
+    return `${checkinURL}?token=${token}&checkGeofence=true`;
+  }
+  
+  return checkinURL;
+}
+
+// New function: Validate geofence for check-in
+export async function validateGeofenceForCheckIn(
+  eventId: string,
+  userLat: number,
+  userLng: number
+): Promise<{ valid: boolean; distance?: number; error?: string }> {
+  try {
+    // Fetch event details including coordinates and geofence radius
+    const { data: event, error } = await supabase
+      .from('events')
+      .select('latitude, longitude, geofence_radius')
+      .eq('id', eventId)
+      .single();
+    
+    if (error || !event) {
+      return { valid: false, error: 'Event not found' };
+    }
+    
+    const distance = calculateDistance(
+      userLat,
+      userLng,
+      event.latitude,
+      event.longitude
+    );
+    
+    const withinGeofence = distance <= (event.geofence_radius || 50);
+    
+    return {
+      valid: withinGeofence,
+      distance: Math.round(distance),
+      error: withinGeofence ? undefined : `You are ${Math.round(distance)}m away from the event venue. Please move within ${event.geofence_radius || 50}m to check in.`
+    };
+  } catch (error) {
+    console.error('Error validating geofence:', error);
+    return { valid: false, error: 'Failed to validate location' };
+  }
 }
