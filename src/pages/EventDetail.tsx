@@ -727,19 +727,70 @@ export default function EventDetail() {
               }}
             />
             
-            {/* Video Controls Overlay - YouTube-style */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              {/* Bottom controls bar */}
+            {/* Media Type Badge - Video */}
+            <div 
+              className="absolute top-4 left-4 px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-2 z-10"
+              style={{
+                background: 'rgba(0, 0, 0, 0.7)'
+              }}
+            >
+              <Film className="w-3.5 h-3.5 text-white" />
+              <span className="text-xs text-white font-medium">Video</span>
+            </div>
+            
+            {/* Always visible minimal controls */}
+            <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between pointer-events-none">
+              <div className="pointer-events-auto">
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleVideoPlay();
+                  }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all duration-200 opacity-80 hover:opacity-100 backdrop-blur-sm cursor-pointer"
+                  style={{
+                    color: DESIGN.colors.textPrimary
+                  }}
+                  aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
+                >
+                  {isVideoPlaying ? (
+                    <Pause className="w-4 h-4" />
+                  ) : (
+                    <Play className="w-4 h-4 ml-0.5" />
+                  )}
+                </button>
+              </div>
+              
+              <div className="pointer-events-auto">
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openVideoModal();
+                  }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all duration-200 opacity-80 hover:opacity-100 backdrop-blur-sm cursor-pointer"
+                  style={{
+                    color: DESIGN.colors.textPrimary
+                  }}
+                  aria-label="Open video in fullscreen"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Expanded controls on hover */}
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
               <div 
                 className="absolute bottom-0 left-0 right-0"
                 style={{
                   background: 'linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 100%)',
                   padding: '16px',
-                  paddingBottom: '32px' // Extra space for better control access
+                  paddingBottom: '32px'
                 }}
               >
                 <div className="flex items-center justify-between max-w-5xl mx-auto">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 pointer-events-auto">
                     {/* Play/Pause Button */}
                     <button
                       onClick={(e) => {
@@ -789,7 +840,7 @@ export default function EventDetail() {
                       e.stopPropagation();
                       openVideoModal();
                     }}
-                    className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all duration-200 cursor-pointer backdrop-blur-sm"
+                    className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all duration-200 cursor-pointer backdrop-blur-sm pointer-events-auto"
                     style={{
                       color: DESIGN.colors.textPrimary
                     }}
@@ -799,58 +850,6 @@ export default function EventDetail() {
                   </button>
                 </div>
               </div>
-            </div>
-            
-            {/* Always visible controls on hover state */}
-            <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between pointer-events-none">
-              <div className="pointer-events-auto">
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleVideoPlay();
-                  }}
-                  className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all duration-200 opacity-80 hover:opacity-100 backdrop-blur-sm cursor-pointer"
-                  style={{
-                    color: DESIGN.colors.textPrimary
-                  }}
-                  aria-label={isVideoPlaying ? 'Pause video' : 'Play video'}
-                >
-                  {isVideoPlaying ? (
-                    <Pause className="w-4 h-4" />
-                  ) : (
-                    <Play className="w-4 h-4 ml-0.5" />
-                  )}
-                </button>
-              </div>
-              
-              <div className="pointer-events-auto">
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openVideoModal();
-                  }}
-                  className="w-10 h-10 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-all duration-200 opacity-80 hover:opacity-100 backdrop-blur-sm cursor-pointer"
-                  style={{
-                    color: DESIGN.colors.textPrimary
-                  }}
-                  aria-label="Open video in fullscreen"
-                >
-                  <Maximize2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            
-            {/* Video Indicator */}
-            <div 
-              className="absolute top-4 left-4 px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-2"
-              style={{
-                background: 'rgba(0, 0, 0, 0.7)'
-              }}
-            >
-              <Film className="w-3.5 h-3.5 text-white" />
-              <span className="text-xs text-white font-medium">Video</span>
             </div>
             
             {/* Play overlay when video ended */}
@@ -888,6 +887,19 @@ export default function EventDetail() {
                     (e.target as HTMLImageElement).src = `https://via.placeholder.com/400x256/2D2D2D/FFFFFF?text=${encodeURIComponent(event.name.substring(0, 30))}`;
                   }}
                 />
+                
+                {/* Media Type Badge - Carousel */}
+                <div 
+                  className="absolute top-4 left-4 px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-2 z-10"
+                  style={{
+                    background: 'rgba(0, 0, 0, 0.7)'
+                  }}
+                >
+                  <Grid3x3 className="w-3.5 h-3.5 text-white" />
+                  <span className="text-xs text-white font-medium">
+                    {currentImageIndex + 1}/{eventImages.length}
+                  </span>
+                </div>
                 
                 {/* Carousel Controls */}
                 {eventImages.length > 1 && (
@@ -945,19 +957,6 @@ export default function EventDetail() {
                           aria-label={`Go to image ${index + 1}`}
                         />
                       ))}
-                    </div>
-                    
-                    {/* Image Counter */}
-                    <div 
-                      className="absolute top-4 right-4 px-3 py-1.5 rounded-full backdrop-blur-sm flex items-center gap-2 z-10"
-                      style={{
-                        background: 'rgba(0, 0, 0, 0.7)'
-                      }}
-                    >
-                      <Grid3x3 className="w-3.5 h-3.5 text-white" />
-                      <span className="text-xs text-white font-medium">
-                        {currentImageIndex + 1}/{eventImages.length}
-                      </span>
                     </div>
                   </>
                 )}
