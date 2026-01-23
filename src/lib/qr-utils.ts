@@ -85,27 +85,54 @@ export async function generateQRCodeDataURL(data: string): Promise<string> {
 
 // Build check-in URL for an event
 export function buildCheckInURL(eventId: string, token: string): string {
-  const baseURL = window.location.origin + window.location.pathname.replace(/\/$/, '');
-  return `${baseURL}#/event/${eventId}/checkin?token=${token}`;
+  const baseURL = window.location.origin;
+  return `${baseURL}/event/${eventId}/checkin?token=${token}`;
 }
 
 // Parse check-in URL and extract event ID and token
 export function parseCheckInURL(url: string): { eventId: string; token: string } | null {
   try {
-    // Handle both regular URLs and hash-based URLs
-    const hashMatch = url.match(/\/event\/([^/]+)\/checkin\?token=([^&]+)/);
-    if (hashMatch) {
-      return { eventId: hashMatch[1], token: hashMatch[2] };
-    }
-    return null;
+    // Handle multiple URL formats:
+    // 1. Regular check-in URL with token: /event/{id}/checkin?token={token}
+    // 2. Event page URL: /event/{id}
+    // 3. Event check-in page URL: /event/{id}/checkin
+    
+    // Remove any hash or query parameters for basic parsing
+    const cleanUrl = url.split('#')[0].split('?')[0];
+    
+    // Try to extract event ID from URL
+    const eventIdMatch = cleanUrl.match(/\/event\/([^/]+)(\/checkin)?$/);
+    if (!eventIdMatch) return null;
+    
+    const eventId = eventIdMatch[1];
+    
+    // Extract token from query parameters if present
+    const urlObj = new URL(url, window.location.origin);
+    const token = urlObj.searchParams.get('token');
+    
+    return { eventId, token: token || '' };
   } catch (error) {
     console.error('Error parsing check-in URL:', error);
     return null;
   }
 }
 
+// Extract event ID from URL
+export function extractEventIdFromURL(url: string): string | null {
+  try {
+    const cleanUrl = url.split('#')[0].split('?')[0];
+    const eventIdMatch = cleanUrl.match(/\/event\/([^/]+)(\/checkin)?$/);
+    return eventIdMatch ? eventIdMatch[1] : null;
+  } catch (error) {
+    console.error('Error extracting event ID from URL:', error);
+    return null;
+  }
+}
+
 // Client-side token validation (for backwards compatibility and basic checks)
 export function validateEventToken(token: string, eventId: string): boolean {
+  if (!token) return false;
+  
   try {
     // Reverse the encoding
     const padded = token.replace(/-/g, '+').replace(/_/g, '/');
@@ -121,6 +148,8 @@ export async function validateSecureEventToken(
   token: string,
   eventId: string
 ): Promise<boolean> {
+  if (!token) return false;
+  
   try {
     // Hash the token to compare with stored hash
     const tokenHash = await hashToken(token);
