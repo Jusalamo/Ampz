@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, KeyboardEvent, useCallback } from 'react';
+import { useState, useEffect, useRef, KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   MessageCircle, 
@@ -28,7 +28,9 @@ import {
   Sparkles,
   Copy,
   Reply,
-  MessageSquare
+  MessageSquare,
+  UserCheck,
+  Clock
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
@@ -37,7 +39,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type Tab = 'matches' | 'friends';
@@ -80,30 +82,67 @@ const DESIGN = {
   }
 };
 
-// Quick Add Modal Component
-function QuickAddModal({ 
+// Friend Requests Modal Component
+function FriendRequestsModal({ 
   isOpen, 
-  onClose,
-  onAddFriend
+  onClose 
 }: { 
   isOpen: boolean; 
   onClose: () => void;
-  onAddFriend: (userId: string) => void;
 }) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const { connectionProfiles } = useApp();
-  
-  // Filter profiles based on search
-  const searchResults = connectionProfiles.filter(p => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ).slice(0, 5);
+  const [activeTab, setActiveTab] = useState<'received' | 'sent'>('received');
+  const { toast } = useToast();
 
-  // Suggestions - people from same events, mutual connections
-  const suggestions = connectionProfiles.slice(0, 4);
+  // Mock data - replace with real data from context
+  const receivedRequests = [
+    { id: '1', name: 'Jessica Martinez', photo: 'https://i.pravatar.cc/100?img=45', mutualFriends: 1, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+    { id: '2', name: 'Alex Kumar', photo: 'https://i.pravatar.cc/100?img=68', mutualFriends: 3, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+  ];
+
+  const sentRequests = [
+    { id: '3', name: 'Sarah Chen', photo: 'https://i.pravatar.cc/100?img=32', mutualFriends: 2, timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(), status: 'pending' },
+    { id: '4', name: 'Mike Wilson', photo: 'https://i.pravatar.cc/100?img=19', mutualFriends: 4, timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(), status: 'pending' },
+  ];
+
+  const handleAcceptRequest = (requestId: string) => {
+    toast({
+      title: 'Friend request accepted!',
+      description: 'You can now message each other.',
+    });
+  };
+
+  const handleDeclineRequest = (requestId: string) => {
+    toast({
+      title: 'Request declined',
+      description: 'The request has been removed.',
+    });
+  };
+
+  const handleCancelRequest = (requestId: string) => {
+    toast({
+      title: 'Request cancelled',
+      description: 'Your friend request has been cancelled.',
+    });
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md" style={{
+      <DialogContent className="max-w-md h-[80vh]" style={{
         background: DESIGN.colors.background,
         borderColor: DESIGN.colors.card,
         borderRadius: DESIGN.borderRadius.card
@@ -113,120 +152,197 @@ function QuickAddModal({
             fontSize: DESIGN.typography.h2,
             color: DESIGN.colors.textPrimary
           }}>
-            <UserPlus className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
-            Quick Add Friends
+            <UserCheck className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+            Friend Requests
           </DialogTitle>
         </DialogHeader>
-        
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" 
-            style={{ color: DESIGN.colors.textSecondary }} />
-          <Input
-            type="text"
-            placeholder="Search by username..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+
+        {/* Tabs */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab('received')}
+            className={cn(
+              'flex-1 py-3 text-sm font-medium transition-all',
+              activeTab === 'received' ? '' : ''
+            )}
             style={{
-              background: DESIGN.colors.card,
-              borderColor: DESIGN.colors.card,
-              borderRadius: DESIGN.borderRadius.input,
-              color: DESIGN.colors.textPrimary
+              borderRadius: DESIGN.borderRadius.smallPill,
+              ...(activeTab === 'received' 
+                ? { 
+                    background: DESIGN.colors.primary, 
+                    color: DESIGN.colors.background 
+                  }
+                : { 
+                    background: DESIGN.colors.card, 
+                    border: `1px solid ${DESIGN.colors.card}`,
+                    color: DESIGN.colors.textSecondary 
+                  })
             }}
-          />
+          >
+            Received ({receivedRequests.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('sent')}
+            className={cn(
+              'flex-1 py-3 text-sm font-medium transition-all',
+              activeTab === 'sent' ? '' : ''
+            )}
+            style={{
+              borderRadius: DESIGN.borderRadius.smallPill,
+              ...(activeTab === 'sent' 
+                ? { 
+                    background: DESIGN.colors.primary, 
+                    color: DESIGN.colors.background 
+                  }
+                : { 
+                    background: DESIGN.colors.card, 
+                    border: `1px solid ${DESIGN.colors.card}`,
+                    color: DESIGN.colors.textSecondary 
+                  })
+            }}
+          >
+            Sent ({sentRequests.length})
+          </button>
         </div>
 
-        {/* Search Results */}
-        {searchQuery && (
-          <div className="space-y-2">
-            <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-              Search Results
-            </p>
-            {searchResults.length > 0 ? (
-              searchResults.map(user => (
-                <div key={user.id} className="flex items-center gap-3 p-3 rounded-xl"
-                  style={{
-                    background: DESIGN.colors.card,
-                    border: `1px solid ${DESIGN.colors.card}`,
-                    borderRadius: DESIGN.borderRadius.card
-                  }}>
-                  <img src={user.photo} alt={user.name} 
-                    className="w-10 h-10 rounded-full object-cover" 
-                    style={{ border: `2px solid ${DESIGN.colors.background}` }} />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm" style={{ color: DESIGN.colors.textPrimary }}>
-                      {user.name}
-                    </p>
-                    <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                      {user.location}
-                    </p>
-                  </div>
-                  <Button 
-                    size="sm" 
-                    onClick={() => onAddFriend(user.id)}
-                    className="h-8 rounded-[8px]"
+        {/* Requests List */}
+        <div className="flex-1 overflow-y-auto" style={{ marginBottom: '-16px' }}>
+          {activeTab === 'received' ? (
+            receivedRequests.length > 0 ? (
+              <div className="space-y-3 pt-4">
+                {receivedRequests.map(request => (
+                  <div key={request.id} className="flex items-center gap-3 p-4"
                     style={{
-                      background: DESIGN.colors.primary,
-                      color: DESIGN.colors.background,
-                      borderRadius: DESIGN.borderRadius.smallPill
-                    }}
-                  >
-                    <UserPlus className="w-4 h-4 mr-1" />
-                    Add
-                  </Button>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-center py-4" style={{ color: DESIGN.colors.textSecondary }}>
-                No users found
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Suggestions */}
-        {!searchQuery && (
-          <div className="space-y-2">
-            <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-              Suggestions
-            </p>
-            {suggestions.map(user => (
-              <div key={user.id} className="flex items-center gap-3 p-3 rounded-xl"
-                style={{
-                  background: DESIGN.colors.card,
-                  border: `1px solid ${DESIGN.colors.card}`,
-                  borderRadius: DESIGN.borderRadius.card
-                }}>
-                <img src={user.photo} alt={user.name} 
-                  className="w-10 h-10 rounded-full object-cover"
-                  style={{ border: `2px solid ${DESIGN.colors.background}` }} />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm" style={{ color: DESIGN.colors.textPrimary }}>
-                    {user.name}
-                  </p>
-                  <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                    {Math.floor(Math.random() * 5)} mutual friends
-                  </p>
-                </div>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => onAddFriend(user.id)}
-                  className="h-8 rounded-[8px]"
-                  style={{
-                    borderColor: DESIGN.colors.primary,
-                    color: DESIGN.colors.textPrimary,
-                    borderRadius: DESIGN.borderRadius.smallPill
-                  }}
-                >
-                  <UserPlus className="w-4 h-4 mr-1" />
-                  Add
-                </Button>
+                      background: DESIGN.colors.card,
+                      border: `1px solid ${DESIGN.colors.card}`,
+                      borderRadius: DESIGN.borderRadius.card
+                    }}>
+                    <img src={request.photo} alt={request.name} 
+                      className="w-12 h-12 rounded-full object-cover" 
+                      style={{ border: `2px solid ${DESIGN.colors.background}` }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm" style={{ color: DESIGN.colors.textPrimary }}>
+                        {request.name}
+                      </p>
+                      <p className="text-xs flex items-center gap-1" style={{ color: DESIGN.colors.textSecondary }}>
+                        <Users className="w-3 h-3" />
+                        {request.mutualFriends} mutual friends
+                      </p>
+                      <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>
+                        {formatTime(request.timestamp)}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-9 w-9 p-0 rounded-full"
+                        onClick={() => handleDeclineRequest(request.id)}
+                        style={{
+                          borderColor: DESIGN.colors.card,
+                          borderRadius: DESIGN.borderRadius.roundButton
+                        }}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        className="h-9 w-9 p-0 rounded-full"
+                        onClick={() => handleAcceptRequest(request.id)}
+                        style={{
+                          background: DESIGN.colors.primary,
+                          color: DESIGN.colors.background,
+                          borderRadius: DESIGN.borderRadius.roundButton
+                        }}
+                      >
+                        <Check className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            ) : (
+              <div className="text-center py-12">
+                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
+                  style={{
+                    background: `${DESIGN.colors.primary}10`,
+                    borderRadius: DESIGN.borderRadius.roundButton
+                  }}>
+                  <UserCheck className="w-10 h-10" style={{ color: DESIGN.colors.primary }} />
+                </div>
+                <p className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
+                  No friend requests at the moment
+                </p>
+              </div>
+            )
+          ) : (
+            sentRequests.length > 0 ? (
+              <div className="space-y-3 pt-4">
+                {sentRequests.map(request => (
+                  <div key={request.id} className="flex items-center gap-3 p-4"
+                    style={{
+                      background: DESIGN.colors.card,
+                      border: `1px solid ${DESIGN.colors.card}`,
+                      borderRadius: DESIGN.borderRadius.card
+                    }}>
+                    <img src={request.photo} alt={request.name} 
+                      className="w-12 h-12 rounded-full object-cover" 
+                      style={{ border: `2px solid ${DESIGN.colors.background}` }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm" style={{ color: DESIGN.colors.textPrimary }}>
+                        {request.name}
+                      </p>
+                      <p className="text-xs flex items-center gap-1" style={{ color: DESIGN.colors.textSecondary }}>
+                        <Users className="w-3 h-3" />
+                        {request.mutualFriends} mutual friends
+                      </p>
+                      <div className="flex items-center gap-1 mt-1">
+                        <Clock className="w-3 h-3" style={{ color: DESIGN.colors.textSecondary }} />
+                        <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                          {formatTime(request.timestamp)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-xs px-2 py-1 rounded-full"
+                        style={{
+                          color: DESIGN.colors.primary,
+                          background: `${DESIGN.colors.primary}10`,
+                          borderRadius: DESIGN.borderRadius.smallPill
+                        }}>
+                        Pending
+                      </span>
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        onClick={() => handleCancelRequest(request.id)}
+                        className="h-8 text-xs"
+                        style={{
+                          color: DESIGN.colors.textSecondary
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
+                  style={{
+                    background: `${DESIGN.colors.primary}10`,
+                    borderRadius: DESIGN.borderRadius.roundButton
+                  }}>
+                  <Send className="w-10 h-10" style={{ color: DESIGN.colors.primary }} />
+                </div>
+                <p className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
+                  No sent friend requests
+                </p>
+              </div>
+            )
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -234,12 +350,12 @@ function QuickAddModal({
 
 export default function Chats() {
   const navigate = useNavigate();
-  const { matches, user, isDemo } = useApp();
+  const { matches, user, isDemo, friends } = useApp();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('matches');
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showFriendRequests, setShowFriendRequests] = useState(false);
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -273,15 +389,6 @@ export default function Chats() {
     },
   ]);
 
-  // Mock friend requests
-  const [friendRequests] = useState([
-    { id: '1', name: 'Jessica Martinez', photo: 'https://i.pravatar.cc/100?img=45', mutualFriends: 1 },
-    { id: '2', name: 'Alex Kumar', photo: 'https://i.pravatar.cc/100?img=68', mutualFriends: 3 },
-  ]);
-
-  // Mock friends list
-  const [friends] = useState<any[]>([]);
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Filter matches based on search
@@ -291,7 +398,8 @@ export default function Chats() {
   );
 
   const unreadMatchesCount = matches.filter(m => m.unread).length;
-  const unreadFriendsCount = 0; // Will be dynamic when friends are implemented
+  const friendRequestsCount = 2; // This should come from your context/API
+  const hasFriends = friends && friends.length > 0;
 
   // Scroll to bottom
   useEffect(() => {
@@ -367,27 +475,6 @@ export default function Chats() {
     if (e.key === 'Enter' && !e.shiftKey) {
       handleSendMessage(e);
     }
-  };
-
-  const handleAddFriend = (userId: string) => {
-    toast({
-      title: 'Friend request sent!',
-      description: 'They will be notified of your request.',
-    });
-    setShowQuickAdd(false);
-  };
-
-  const handleAcceptRequest = (requestId: string) => {
-    toast({
-      title: 'Friend request accepted!',
-      description: 'You can now message each other.',
-    });
-  };
-
-  const handleDeclineRequest = (requestId: string) => {
-    toast({
-      title: 'Request declined',
-    });
   };
 
   // Conversation View
@@ -704,25 +791,24 @@ export default function Chats() {
             Chats
           </h1>
           <div className="flex items-center gap-2">
-            <button className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
+            <button 
+              onClick={() => setShowFriendRequests(true)}
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity relative"
               style={{
                 background: DESIGN.colors.card,
                 borderRadius: DESIGN.borderRadius.roundButton
               }}>
-              <Filter className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
+              <UserCheck className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
+              {friendRequestsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs"
+                  style={{
+                    background: DESIGN.colors.primary,
+                    color: DESIGN.colors.background
+                  }}>
+                  {friendRequestsCount}
+                </span>
+              )}
             </button>
-            {activeTab === 'friends' && (
-              <button 
-                onClick={() => setShowQuickAdd(true)}
-                className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
-                style={{
-                  background: `${DESIGN.colors.primary}10`,
-                  borderRadius: DESIGN.borderRadius.roundButton
-                }}
-              >
-                <UserPlus className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
-              </button>
-            )}
           </div>
         </div>
 
@@ -785,14 +871,6 @@ export default function Chats() {
           >
             <Users className="w-4 h-4" />
             Friends
-            {unreadFriendsCount > 0 && (
-              <span className={cn(
-                'px-2 py-0.5 rounded-full text-xs',
-                activeTab === 'friends' ? 'bg-white/20' : 'bg-blue-500 text-white'
-              )}>
-                {unreadFriendsCount}
-              </span>
-            )}
           </button>
         </div>
 
@@ -919,114 +997,90 @@ export default function Chats() {
           </>
         ) : (
           <>
-            {/* Friend Requests Section */}
-            {friendRequests.length > 0 && (
-              <div className="mb-6">
-                <h2 className="text-sm font-semibold mb-3 flex items-center gap-2"
-                  style={{ color: DESIGN.colors.textSecondary }}>
-                  <UserPlus className="w-4 h-4" />
-                  Friend Requests ({friendRequests.length})
-                </h2>
-                <div className="space-y-2">
-                  {friendRequests.map(request => (
-                    <div key={request.id} className="p-4" style={{
+            {/* Friends List */}
+            {hasFriends ? (
+              <div className="space-y-2">
+                {friends.map((friend) => (
+                  <button
+                    key={friend.id}
+                    onClick={() => {/* Navigate to friend chat */}}
+                    className="w-full p-4 flex items-center gap-4 text-left hover:opacity-80 transition-all"
+                    style={{
                       background: DESIGN.colors.card,
                       border: `1px solid ${DESIGN.colors.card}`,
                       borderRadius: DESIGN.borderRadius.card
-                    }}>
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={request.photo}
-                          alt={request.name}
-                          className="w-12 h-12 rounded-full object-cover"
-                          style={{ border: `2px solid ${DESIGN.colors.background}` }}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm" style={{ color: DESIGN.colors.textPrimary }}>
-                            {request.name}
-                          </p>
-                          <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                            {request.mutualFriends} mutual friends
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="h-9 w-9 p-0 rounded-full"
-                            onClick={() => handleDeclineRequest(request.id)}
-                            style={{
-                              borderColor: DESIGN.colors.card,
-                              borderRadius: DESIGN.borderRadius.roundButton
-                            }}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            className="h-9 w-9 p-0 rounded-full"
-                            onClick={() => handleAcceptRequest(request.id)}
-                            style={{
-                              background: DESIGN.colors.primary,
-                              color: DESIGN.colors.background,
-                              borderRadius: DESIGN.borderRadius.roundButton
-                            }}
-                          >
-                            <Check className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
+                    }}
+                  >
+                    <div className="relative">
+                      <img
+                        src={friend.photo}
+                        alt={friend.name}
+                        className="w-14 h-14 rounded-full object-cover"
+                        style={{ border: `2px solid ${DESIGN.colors.background}` }}
+                      />
+                      {friend.online && (
+                        <span className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full"
+                          style={{ border: `2px solid ${DESIGN.colors.background}` }} />
+                      )}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Friends List */}
-            {friends.length > 0 ? (
-              <div className="space-y-2">
-                {/* Friends would be listed here similar to matches */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="font-semibold"
+                          style={{ color: DESIGN.colors.textPrimary }}>
+                          {friend.name}
+                        </h3>
+                        <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                          {friend.lastActive ? formatTime(friend.lastActive) : ''}
+                        </span>
+                      </div>
+                      <p className="text-sm truncate" style={{ color: DESIGN.colors.textSecondary }}>
+                        {friend.lastMessage || 'Start a conversation'}
+                      </p>
+                    </div>
+                  </button>
+                ))}
               </div>
             ) : (
-              // Empty State for Friends
-              <div className="text-center py-16">
-                <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"
-                  style={{
-                    background: `${DESIGN.colors.primary}10`,
-                    borderRadius: DESIGN.borderRadius.roundButton
+              // Empty State for Friends - Only show if no friend requests
+              !hasFriends && (
+                <div className="text-center py-16">
+                  <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"
+                    style={{
+                      background: `${DESIGN.colors.primary}10`,
+                      borderRadius: DESIGN.borderRadius.roundButton
+                    }}>
+                    <Users className="w-12 h-12" style={{ color: DESIGN.colors.primary }} />
+                  </div>
+                  <h3 className="font-bold mb-2" style={{
+                    fontSize: DESIGN.typography.h3,
+                    color: DESIGN.colors.textPrimary
                   }}>
-                  <Users className="w-12 h-12" style={{ color: DESIGN.colors.primary }} />
+                    Build Your Network
+                  </h3>
+                  <p className="text-sm mb-6 max-w-xs mx-auto" style={{ color: DESIGN.colors.textSecondary }}>
+                    Add friends to see their event plans, chat anytime, and make the most of your social experiences!
+                  </p>
+                  <Button onClick={() => navigate('/connect')} 
+                    className="rounded-xl"
+                    style={{
+                      background: DESIGN.colors.primary,
+                      color: DESIGN.colors.background,
+                      borderRadius: DESIGN.borderRadius.button
+                    }}>
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Find Friends
+                  </Button>
                 </div>
-                <h3 className="font-bold mb-2" style={{
-                  fontSize: DESIGN.typography.h3,
-                  color: DESIGN.colors.textPrimary
-                }}>
-                  Build Your Network
-                </h3>
-                <p className="text-sm mb-6 max-w-xs mx-auto" style={{ color: DESIGN.colors.textSecondary }}>
-                  Add friends to see their event plans, chat anytime, and make the most of your social experiences!
-                </p>
-                <Button onClick={() => setShowQuickAdd(true)} 
-                  className="rounded-xl"
-                  style={{
-                    background: DESIGN.colors.primary,
-                    color: DESIGN.colors.background,
-                    borderRadius: DESIGN.borderRadius.button
-                  }}>
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Quick Add Friends
-                </Button>
-              </div>
+              )
             )}
           </>
         )}
       </div>
 
-      {/* Quick Add Modal */}
-      <QuickAddModal 
-        isOpen={showQuickAdd} 
-        onClose={() => setShowQuickAdd(false)}
-        onAddFriend={handleAddFriend}
+      {/* Friend Requests Modal */}
+      <FriendRequestsModal 
+        isOpen={showFriendRequests} 
+        onClose={() => setShowFriendRequests(false)}
       />
 
       <BottomNav />
