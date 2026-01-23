@@ -5,17 +5,17 @@ import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Event } from '@/lib/types';
-import { validateEventToken, calculateDistance } from '@/lib/qr-utils';
+import { useCheckIn } from '@/hooks/useCheckIn';
 
 export default function EventCheckIn() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading: authLoading } = useApp();
+  const { checkIn, isLoading: checkInLoading } = useCheckIn(user?.id);
   
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
-  const [checkingIn, setCheckingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -85,60 +85,23 @@ export default function EventCheckIn() {
   const handleCheckIn = async () => {
     if (!event || !user) return;
 
-    setCheckingIn(true);
     setLocationError(null);
+    setError(null);
 
     try {
-      // Get user location
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0,
-        });
-      });
-
-      const userLat = position.coords.latitude;
-      const userLng = position.coords.longitude;
-
-      // Calculate distance
-      const distance = calculateDistance(
-        userLat,
-        userLng,
-        event.coordinates.lat,
-        event.coordinates.lng
-      );
-
-      const withinGeofence = distance <= event.geofenceRadius;
-
-      if (!withinGeofence) {
-        setLocationError(`You are ${Math.round(distance)}m away. Please move within ${event.geofenceRadius}m of the venue.`);
-        setCheckingIn(false);
-        return;
+      // Use the unified checkIn method from useCheckIn hook
+      const result = await checkIn(event, 'public');
+      
+      if (result.success) {
+        setSuccess(true);
+      } else {
+        // Check if error is specifically about geofence
+        if (result.error?.includes('inside the event\'s geofence')) {
+          setLocationError(result.error);
+        } else {
+          setError(result.error || 'Failed to check in');
+        }
       }
-
-      // Create check-in record
-      const { error: checkInError } = await supabase
-        .from('check_ins')
-        .insert({
-          user_id: user.id,
-          event_id: event.id,
-          check_in_latitude: userLat,
-          check_in_longitude: userLng,
-          within_geofence: true,
-          distance_from_venue: distance,
-          visibility_mode: 'public',
-          verification_method: 'qr_scan',
-          checked_in_at: new Date().toISOString(),
-        });
-
-      if (checkInError) {
-        setError('Failed to check in. Please try again.');
-        setCheckingIn(false);
-        return;
-      }
-
-      setSuccess(true);
     } catch (err: any) {
       if (err.code === 1) {
         setLocationError('Location permission denied. Please enable location access.');
@@ -149,8 +112,6 @@ export default function EventCheckIn() {
       } else {
         setError('Check-in failed. Please try again.');
       }
-    } finally {
-      setCheckingIn(false);
     }
   };
 
@@ -328,9 +289,9 @@ export default function EventCheckIn() {
           <Button
             className="w-full h-14 text-lg font-semibold"
             onClick={handleCheckIn}
-            disabled={checkingIn}
+            disabled={checkInLoading}
           >
-            {checkingIn ? (
+            {checkInLoading ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Verifying Location...
