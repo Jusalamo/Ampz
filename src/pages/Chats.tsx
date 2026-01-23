@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
-import { Match, Message, Friend, FriendRequest } from '@/lib/types';
+import { Match, Message, Friend, FriendRequest, ConnectionProfile } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -82,6 +82,164 @@ const DESIGN = {
   }
 };
 
+// Quick Add Modal Component
+function QuickAddModal({ 
+  isOpen, 
+  onClose,
+  onSendRequest
+}: { 
+  isOpen: boolean; 
+  onClose: () => void;
+  onSendRequest: (userId: string) => void;
+}) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const { connectionProfiles, friends, sentRequests } = useApp();
+  
+  // Filter out already friends and people with pending requests
+  const availableProfiles = connectionProfiles.filter(profile => 
+    !friends.some(friend => friend.id === profile.id) &&
+    !sentRequests.some(request => request.userId === profile.id)
+  );
+
+  // Filter profiles based on search
+  const searchResults = availableProfiles.filter(p => 
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  ).slice(0, 5);
+
+  // Suggestions - people from same events, mutual connections
+  const suggestions = availableProfiles.slice(0, 4);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-md" style={{
+        background: DESIGN.colors.background,
+        borderColor: DESIGN.colors.card,
+        borderRadius: DESIGN.borderRadius.card
+      }}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2" style={{
+            fontSize: DESIGN.typography.h2,
+            color: DESIGN.colors.textPrimary
+          }}>
+            <UserPlus className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+            Quick Add Friends
+          </DialogTitle>
+        </DialogHeader>
+        
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" 
+            style={{ color: DESIGN.colors.textSecondary }} />
+          <Input
+            type="text"
+            placeholder="Search by username..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+            style={{
+              background: DESIGN.colors.card,
+              borderColor: DESIGN.colors.card,
+              borderRadius: DESIGN.borderRadius.input,
+              color: DESIGN.colors.textPrimary
+            }}
+          />
+        </div>
+
+        {/* Search Results */}
+        {searchQuery && (
+          <div className="space-y-2">
+            <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+              Search Results
+            </p>
+            {searchResults.length > 0 ? (
+              searchResults.map(user => (
+                <div key={user.id} className="flex items-center gap-3 p-3 rounded-xl"
+                  style={{
+                    background: DESIGN.colors.card,
+                    border: `1px solid ${DESIGN.colors.card}`,
+                    borderRadius: DESIGN.borderRadius.card
+                  }}>
+                  <img src={user.photo} alt={user.name} 
+                    className="w-10 h-10 rounded-full object-cover" 
+                    style={{ border: `2px solid ${DESIGN.colors.background}` }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm" style={{ color: DESIGN.colors.textPrimary }}>
+                      {user.name}
+                    </p>
+                    <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                      {user.location}
+                    </p>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    onClick={() => onSendRequest(user.id)}
+                    className="h-8 rounded-[8px]"
+                    style={{
+                      background: DESIGN.colors.primary,
+                      color: DESIGN.colors.background,
+                      borderRadius: DESIGN.borderRadius.smallPill
+                    }}
+                  >
+                    <UserPlus className="w-4 h-4 mr-1" />
+                    Add
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-center py-4" style={{ color: DESIGN.colors.textSecondary }}>
+                No users found
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Suggestions */}
+        {!searchQuery && (
+          <div className="space-y-2">
+            <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+              Suggestions
+            </p>
+            {suggestions.map(user => (
+              <div key={user.id} className="flex items-center gap-3 p-3 rounded-xl"
+                style={{
+                  background: DESIGN.colors.card,
+                  border: `1px solid ${DESIGN.colors.card}`,
+                  borderRadius: DESIGN.borderRadius.card
+                }}>
+                <img src={user.photo} alt={user.name} 
+                  className="w-10 h-10 rounded-full object-cover"
+                  style={{ border: `2px solid ${DESIGN.colors.background}` }} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm" style={{ color: DESIGN.colors.textPrimary }}>
+                    {user.name}
+                  </p>
+                  <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                    {Math.floor(Math.random() * 5)} mutual friends
+                  </p>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => onSendRequest(user.id)}
+                  className="h-8 rounded-[8px]"
+                  style={{
+                    borderColor: DESIGN.colors.primary,
+                    color: DESIGN.colors.textPrimary,
+                    borderRadius: DESIGN.borderRadius.smallPill
+                  }}
+                >
+                  <UserPlus className="w-4 h-4 mr-1" />
+                  Add
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // Friend Requests Modal Component
 function FriendRequestsModal({ 
   isOpen, 
@@ -92,37 +250,82 @@ function FriendRequestsModal({
 }) {
   const [activeTab, setActiveTab] = useState<'received' | 'sent'>('received');
   const { toast } = useToast();
+  const { 
+    friendRequests, 
+    sentRequests, 
+    acceptFriendRequest, 
+    declineFriendRequest, 
+    cancelFriendRequest,
+    connectionProfiles
+  } = useApp();
 
-  // Mock data - replace with real data from context
-  const receivedRequests = [
-    { id: '1', name: 'Jessica Martinez', photo: 'https://i.pravatar.cc/100?img=45', mutualFriends: 1, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
-    { id: '2', name: 'Alex Kumar', photo: 'https://i.pravatar.cc/100?img=68', mutualFriends: 3, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
-  ];
+  // Enrich requests with user data
+  const enrichedReceivedRequests = friendRequests.map(request => {
+    const user = connectionProfiles.find(p => p.id === request.fromUserId);
+    return {
+      ...request,
+      name: user?.name || 'Unknown User',
+      photo: user?.photo || 'https://i.pravatar.cc/100?img=0',
+      mutualFriends: Math.floor(Math.random() * 5) // This should come from your backend
+    };
+  });
 
-  const sentRequests = [
-    { id: '3', name: 'Sarah Chen', photo: 'https://i.pravatar.cc/100?img=32', mutualFriends: 2, timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(), status: 'pending' },
-    { id: '4', name: 'Mike Wilson', photo: 'https://i.pravatar.cc/100?img=19', mutualFriends: 4, timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(), status: 'pending' },
-  ];
+  const enrichedSentRequests = sentRequests.map(request => {
+    const user = connectionProfiles.find(p => p.id === request.toUserId);
+    return {
+      ...request,
+      name: user?.name || 'Unknown User',
+      photo: user?.photo || 'https://i.pravatar.cc/100?img=0',
+      mutualFriends: Math.floor(Math.random() * 5) // This should come from your backend
+    };
+  });
 
-  const handleAcceptRequest = (requestId: string) => {
-    toast({
-      title: 'Friend request accepted!',
-      description: 'You can now message each other.',
-    });
+  const handleAcceptRequest = async (requestId: string) => {
+    try {
+      await acceptFriendRequest(requestId);
+      toast({
+        title: 'Friend request accepted!',
+        description: 'You can now message each other.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error accepting request',
+        description: 'Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
-  const handleDeclineRequest = (requestId: string) => {
-    toast({
-      title: 'Request declined',
-      description: 'The request has been removed.',
-    });
+  const handleDeclineRequest = async (requestId: string) => {
+    try {
+      await declineFriendRequest(requestId);
+      toast({
+        title: 'Request declined',
+        description: 'The request has been removed.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error declining request',
+        description: 'Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
-  const handleCancelRequest = (requestId: string) => {
-    toast({
-      title: 'Request cancelled',
-      description: 'Your friend request has been cancelled.',
-    });
+  const handleCancelRequest = async (requestId: string) => {
+    try {
+      await cancelFriendRequest(requestId);
+      toast({
+        title: 'Request cancelled',
+        description: 'Your friend request has been cancelled.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error cancelling request',
+        description: 'Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const formatTime = (dateString: string) => {
@@ -158,15 +361,15 @@ function FriendRequestsModal({
         </DialogHeader>
 
         {/* Tabs */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 justify-center mb-4">
           <button
             onClick={() => setActiveTab('received')}
             className={cn(
-              'flex-1 py-3 text-sm font-medium transition-all',
+              'px-4 py-1.5 text-sm font-medium transition-all',
               activeTab === 'received' ? '' : ''
             )}
             style={{
-              borderRadius: DESIGN.borderRadius.smallPill,
+              borderRadius: DESIGN.borderRadius.input,
               ...(activeTab === 'received' 
                 ? { 
                     background: DESIGN.colors.primary, 
@@ -179,16 +382,16 @@ function FriendRequestsModal({
                   })
             }}
           >
-            Received ({receivedRequests.length})
+            Received {enrichedReceivedRequests.length > 0 && `(${enrichedReceivedRequests.length})`}
           </button>
           <button
             onClick={() => setActiveTab('sent')}
             className={cn(
-              'flex-1 py-3 text-sm font-medium transition-all',
+              'px-4 py-1.5 text-sm font-medium transition-all',
               activeTab === 'sent' ? '' : ''
             )}
             style={{
-              borderRadius: DESIGN.borderRadius.smallPill,
+              borderRadius: DESIGN.borderRadius.input,
               ...(activeTab === 'sent' 
                 ? { 
                     background: DESIGN.colors.primary, 
@@ -201,16 +404,19 @@ function FriendRequestsModal({
                   })
             }}
           >
-            Sent ({sentRequests.length})
+            Sent {enrichedSentRequests.length > 0 && `(${enrichedSentRequests.length})`}
           </button>
         </div>
 
         {/* Requests List */}
-        <div className="flex-1 overflow-y-auto" style={{ marginBottom: '-16px' }}>
+        <div className="flex-1 overflow-y-auto pb-4" style={{ 
+          marginBottom: '-16px',
+          paddingBottom: 'env(safe-area-inset-bottom, 16px)'
+        }}>
           {activeTab === 'received' ? (
-            receivedRequests.length > 0 ? (
-              <div className="space-y-3 pt-4">
-                {receivedRequests.map(request => (
+            enrichedReceivedRequests.length > 0 ? (
+              <div className="space-y-3">
+                {enrichedReceivedRequests.map(request => (
                   <div key={request.id} className="flex items-center gap-3 p-4"
                     style={{
                       background: DESIGN.colors.card,
@@ -229,7 +435,7 @@ function FriendRequestsModal({
                         {request.mutualFriends} mutual friends
                       </p>
                       <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>
-                        {formatTime(request.timestamp)}
+                        {formatTime(request.createdAt)}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -276,9 +482,9 @@ function FriendRequestsModal({
               </div>
             )
           ) : (
-            sentRequests.length > 0 ? (
-              <div className="space-y-3 pt-4">
-                {sentRequests.map(request => (
+            enrichedSentRequests.length > 0 ? (
+              <div className="space-y-3">
+                {enrichedSentRequests.map(request => (
                   <div key={request.id} className="flex items-center gap-3 p-4"
                     style={{
                       background: DESIGN.colors.card,
@@ -299,7 +505,7 @@ function FriendRequestsModal({
                       <div className="flex items-center gap-1 mt-1">
                         <Clock className="w-3 h-3" style={{ color: DESIGN.colors.textSecondary }} />
                         <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                          {formatTime(request.timestamp)}
+                          {formatTime(request.createdAt)}
                         </p>
                       </div>
                     </div>
@@ -350,12 +556,22 @@ function FriendRequestsModal({
 
 export default function Chats() {
   const navigate = useNavigate();
-  const { matches, user, isDemo, friends } = useApp();
+  const { 
+    matches, 
+    user, 
+    isDemo, 
+    friends, 
+    friendRequests, 
+    sentRequests, 
+    sendFriendRequest,
+    connectionProfiles 
+  } = useApp();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('matches');
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFriendRequests, setShowFriendRequests] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -398,8 +614,9 @@ export default function Chats() {
   );
 
   const unreadMatchesCount = matches.filter(m => m.unread).length;
-  const friendRequestsCount = 2; // This should come from your context/API
+  const friendRequestsCount = friendRequests.length;
   const hasFriends = friends && friends.length > 0;
+  const hasFriendRequests = friendRequests.length > 0;
 
   // Scroll to bottom
   useEffect(() => {
@@ -474,6 +691,23 @@ export default function Chats() {
   const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       handleSendMessage(e);
+    }
+  };
+
+  const handleSendFriendRequest = async (userId: string) => {
+    try {
+      await sendFriendRequest(userId);
+      toast({
+        title: 'Friend request sent!',
+        description: 'They will be notified of your request.',
+      });
+      setShowQuickAdd(false);
+    } catch (error) {
+      toast({
+        title: 'Error sending request',
+        description: 'Please try again.',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -1041,8 +1275,8 @@ export default function Chats() {
                 ))}
               </div>
             ) : (
-              // Empty State for Friends - Only show if no friend requests
-              !hasFriends && (
+              // Empty State for Friends - Only show if no friend requests and no friends
+              !hasFriendRequests && !hasFriends && (
                 <div className="text-center py-16">
                   <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"
                     style={{
@@ -1060,16 +1294,30 @@ export default function Chats() {
                   <p className="text-sm mb-6 max-w-xs mx-auto" style={{ color: DESIGN.colors.textSecondary }}>
                     Add friends to see their event plans, chat anytime, and make the most of your social experiences!
                   </p>
-                  <Button onClick={() => navigate('/connect')} 
-                    className="rounded-xl"
-                    style={{
-                      background: DESIGN.colors.primary,
-                      color: DESIGN.colors.background,
-                      borderRadius: DESIGN.borderRadius.button
-                    }}>
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Find Friends
-                  </Button>
+                  <div className="flex gap-3">
+                    <Button onClick={() => setShowQuickAdd(true)} 
+                      className="flex-1 rounded-xl"
+                      style={{
+                        background: DESIGN.colors.primary,
+                        color: DESIGN.colors.background,
+                        borderRadius: DESIGN.borderRadius.button
+                      }}>
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Quick Add
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => navigate('/connect')} 
+                      className="flex-1 rounded-xl"
+                      style={{
+                        borderColor: DESIGN.colors.card,
+                        color: DESIGN.colors.textPrimary,
+                        borderRadius: DESIGN.borderRadius.button
+                      }}>
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Connect
+                    </Button>
+                  </div>
                 </div>
               )
             )}
@@ -1081,6 +1329,13 @@ export default function Chats() {
       <FriendRequestsModal 
         isOpen={showFriendRequests} 
         onClose={() => setShowFriendRequests(false)}
+      />
+
+      {/* Quick Add Modal */}
+      <QuickAddModal 
+        isOpen={showQuickAdd} 
+        onClose={() => setShowQuickAdd(false)}
+        onSendRequest={handleSendFriendRequest}
       />
 
       <BottomNav />
