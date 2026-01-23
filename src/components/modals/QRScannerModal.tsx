@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, QrCode, Keyboard, Loader2, MapPin, AlertCircle, Check, ExternalLink } from 'lucide-react';
+import { X, QrCode, Keyboard, Loader2, MapPin, AlertCircle, Check, ExternalLink, Navigation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCheckIn } from '@/hooks/useCheckIn';
 import { Event } from '@/lib/types';
 import { BrowserMultiFormatReader } from '@zxing/browser';
+import { validateGeofenceForCheckIn } from '@/lib/qr-utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface QRScannerModalProps {
   isOpen: boolean;
@@ -15,11 +17,11 @@ interface QRScannerModalProps {
   onCheckInSuccess?: (eventId: string) => void;
 }
 
-type ScannerStep = 'scan' | 'code' | 'verifying' | 'geofence' | 'success' | 'error';
+type ScannerStep = 'scan' | 'code' | 'verifying' | 'geofence_check' | 'success' | 'error' | 'outside_geofence';
 
 export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QRScannerModalProps) {
   const navigate = useNavigate();
-  const { processQRCodeScan, isLoading } = useCheckIn(userId);
+  const { processQRCodeScan, isLoading, validateQRCode, getUserLocation } = useCheckIn(userId);
   
   const [step, setStep] = useState<ScannerStep>('scan');
   const [manualCode, setManualCode] = useState('');
@@ -28,6 +30,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
   const [successMessage, setSuccessMessage] = useState('');
   const [distance, setDistance] = useState<number | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -44,16 +47,137 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       setSuccessMessage('');
       setDistance(null);
       setDebugInfo('');
+      setUserLocation(null);
     }
   }, [isOpen]);
 
-  // Unified QR code processing function
+  // Fetch event details by ID
+  const fetchEventDetails = useCallback(async (eventId: string): Promise<Event | null> => {
+    try {
+      const { data: eventData, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .single();
+
+      if (error || !eventData) {
+        return null;
+      }
+
+      return {
+        id: eventData.id,
+        name: eventData.name,
+        description: eventData.description || '',
+        category: eventData.category,
+        location: eventData.location,
+        address: eventData.address,
+        coordinates: { lat: eventData.latitude, lng: eventData.longitude },
+        date: eventData.date,
+        time: eventData.time,
+        price: eventData.price || 0,
+        currency: eventData.currency || 'NAD',
+        maxAttendees: eventData.max_attendees || 500,
+        attendees: eventData.attendees_count || 0,
+        organizerId: eventData.organizer_id,
+        qrCode: eventData.qr_code,
+        qrCodeUrl: eventData.qr_code_url,
+        geofenceRadius: eventData.geofence_radius || 50,
+        customTheme: eventData.custom_theme || '#8B5CF6',
+        coverImage: eventData.cover_image || '',
+        images: eventData.images || [],
+        videos: eventData.videos || [],
+        tags: eventData.tags || [],
+        isFeatured: eventData.is_featured || false,
+        isDemo: eventData.is_demo || false,
+        isActive: eventData.is_active ?? true,
+      };
+    } catch (error) {
+      console.error('Error fetching event details:', error);
+      return null;
+    }
+  }, []);
+
+  // Check geofence function
+  const checkGeofence = useCallback(async (event: Event): Promise<{ withinGeofence: boolean; distance?: number; error?: string }> => {
+    try {
+      const location = await getUserLocation();
+      setUserLocation({ lat: location.latitude, lng: location.longitude });
+      
+      const geofenceCheck = await validateGeofenceForCheckIn(
+        event.id,
+        location.latitude,
+        location.longitude
+      );
+      
+      return {
+        withinGeofence: geofenceCheck.valid,
+        distance: geofenceCheck.distance,
+        error: geofenceCheck.error
+      };
+    } catch (err: any) {
+      console.error('Geofence check error:', err);
+      return {
+        withinGeofence: false,
+        error: err.message || 'Failed to check location'
+      };
+    }
+  }, [getUserLocation]);
+
+  // Process QR code with proper validation
   const processQRCode = useCallback(async (code: string) => {
     setStep('verifying');
-    setDebugInfo(`Processing code: ${code.substring(0, 50)}...`);
+    setDebugInfo(`Processing QR code...`);
     
     try {
-      // Use the unified processQRCodeScan method that handles validation, geofence check, and check-in
+      // First, validate the QR code to get event info
+      const validationResult = await validateQRCode(code);
+      
+      if (!validationResult.valid || !validationResult.event) {
+        setErrorMessage(validationResult.error || 'Invalid QR code');
+        setStep('error');
+        return;
+      }
+      
+      const event = validationResult.event;
+      setScannedEvent(event);
+      setDebugInfo(`Event found: ${event.name}`);
+      
+      // Check if user has already checked in
+      if (userId) {
+        const { data: existingCheckIn } = await supabase
+          .from('check_ins')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('event_id', event.id)
+          .limit(1);
+
+        if (existingCheckIn && existingCheckIn.length > 0) {
+          setSuccessMessage(`Already checked in to ${event.name}!`);
+          setStep('success');
+          return;
+        }
+      }
+      
+      // Check geofence if required
+      if (validationResult.requiresGeofence !== false) {
+        setStep('geofence_check');
+        setDebugInfo('Checking your location...');
+        
+        const geofenceResult = await checkGeofence(event);
+        
+        if (!geofenceResult.withinGeofence) {
+          setDistance(geofenceResult.distance || null);
+          setErrorMessage(geofenceResult.error || 'You are not within the event geofence');
+          setStep('outside_geofence');
+          return;
+        }
+        
+        setDistance(geofenceResult.distance || null);
+        setDebugInfo(`Within geofence! Distance: ${geofenceResult.distance}m`);
+      }
+      
+      // Now perform the actual check-in
+      setDebugInfo('Processing check-in...');
       const result = await processQRCodeScan(code, 'public');
       
       if (result.success) {
@@ -61,22 +185,15 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
         setStep('success');
         onCheckInSuccess?.(result.eventId || '');
       } else {
-        // Check if the error is specifically about geofence
-        if (result.error?.includes('inside the event\'s geofence')) {
-          setErrorMessage(result.error);
-          setDistance(result.distance || null);
-        } else {
-          setErrorMessage(result.error || 'Check-in failed');
-        }
-        setDebugInfo(`Error: ${result.error}`);
+        setErrorMessage(result.error || 'Check-in failed');
         setStep('error');
       }
     } catch (err: any) {
+      console.error('Error processing QR code:', err);
       setErrorMessage(err?.message || 'Failed to process QR code');
-      setDebugInfo(`Exception: ${err.message}`);
       setStep('error');
     }
-  }, [processQRCodeScan, onCheckInSuccess]);
+  }, [validateQRCode, checkGeofence, processQRCodeScan, userId, onCheckInSuccess]);
 
   // Stop scanning
   const stopScanning = useCallback(() => {
@@ -97,7 +214,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
     try {
       codeReaderRef.current = new BrowserMultiFormatReader();
 
-      // Prefer the rear/environment camera when available.
+      // Try to get the environment/rear camera
       let preferredDeviceId: string | undefined;
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -162,6 +279,34 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
     onClose();
   };
 
+  const handleRetryGeofence = async () => {
+    if (!scannedEvent) return;
+    
+    setStep('geofence_check');
+    setErrorMessage('');
+    
+    const geofenceResult = await checkGeofence(scannedEvent);
+    
+    if (geofenceResult.withinGeofence) {
+      // Retry check-in now that we're within geofence
+      const code = manualCode || `${window.location.origin}/event/${scannedEvent.id}/checkin?checkGeofence=true`;
+      const result = await processQRCodeScan(code, 'public');
+      
+      if (result.success) {
+        setSuccessMessage(result.message || 'Check-in successful!');
+        setStep('success');
+        onCheckInSuccess?.(result.eventId || '');
+      } else {
+        setErrorMessage(result.error || 'Check-in failed');
+        setStep('error');
+      }
+    } else {
+      setDistance(geofenceResult.distance || null);
+      setErrorMessage(geofenceResult.error || 'You are still not within the event geofence');
+      setStep('outside_geofence');
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -178,9 +323,10 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
             {step === 'scan' && 'Scan QR Code'}
             {step === 'code' && 'Enter Event Code'}
             {step === 'verifying' && 'Verifying...'}
-            {step === 'geofence' && 'Checking Location'}
+            {step === 'geofence_check' && 'Checking Location'}
             {step === 'success' && 'Check-In Complete!'}
             {step === 'error' && 'Check-In Failed'}
+            {step === 'outside_geofence' && 'Outside Event Area'}
           </h2>
           <button
             onClick={handleClose}
@@ -240,6 +386,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 onChange={(e) => setManualCode(e.target.value)}
                 placeholder="Enter code or event URL..."
                 className="text-center text-lg font-medium h-14 max-w-xs mb-6"
+                onKeyDown={(e) => e.key === 'Enter' && handleCodeSubmit()}
               />
               <div className="flex gap-3 w-full max-w-xs">
                 <Button 
@@ -274,14 +421,26 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
             </>
           )}
 
-          {step === 'geofence' && (
+          {step === 'geofence_check' && (
             <>
               <div className="relative">
-                <MapPin className="w-16 h-16 text-primary mb-6" />
+                <Navigation className="w-16 h-16 text-primary mb-6" />
                 <Loader2 className="absolute -bottom-2 -right-2 w-8 h-8 text-primary animate-spin" />
               </div>
               <h3 className="text-xl font-bold mb-2">Checking Your Location</h3>
-              <p className="text-muted-foreground text-center">Verifying you're at the event location...</p>
+              <p className="text-muted-foreground text-center mb-4">
+                Verifying you're at the event location...
+              </p>
+              {scannedEvent && (
+                <p className="text-sm text-muted-foreground text-center">
+                  Event: <span className="font-medium">{scannedEvent.name}</span>
+                </p>
+              )}
+              {debugInfo && (
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  {debugInfo}
+                </p>
+              )}
             </>
           )}
 
@@ -292,6 +451,14 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
               </div>
               <h3 className="text-xl font-bold mb-2">{successMessage}</h3>
               <p className="text-muted-foreground text-center mb-6">You're now checked in!</p>
+              {distance !== null && (
+                <div className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                  <p className="text-sm text-green-600 dark:text-green-400">
+                    <MapPin className="w-4 h-4 inline mr-1" />
+                    You checked in from {distance}m away
+                  </p>
+                </div>
+              )}
               <div className="flex gap-3">
                 <Button 
                   className="h-12 px-6" 
@@ -299,14 +466,16 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 >
                   Close
                 </Button>
-                <Button 
-                  variant="outline" 
-                  className="h-12 px-6"
-                  onClick={handleViewEvent}
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  View Event
-                </Button>
+                {scannedEvent && (
+                  <Button 
+                    variant="outline" 
+                    className="h-12 px-6"
+                    onClick={handleViewEvent}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View Event
+                  </Button>
+                )}
               </div>
             </>
           )}
@@ -318,14 +487,6 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
               </div>
               <h3 className="text-xl font-bold mb-2">Check-In Failed</h3>
               <p className="text-muted-foreground text-center mb-6 max-w-xs">{errorMessage}</p>
-              {distance && (
-                <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                  <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                    <MapPin className="w-4 h-4 inline mr-1" />
-                    You need to be inside the event's geofence to proceed.
-                  </p>
-                </div>
-              )}
               {debugInfo && (
                 <p className="text-xs text-muted-foreground text-center mb-4 max-w-xs break-all">
                   {debugInfo}
@@ -335,7 +496,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 <Button 
                   variant="outline" 
                   className="h-12" 
-                  onClick={() => setStep('code')}
+                  onClick={() => setStep('scan')}
                   disabled={isLoading}
                 >
                   Try Again
@@ -350,7 +511,85 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
               </div>
             </>
           )}
+
+          {step === 'outside_geofence' && (
+            <>
+              <div className="w-20 h-20 rounded-full bg-yellow-500/20 flex items-center justify-center mb-6">
+                <MapPin className="w-10 h-10 text-yellow-500" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Outside Event Area</h3>
+              <p className="text-muted-foreground text-center mb-4 max-w-xs">{errorMessage}</p>
+              
+              {scannedEvent && (
+                <div className="w-full max-w-xs mb-6">
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-4">
+                    <h4 className="font-medium text-yellow-600 dark:text-yellow-400 mb-2">
+                      Event Details
+                    </h4>
+                    <p className="text-sm text-foreground mb-1">
+                      <span className="font-medium">Event:</span> {scannedEvent.name}
+                    </p>
+                    <p className="text-sm text-foreground mb-1">
+                      <span className="font-medium">Location:</span> {scannedEvent.location}
+                    </p>
+                    <p className="text-sm text-foreground">
+                      <span className="font-medium">Required Radius:</span> {scannedEvent.geofenceRadius}m
+                    </p>
+                  </div>
+                  
+                  {distance !== null && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                      <p className="text-sm text-red-600 dark:text-red-400">
+                        <MapPin className="w-4 h-4 inline mr-1" />
+                        You are {distance}m away from the event
+                      </p>
+                      <p className="text-xs text-red-500/80 mt-1">
+                        You need to be within {scannedEvent.geofenceRadius}m to check in
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <div className="flex flex-col gap-3 w-full max-w-xs">
+                <Button 
+                  className="h-12 w-full" 
+                  onClick={handleRetryGeofence}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Navigation className="w-4 h-4 mr-2" />
+                  )}
+                  Check Location Again
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="h-12 w-full" 
+                  onClick={() => setStep('scan')}
+                  disabled={isLoading}
+                >
+                  Scan Different QR Code
+                </Button>
+                <Button 
+                  className="h-12 w-full" 
+                  onClick={handleClose}
+                  disabled={isLoading}
+                >
+                  Close
+                </Button>
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Debug info (visible only in development) */}
+        {process.env.NODE_ENV === 'development' && debugInfo && (
+          <div className="p-2 bg-gray-900 text-gray-300 text-xs">
+            <p className="font-mono">{debugInfo}</p>
+          </div>
+        )}
       </motion.div>
     </AnimatePresence>
   );
