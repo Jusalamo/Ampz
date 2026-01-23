@@ -956,7 +956,7 @@ export function EventWizardModal({ isOpen, onClose, editingEvent }: EventWizardM
       };
 
       if (editingEvent && updateEvent) {
-        await updateEvent(newEvent);
+        await updateEvent(editingEvent.id, newEvent);
         toast({
           title: 'Event updated!',
           description: 'Your event has been updated successfully.',
