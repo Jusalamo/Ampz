@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, MapPin, Calendar, Clock, CheckCircle, AlertCircle, LogIn, ArrowLeft } from 'lucide-react';
+import { Loader2, MapPin, Calendar, Clock, CheckCircle, AlertCircle, LogIn, ArrowLeft, Navigation } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Event } from '@/lib/types';
 import { useCheckIn } from '@/hooks/useCheckIn';
+import { validateGeofenceForCheckIn } from '@/lib/qr-utils';
 
 export default function EventCheckIn() {
   const { id } = useParams<{ id: string }>();
@@ -20,8 +21,11 @@ export default function EventCheckIn() {
   const [success, setSuccess] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false);
+  const [checkingGeofence, setCheckingGeofence] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const token = searchParams.get('token');
+  const checkGeofence = searchParams.get('checkGeofence') === 'true';
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -61,6 +65,7 @@ export default function EventCheckIn() {
           attendees: data.attendees_count || 0,
           organizerId: data.organizer_id,
           qrCode: data.qr_code,
+          qrCodeUrl: data.qr_code_url,
           geofenceRadius: data.geofence_radius || 50,
           customTheme: data.custom_theme || '#8B5CF6',
           coverImage: data.cover_image || '',
@@ -98,11 +103,69 @@ export default function EventCheckIn() {
     fetchEvent();
   }, [id, user]);
 
+  const checkUserLocation = async (): Promise<boolean> => {
+    if (!event) return false;
+    
+    setCheckingGeofence(true);
+    setLocationError(null);
+    
+    try {
+      // Get user's current location
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        });
+      });
+      
+      const userLat = position.coords.latitude;
+      const userLng = position.coords.longitude;
+      
+      setUserLocation({ lat: userLat, lng: userLng });
+      
+      // Validate geofence
+      const geofenceCheck = await validateGeofenceForCheckIn(
+        event.id,
+        userLat,
+        userLng
+      );
+      
+      if (!geofenceCheck.valid) {
+        setLocationError(geofenceCheck.error || 'You are not within the event geofence');
+        return false;
+      }
+      
+      return true;
+    } catch (err: any) {
+      if (err.code === 1) {
+        setLocationError('Location permission denied. Please enable location access.');
+      } else if (err.code === 2) {
+        setLocationError('Unable to get your location. Please try again.');
+      } else if (err.code === 3) {
+        setLocationError('Location request timed out. Please try again.');
+      } else {
+        setLocationError('Failed to check location. Please try again.');
+      }
+      return false;
+    } finally {
+      setCheckingGeofence(false);
+    }
+  };
+
   const handleCheckIn = async () => {
     if (!event || !user) return;
 
     setLocationError(null);
     setError(null);
+
+    // If geofence check is required, validate location first
+    if (checkGeofence) {
+      const isWithinGeofence = await checkUserLocation();
+      if (!isWithinGeofence) {
+        return; // Stop if not within geofence
+      }
+    }
 
     try {
       // Use the unified checkIn method from useCheckIn hook
@@ -318,11 +381,24 @@ export default function EventCheckIn() {
             </div>
           </div>
 
+          {/* Geofence Information */}
+          <div className="bg-primary/10 rounded-xl p-4 mb-4">
+            <div className="flex items-center gap-3">
+              <Navigation className="w-5 h-5 text-primary" />
+              <div>
+                <p className="font-medium text-primary">Geofence Check Required</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  You must be within {event.geofenceRadius}m of the venue to check in
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Location Error */}
           {locationError && (
             <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 mb-4">
               <div className="flex items-start gap-3">
-                <MapPin className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-destructive">Location Check Failed</p>
                   <p className="text-sm text-muted-foreground mt-1">{locationError}</p>
@@ -348,12 +424,17 @@ export default function EventCheckIn() {
           <Button
             className="w-full h-14 text-lg font-semibold"
             onClick={handleCheckIn}
-            disabled={checkInLoading}
+            disabled={checkInLoading || checkingGeofence}
           >
-            {checkInLoading ? (
+            {checkingGeofence ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Verifying Location...
+                Checking Location...
+              </>
+            ) : checkInLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Checking In...
               </>
             ) : (
               'Check In Now'
@@ -361,7 +442,9 @@ export default function EventCheckIn() {
           </Button>
 
           <p className="text-center text-sm text-muted-foreground mt-4">
-            You must be within {event.geofenceRadius}m of the venue to check in
+            {checkGeofence 
+              ? 'Your location will be verified before check-in' 
+              : 'Location verification may be required for this event'}
           </p>
         </div>
       </div>
