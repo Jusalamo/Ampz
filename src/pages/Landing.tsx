@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Zap, Users, Calendar, MapPin, QrCode, MessageCircle, ChevronRight, Sparkles, CheckCircle } from 'lucide-react';
+import { Zap, Users, Calendar, MapPin, QrCode, MessageCircle, ChevronRight, Sparkles, Pause, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ColorBends from '@/components/ColorBends';
 import { useApp } from '@/contexts/AppContext';
@@ -71,7 +71,13 @@ export default function Landing() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const carouselRef = useRef<HTMLDivElement>(null);
+  const testimonialCarouselRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<NodeJS.Timeout>();
+  const testimonialIntervalRef = useRef<NodeJS.Timeout>();
+  
+  // Testimonial carousel states
+  const [isTestimonialPaused, setIsTestimonialPaused] = useState(false);
+  const [testimonialPosition, setTestimonialPosition] = useState(0);
 
   // Get only 4 featured events
   const featuredEvents = events.filter(e => e.isFeatured).slice(0, 4);
@@ -84,7 +90,7 @@ export default function Landing() {
     { icon: MessageCircle, label: 'Real-time Chat', description: 'Chat before and during events' },
   ];
 
-  // Testimonials for social proof
+  // Testimonials for social proof - duplicated for seamless loop
   const testimonials = [
     {
       text: "Met my best friend at a concert through Amps!",
@@ -100,10 +106,23 @@ export default function Landing() {
       text: "The check-in system makes networking so easy.",
       author: "Priya K.",
       role: "Professional"
+    },
+    {
+      text: "Best app for finding people with similar interests.",
+      author: "Alex R.",
+      role: "Tech Enthusiast"
+    },
+    {
+      text: "Made attending events alone so much less intimidating.",
+      author: "Maria L.",
+      role: "Event Goer"
     }
   ];
 
-  // Auto-play carousel
+  // Duplicate testimonials for seamless loop
+  const duplicatedTestimonials = [...testimonials, ...testimonials];
+
+  // Auto-play event carousel
   useEffect(() => {
     if (isAutoPlaying && featuredEvents.length > 0) {
       intervalRef.current = setInterval(() => {
@@ -117,6 +136,27 @@ export default function Landing() {
       }
     };
   }, [isAutoPlaying, featuredEvents.length]);
+
+  // Auto-play testimonial carousel
+  useEffect(() => {
+    if (!isTestimonialPaused) {
+      testimonialIntervalRef.current = setInterval(() => {
+        setTestimonialPosition(prev => {
+          // Reset to start for seamless loop
+          if (prev >= 100 * (testimonials.length)) {
+            return 0;
+          }
+          return prev + 0.5; // Adjust speed here (0.5% per interval)
+        });
+      }, 50); // Update every 50ms for smooth movement
+    }
+
+    return () => {
+      if (testimonialIntervalRef.current) {
+        clearInterval(testimonialIntervalRef.current);
+      }
+    };
+  }, [isTestimonialPaused, testimonials.length]);
 
   const goToSlide = (index: number) => {
     setCurrentSlide(index);
@@ -140,6 +180,14 @@ export default function Landing() {
       setIsAutoPlaying(false);
       setTimeout(() => setIsAutoPlaying(true), 5000);
     }
+  };
+
+  const handleTestimonialMouseDown = () => {
+    setIsTestimonialPaused(true);
+  };
+
+  const handleTestimonialMouseUp = () => {
+    setIsTestimonialPaused(false);
   };
 
   return (
@@ -226,19 +274,6 @@ export default function Landing() {
         {/* Hero Section */}
         <section className="min-h-[85vh] flex flex-col items-center justify-center px-4 pt-12 pb-8">
           <div className="text-center max-w-3xl mx-auto px-4">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6"
-              style={{ 
-                background: DESIGN.colors.primaryDark,
-                borderRadius: DESIGN.borderRadius.roundButton
-              }}
-            >
-              <Sparkles className="w-4 h-4" style={{ color: DESIGN.colors.primaryLight }} />
-              <span className="text-sm font-medium" style={{ color: DESIGN.colors.primaryLight }}>
-                Join 10,000+ people connecting now
-              </span>
-            </div>
-
             <h1 
               className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-tight mb-6 tracking-tight"
               style={{ color: DESIGN.colors.textPrimary }}
@@ -538,7 +573,7 @@ export default function Landing() {
           </section>
         )}
 
-        {/* Social Proof Section */}
+        {/* Social Proof Section - Continuous Carousel */}
         <section className="py-16 px-4">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-12">
@@ -556,52 +591,105 @@ export default function Landing() {
               </p>
             </div>
 
-            {/* Testimonials Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {testimonials.map((testimonial, index) => (
-                <div
-                  key={index}
-                  className="p-6"
+            {/* Continuous Testimonial Carousel */}
+            <div className="relative overflow-hidden py-8">
+              {/* Pause/Play Control */}
+              <div className="absolute top-0 right-0 z-20">
+                <button
+                  onClick={() => setIsTestimonialPaused(!isTestimonialPaused)}
+                  className="w-10 h-10 flex items-center justify-center rounded-full"
                   style={{ 
-                    background: DESIGN.colors.card,
-                    borderRadius: DESIGN.borderRadius.card,
-                    border: `1px solid ${DESIGN.colors.primary}20`,
-                    boxShadow: DESIGN.shadows.card
+                    background: DESIGN.colors.primary,
+                    color: DESIGN.colors.background,
+                    boxShadow: DESIGN.shadows.purpleGlow
                   }}
                 >
-                  <div className="flex items-center gap-1 mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <div 
-                        key={i}
-                        className="w-4 h-4"
-                        style={{ color: DESIGN.colors.primary }}
-                      >
-                        ★
-                      </div>
-                    ))}
-                  </div>
-                  <p 
-                    className="mb-4 italic"
-                    style={{ color: DESIGN.colors.textPrimary }}
+                  {isTestimonialPaused ? (
+                    <Play className="w-5 h-5 ml-0.5" />
+                  ) : (
+                    <Pause className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
+
+              {/* Carousel Track */}
+              <div
+                ref={testimonialCarouselRef}
+                className="relative"
+                style={{
+                  transform: `translateX(-${testimonialPosition}%)`,
+                  transition: isTestimonialPaused ? 'none' : 'transform 0.1s linear',
+                  display: 'flex',
+                  gap: '24px'
+                }}
+                onMouseDown={handleTestimonialMouseDown}
+                onMouseUp={handleTestimonialMouseUp}
+                onTouchStart={handleTestimonialMouseDown}
+                onTouchEnd={handleTestimonialMouseUp}
+              >
+                {duplicatedTestimonials.map((testimonial, index) => (
+                  <div
+                    key={index}
+                    className="flex-shrink-0 w-[calc(33.333%-16px)] md:w-[calc(25%-18px)] p-6 cursor-pointer select-none"
+                    style={{ 
+                      background: DESIGN.colors.card,
+                      borderRadius: DESIGN.borderRadius.card,
+                      border: `1px solid ${DESIGN.colors.primary}20`,
+                      boxShadow: DESIGN.shadows.card
+                    }}
+                    onMouseDown={handleTestimonialMouseDown}
+                    onMouseUp={handleTestimonialMouseUp}
+                    onTouchStart={handleTestimonialMouseDown}
+                    onTouchEnd={handleTestimonialMouseUp}
                   >
-                    "{testimonial.text}"
-                  </p>
-                  <div>
-                    <div 
-                      className="font-bold"
+                    <div className="flex items-center gap-1 mb-4">
+                      {[...Array(5)].map((_, i) => (
+                        <div 
+                          key={i}
+                          className="w-4 h-4"
+                          style={{ color: DESIGN.colors.primary }}
+                        >
+                          ★
+                        </div>
+                      ))}
+                    </div>
+                    <p 
+                      className="mb-4 italic text-base"
                       style={{ color: DESIGN.colors.textPrimary }}
                     >
-                      {testimonial.author}
-                    </div>
-                    <div 
-                      className="text-sm"
-                      style={{ color: DESIGN.colors.textSecondary }}
-                    >
-                      {testimonial.role}
+                      "{testimonial.text}"
+                    </p>
+                    <div>
+                      <div 
+                        className="font-bold"
+                        style={{ color: DESIGN.colors.textPrimary }}
+                      >
+                        {testimonial.author}
+                      </div>
+                      <div 
+                        className="text-sm"
+                        style={{ color: DESIGN.colors.textSecondary }}
+                      >
+                        {testimonial.role}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+
+              {/* Overlay gradients for smooth edges */}
+              <div 
+                className="absolute left-0 top-0 bottom-0 w-24 z-10 pointer-events-none"
+                style={{
+                  background: 'linear-gradient(to right, rgba(26, 26, 26, 1), rgba(26, 26, 26, 0))'
+                }}
+              />
+              <div 
+                className="absolute right-0 top-0 bottom-0 w-24 z-10 pointer-events-none"
+                style={{
+                  background: 'linear-gradient(to left, rgba(26, 26, 26, 1), rgba(26, 26, 26, 0))'
+                }}
+              />
             </div>
           </div>
         </section>
@@ -659,7 +747,7 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* Footer */}
+        {/* Simplified Footer */}
         <footer 
           className="py-12 px-4"
           style={{ 
@@ -667,58 +755,27 @@ export default function Landing() {
             background: DESIGN.colors.background
           }}
         >
-          <div className="max-w-6xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-center mb-8">
-              <div className="flex items-center gap-2 mb-4 md:mb-0">
-                <div 
-                  className="w-10 h-10 flex items-center justify-center"
-                  style={{ 
-                    background: DESIGN.colors.primary,
-                    borderRadius: DESIGN.borderRadius.button,
-                    boxShadow: DESIGN.shadows.purpleGlow
-                  }}
-                >
-                  <Zap className="w-5 h-5" style={{ color: DESIGN.colors.background }} />
-                </div>
-                <span 
-                  className="text-xl font-bold"
-                  style={{ color: DESIGN.colors.primary }}
-                >
-                  Amps
-                </span>
+          <div className="max-w-6xl mx-auto text-center">
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <div 
+                className="w-10 h-10 flex items-center justify-center"
+                style={{ 
+                  background: DESIGN.colors.primary,
+                  borderRadius: DESIGN.borderRadius.button,
+                  boxShadow: DESIGN.shadows.purpleGlow
+                }}
+              >
+                <Zap className="w-5 h-5" style={{ color: DESIGN.colors.background }} />
               </div>
-              <div className="flex gap-6">
-                <button 
-                  onClick={() => navigate('/terms')}
-                  className="text-sm hover:underline"
-                  style={{ color: DESIGN.colors.textSecondary }}
-                >
-                  Terms
-                </button>
-                <button 
-                  onClick={() => navigate('/privacy')}
-                  className="text-sm hover:underline"
-                  style={{ color: DESIGN.colors.textSecondary }}
-                >
-                  Privacy
-                </button>
-                <button 
-                  onClick={() => navigate('/contact')}
-                  className="text-sm hover:underline"
-                  style={{ color: DESIGN.colors.textSecondary }}
-                >
-                  Contact
-                </button>
-              </div>
+              <span 
+                className="text-xl font-bold"
+                style={{ color: DESIGN.colors.primary }}
+              >
+                Amps
+              </span>
             </div>
             <p 
-              className="text-center text-sm mb-4"
-              style={{ color: DESIGN.colors.textSecondary }}
-            >
-              By continuing, you agree to our Terms of Service and Privacy Policy
-            </p>
-            <p 
-              className="text-center text-xs"
+              className="text-xs"
               style={{ color: `${DESIGN.colors.textSecondary}60` }}
             >
               © 2025 Amps. All rights reserved. Made with ❤️ in Namibia
