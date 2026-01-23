@@ -226,9 +226,7 @@ export default function Auth() {
           <span className="relative px-4 bg-background text-sm text-muted-foreground">or continue with</span>
         </div>
 
-        <Button type="button" variant="outline" onClick={handleGoogleLogin} disabled={submitting} className="w-full h-14 text-lg font-semibold mb-4">
-          <Zap className="w-5 h-5 mr-2" /> Continue with Google
-        </Button>
+        {/* Google login removed per user request */}
 
         <div className="mt-4">
           <div className="relative flex items-center justify-center mb-4">
