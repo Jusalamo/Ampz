@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, QrCode, Keyboard, Loader2, MapPin, AlertCircle, Check } from 'lucide-react';
+import { X, QrCode, Keyboard, Loader2, MapPin, AlertCircle, Check, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
@@ -27,6 +27,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [distance, setDistance] = useState<number | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>('');
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -42,12 +43,14 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       setErrorMessage('');
       setSuccessMessage('');
       setDistance(null);
+      setDebugInfo('');
     }
   }, [isOpen]);
 
   // Unified QR code processing function
   const processQRCode = useCallback(async (code: string) => {
     setStep('verifying');
+    setDebugInfo(`Processing code: ${code.substring(0, 50)}...`);
     
     try {
       // Use the unified processQRCodeScan method that handles validation, geofence check, and check-in
@@ -65,10 +68,12 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
         } else {
           setErrorMessage(result.error || 'Check-in failed');
         }
+        setDebugInfo(`Error: ${result.error}`);
         setStep('error');
       }
     } catch (err: any) {
       setErrorMessage(err?.message || 'Failed to process QR code');
+      setDebugInfo(`Exception: ${err.message}`);
       setStep('error');
     }
   }, [processQRCodeScan, onCheckInSuccess]);
@@ -150,6 +155,13 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
     }
   };
 
+  const handleViewEvent = () => {
+    if (scannedEvent) {
+      navigate(`/event/${scannedEvent.id}`);
+    }
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -172,7 +184,8 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
           </h2>
           <button
             onClick={handleClose}
-            className="w-10 h-10 rounded-full bg-card flex items-center justify-center"
+            className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-accent transition-colors"
+            disabled={isLoading}
           >
             <X className="w-5 h-5" />
           </button>
@@ -203,7 +216,12 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
               <p className="text-muted-foreground text-center mb-6">
                 Point your camera at the event's QR code
               </p>
-              <Button variant="outline" className="h-12" onClick={() => setStep('code')}>
+              <Button 
+                variant="outline" 
+                className="h-12"
+                onClick={() => setStep('code')}
+                disabled={isLoading}
+              >
                 <Keyboard className="w-4 h-4 mr-2" />
                 Enter Code Manually
               </Button>
@@ -215,20 +233,28 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
               <QrCode className="w-16 h-16 text-primary mb-6" />
               <h3 className="text-xl font-bold mb-2">Enter Event Code</h3>
               <p className="text-muted-foreground text-center mb-6">
-                Ask the event organizer for the check-in code
+                Ask the event organizer for the check-in code or enter the full event URL
               </p>
               <Input
                 value={manualCode}
-                onChange={(e) => setManualCode(e.target.value.toUpperCase())}
-                placeholder="Enter code..."
-                className="text-center text-2xl font-bold tracking-widest h-14 max-w-xs mb-6"
-                maxLength={8}
+                onChange={(e) => setManualCode(e.target.value)}
+                placeholder="Enter code or event URL..."
+                className="text-center text-lg font-medium h-14 max-w-xs mb-6"
               />
               <div className="flex gap-3 w-full max-w-xs">
-                <Button variant="outline" className="flex-1 h-12" onClick={() => setStep('scan')}>
+                <Button 
+                  variant="outline" 
+                  className="flex-1 h-12" 
+                  onClick={() => setStep('scan')}
+                  disabled={isLoading}
+                >
                   Back
                 </Button>
-                <Button className="flex-1 h-12" onClick={handleCodeSubmit} disabled={!manualCode.trim() || isLoading}>
+                <Button 
+                  className="flex-1 h-12" 
+                  onClick={handleCodeSubmit} 
+                  disabled={!manualCode.trim() || isLoading}
+                >
                   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit'}
                 </Button>
               </div>
@@ -239,7 +265,12 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
             <>
               <Loader2 className="w-16 h-16 text-primary animate-spin mb-6" />
               <h3 className="text-xl font-bold mb-2">Verifying Code</h3>
-              <p className="text-muted-foreground text-center">Please wait...</p>
+              <p className="text-muted-foreground text-center mb-4">Please wait...</p>
+              {debugInfo && (
+                <p className="text-xs text-muted-foreground text-center max-w-xs break-all">
+                  {debugInfo}
+                </p>
+              )}
             </>
           )}
 
@@ -261,33 +292,16 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
               </div>
               <h3 className="text-xl font-bold mb-2">{successMessage}</h3>
               <p className="text-muted-foreground text-center mb-6">You're now checked in!</p>
-              <Button className="h-12 px-8" onClick={handleClose}>Continue to Event</Button>
-            </>
-          )}
-
-          {step === 'error' && (
-            <>
-              <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center mb-6">
-                <AlertCircle className="w-10 h-10 text-red-500" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">Check-In Failed</h3>
-              <p className="text-muted-foreground text-center mb-6 max-w-xs">{errorMessage}</p>
-              {distance && (
-                <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                  <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                    <MapPin className="w-4 h-4 inline mr-1" />
-                    You need to be inside the event's geofence to proceed.
-                  </p>
-                </div>
-              )}
               <div className="flex gap-3">
-                <Button variant="outline" className="h-12" onClick={() => setStep('code')}>Try Again</Button>
-                <Button className="h-12" onClick={handleClose}>Close</Button>
-              </div>
-            </>
-          )}
-        </div>
-      </motion.div>
-    </AnimatePresence>
-  );
-}
+                <Button 
+                  className="h-12 px-6" 
+                  onClick={handleClose}
+                >
+                  Close
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="h-12 px-6"
+                  onClick={handleViewEvent}
+                >
+                  <ExternalLink className="w-
