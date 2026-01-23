@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { calculateDistance, isWithinGeofence, parseCheckInURL, validateEventToken, validateSecureEventToken } from '@/lib/qr-utils';
+import { calculateDistance, isWithinGeofence, parseCheckInURL, validateEventToken, validateSecureEventToken, extractEventIdFromURL } from '@/lib/qr-utils';
 import { Event } from '@/lib/types';
 
 export interface CheckInResult {
@@ -101,6 +101,24 @@ export function useCheckIn(userId?: string) {
         };
       }
 
+      // Check if user has already checked in
+      const { data: existingCheckIn } = await supabase
+        .from('check_ins')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('event_id', event.id)
+        .limit(1);
+
+      if (existingCheckIn && existingCheckIn.length > 0) {
+        return {
+          success: true,
+          message: `You're already checked in to ${event.name}!`,
+          eventId: event.id,
+          isWithinGeofence: true,
+          distance: Math.round(distance)
+        };
+      }
+
       // Create check-in record
       const { data, error: insertError } = await supabase
         .from('check_ins')
@@ -155,6 +173,9 @@ export function useCheckIn(userId?: string) {
         }
       }
 
+      // Update event attendees count
+      await supabase.rpc('increment_event_attendees', { event_id: event.id });
+
       return {
         success: true,
         message: `Welcome to ${event.name}!`,
@@ -172,75 +193,62 @@ export function useCheckIn(userId?: string) {
     }
   }, [userId, getUserLocation]);
 
-  // Validate QR code and return event info
+  // Validate QR code and return event info - UPDATED to handle multiple formats
   const validateQRCode = useCallback(async (
     qrData: string
   ): Promise<{ valid: boolean; eventId?: string; event?: Event; error?: string }> => {
     try {
-      // Parse the QR code URL
+      console.log('Validating QR code data:', qrData);
+      
+      // First, try to parse as URL to extract event ID
       const parsed = parseCheckInURL(qrData);
       
-      if (!parsed) {
-        // Try to find by access code directly
+      if (parsed) {
+        const eventId = parsed.eventId;
+        
+        // If we have a token, validate it
+        if (parsed.token) {
+          const isSecureTokenValid = await validateSecureEventToken(parsed.token, eventId);
+          const isLegacyTokenValid = validateEventToken(parsed.token, eventId);
+          
+          if (!isSecureTokenValid && !isLegacyTokenValid) {
+            return { valid: false, error: 'Invalid or expired QR code token' };
+          }
+        }
+        
+        // Fetch event by ID
         const { data: eventData, error: fetchError } = await supabase
           .from('events')
           .select('*')
-          .or(`qr_code.eq.${qrData},access_code.eq.${qrData}`)
+          .eq('id', eventId)
           .single();
 
         if (fetchError || !eventData) {
-          return { valid: false, error: 'Invalid QR code or access code' };
+          return { valid: false, error: 'Event not found' };
+        }
+
+        if (!eventData.is_active) {
+          return { valid: false, error: 'This event is no longer active' };
         }
 
         return {
           valid: true,
           eventId: eventData.id,
-          event: {
-            id: eventData.id,
-            name: eventData.name,
-            description: eventData.description || '',
-            category: eventData.category,
-            location: eventData.location,
-            address: eventData.address,
-            coordinates: { lat: eventData.latitude, lng: eventData.longitude },
-            date: eventData.date,
-            time: eventData.time,
-            price: eventData.price || 0,
-            currency: eventData.currency || 'NAD',
-            maxAttendees: eventData.max_attendees || 500,
-            attendees: eventData.attendees_count || 0,
-            organizerId: eventData.organizer_id,
-            qrCode: eventData.qr_code,
-            geofenceRadius: eventData.geofence_radius || 50,
-            customTheme: eventData.custom_theme || '#8B5CF6',
-            coverImage: eventData.cover_image || '',
-            images: eventData.images || [],
-            videos: eventData.videos || [],
-            tags: eventData.tags || [],
-            isFeatured: eventData.is_featured || false,
-            isDemo: eventData.is_demo || false,
-            isActive: eventData.is_active ?? true,
-          } as Event,
+          event: formatEventData(eventData),
         };
       }
 
-      // Validate token - try server-side first, fall back to client-side for legacy tokens
-      const isSecureTokenValid = await validateSecureEventToken(parsed.token, parsed.eventId);
-      const isLegacyTokenValid = validateEventToken(parsed.token, parsed.eventId);
+      // If not a URL, try to find by access code or QR code directly
+      console.log('Trying to find event by access code or QR code:', qrData);
       
-      if (!isSecureTokenValid && !isLegacyTokenValid) {
-        return { valid: false, error: 'Invalid or expired QR code' };
-      }
-
-      // Fetch event details
       const { data: eventData, error: fetchError } = await supabase
         .from('events')
         .select('*')
-        .eq('id', parsed.eventId)
+        .or(`qr_code.eq.${qrData},access_code.eq.${qrData}`)
         .single();
 
       if (fetchError || !eventData) {
-        return { valid: false, error: 'Event not found' };
+        return { valid: false, error: 'Invalid QR code or access code. Please try again.' };
       }
 
       if (!eventData.is_active) {
@@ -250,37 +258,43 @@ export function useCheckIn(userId?: string) {
       return {
         valid: true,
         eventId: eventData.id,
-        event: {
-          id: eventData.id,
-          name: eventData.name,
-          description: eventData.description || '',
-          category: eventData.category,
-          location: eventData.location,
-          address: eventData.address,
-          coordinates: { lat: eventData.latitude, lng: eventData.longitude },
-          date: eventData.date,
-          time: eventData.time,
-          price: eventData.price || 0,
-          currency: eventData.currency || 'NAD',
-          maxAttendees: eventData.max_attendees || 500,
-          attendees: eventData.attendees_count || 0,
-          organizerId: eventData.organizer_id,
-          qrCode: eventData.qr_code,
-          geofenceRadius: eventData.geofence_radius || 50,
-          customTheme: eventData.custom_theme || '#8B5CF6',
-          coverImage: eventData.cover_image || '',
-          images: eventData.images || [],
-          videos: eventData.videos || [],
-          tags: eventData.tags || [],
-          isFeatured: eventData.is_featured || false,
-          isDemo: eventData.is_demo || false,
-          isActive: eventData.is_active ?? true,
-        } as Event,
+        event: formatEventData(eventData),
       };
     } catch (err: any) {
-      return { valid: false, error: err?.message || 'Failed to validate QR code' };
+      console.error('Error validating QR code:', err);
+      return { valid: false, error: 'Failed to validate QR code. Please try again.' };
     }
   }, []);
+
+  // Helper function to format event data
+  const formatEventData = (eventData: any): Event => {
+    return {
+      id: eventData.id,
+      name: eventData.name,
+      description: eventData.description || '',
+      category: eventData.category,
+      location: eventData.location,
+      address: eventData.address,
+      coordinates: { lat: eventData.latitude, lng: eventData.longitude },
+      date: eventData.date,
+      time: eventData.time,
+      price: eventData.price || 0,
+      currency: eventData.currency || 'NAD',
+      maxAttendees: eventData.max_attendees || 500,
+      attendees: eventData.attendees_count || 0,
+      organizerId: eventData.organizer_id,
+      qrCode: eventData.qr_code,
+      geofenceRadius: eventData.geofence_radius || 50,
+      customTheme: eventData.custom_theme || '#8B5CF6',
+      coverImage: eventData.cover_image || '',
+      images: eventData.images || [],
+      videos: eventData.videos || [],
+      tags: eventData.tags || [],
+      isFeatured: eventData.is_featured || false,
+      isDemo: eventData.is_demo || false,
+      isActive: eventData.is_active ?? true,
+    } as Event;
+  };
 
   // Unified QR code scanning flow with geofence check
   const processQRCodeScan = useCallback(async (
@@ -296,14 +310,21 @@ export function useCheckIn(userId?: string) {
     setError(null);
 
     try {
+      console.log('Processing QR code scan:', qrData);
+      
       // First validate the QR code
       const validationResult = await validateQRCode(qrData);
       
       if (!validationResult.valid || !validationResult.event) {
-        return { success: false, error: validationResult.error || 'Invalid QR code' };
+        console.log('QR code validation failed:', validationResult.error);
+        return { 
+          success: false, 
+          error: validationResult.error || 'Invalid QR code. Please make sure you\'re scanning a valid event QR code.' 
+        };
       }
 
       const event = validationResult.event;
+      console.log('Event found:', event.name);
       
       // Get user's location for geofence check
       const location = await getUserLocation();
@@ -327,6 +348,24 @@ export function useCheckIn(userId?: string) {
           isWithinGeofence: false,
           distance: distanceInMeters,
           eventId: event.id
+        };
+      }
+
+      // Check if user has already checked in
+      const { data: existingCheckIn } = await supabase
+        .from('check_ins')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('event_id', event.id)
+        .limit(1);
+
+      if (existingCheckIn && existingCheckIn.length > 0) {
+        return {
+          success: true,
+          message: `You're already checked in to ${event.name}!`,
+          eventId: event.id,
+          isWithinGeofence: true,
+          distance: Math.round(distance)
         };
       }
 
@@ -384,6 +423,9 @@ export function useCheckIn(userId?: string) {
         }
       }
 
+      // Update event attendees count
+      await supabase.rpc('increment_event_attendees', { event_id: event.id });
+
       return {
         success: true,
         message: `Welcome to ${event.name}!`,
@@ -393,7 +435,8 @@ export function useCheckIn(userId?: string) {
         distance: Math.round(distance)
       };
     } catch (err: any) {
-      const message = err?.message || 'Check-in failed';
+      console.error('Error in processQRCodeScan:', err);
+      const message = err?.message || 'Check-in failed. Please try again.';
       setError(message);
       return { success: false, error: message };
     } finally {
