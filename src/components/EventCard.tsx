@@ -51,6 +51,11 @@ export function EventCard({ event, variant = 'default', onClick }: EventCardProp
     bookmarkEvent(event.id);
   };
 
+  // Ensure coverImage always has a valid URL
+  const coverImage = event.coverImage || 
+    event.images?.[0] || 
+    `https://via.placeholder.com/400x225/2D2D2D/FFFFFF?text=${encodeURIComponent(event.name)}`;
+
   if (variant === 'compact') {
     return (
       <div
@@ -68,9 +73,13 @@ export function EventCard({ event, variant = 'default', onClick }: EventCardProp
           style={{ borderRadius: DESIGN.borderRadius.cardInner }}
         >
           <img
-            src={event.coverImage}
+            src={coverImage}
             alt={event.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            loading="lazy"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = `https://via.placeholder.com/200x120/2D2D2D/FFFFFF?text=${encodeURIComponent(event.name.substring(0, 20))}`;
+            }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
           {event.price === 0 && (
@@ -116,10 +125,14 @@ export function EventCard({ event, variant = 'default', onClick }: EventCardProp
         style={{ borderRadius: DESIGN.borderRadius.card }}
       >
         <img
-          src={event.coverImage}
+          src={coverImage}
           alt={event.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           style={{ borderRadius: DESIGN.borderRadius.card }}
+          loading="lazy"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = `https://via.placeholder.com/300x180/2D2D2D/FFFFFF?text=${encodeURIComponent(event.name.substring(0, 30))}`;
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-4">
@@ -201,9 +214,13 @@ export function EventCard({ event, variant = 'default', onClick }: EventCardProp
     >
       <div className="relative h-36">
         <img
-          src={event.coverImage}
+          src={coverImage}
           alt={event.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          loading="lazy"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = `https://via.placeholder.com/400x144/2D2D2D/FFFFFF?text=${encodeURIComponent(event.name.substring(0, 30))}`;
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
         <div className="absolute top-3 left-3 flex gap-2">
