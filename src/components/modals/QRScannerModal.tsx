@@ -304,4 +304,54 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                   className="h-12 px-6"
                   onClick={handleViewEvent}
                 >
-                  <ExternalLink className="w-
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  View Event
+                </Button>
+              </div>
+            </>
+          )}
+
+          {step === 'error' && (
+            <>
+              <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center mb-6">
+                <AlertCircle className="w-10 h-10 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Check-In Failed</h3>
+              <p className="text-muted-foreground text-center mb-6 max-w-xs">{errorMessage}</p>
+              {distance && (
+                <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                    <MapPin className="w-4 h-4 inline mr-1" />
+                    You need to be inside the event's geofence to proceed.
+                  </p>
+                </div>
+              )}
+              {debugInfo && (
+                <p className="text-xs text-muted-foreground text-center mb-4 max-w-xs break-all">
+                  {debugInfo}
+                </p>
+              )}
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  className="h-12" 
+                  onClick={() => setStep('code')}
+                  disabled={isLoading}
+                >
+                  Try Again
+                </Button>
+                <Button 
+                  className="h-12" 
+                  onClick={handleClose}
+                  disabled={isLoading}
+                >
+                  Close
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
