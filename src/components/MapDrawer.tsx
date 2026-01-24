@@ -96,8 +96,6 @@ interface Event {
   isFeatured?: boolean;
   customTheme?: string;
   geofenceRadius: number;
-  isActive?: boolean;
-  endedAt?: string;
 }
 
 interface MapDrawerProps {
@@ -618,7 +616,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         className="absolute inset-0 w-full h-full"
         style={{ 
           zIndex: 0,
-          position: 'fixed',
+          position: 'fixed', // Changed to fixed to ensure map stays in background
           top: 0,
           left: 0
         }}
@@ -629,7 +627,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         style={{ 
           color: DESIGN.colors.textPrimary,
           background: 'rgba(0, 0, 0, 0.4)',
-          pointerEvents: 'auto'
+          pointerEvents: 'auto' // Ensure it's clickable
         }}>
         © Mapbox © OpenStreetMap
       </div>
@@ -638,7 +636,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       <div
         ref={drawerRef}
         className={cn(
-          'absolute left-0 right-0 z-50 flex flex-col',
+          'absolute left-0 right-0 z-50 flex flex-col', // Increased z-index to 50
           isDragging ? '' : 'transition-transform duration-300 ease-out'
         )}
         style={{
@@ -650,7 +648,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
           borderTopRightRadius: DESIGN.borderRadius.large,
           borderTop: `1px solid ${DESIGN.colors.textSecondary}20`,
           boxShadow: DESIGN.shadows.card,
-          position: 'relative'
+          position: 'relative' // Ensure it's above the map
         }}
       >
         {/* Drawer Handle - Always visible at top when drawer is up */}
@@ -911,8 +909,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                 scrollbarColor: `${DESIGN.colors.primary} ${DESIGN.colors.card}`
               }}
             >
-              {/* FIXED: Show all events by default when no search/filters */}
-              {filteredEvents.length > 0 ? (
+              {(search || selectedCategory !== 'All') && filteredEvents.length > 0 ? (
                 filteredEvents.map((event) => (
                   <EventCard
                     key={event.id}
@@ -920,7 +917,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                     onClick={() => handleEventCardClick(event)}
                   />
                 ))
-              ) : (
+              ) : (search || selectedCategory !== 'All') && filteredEvents.length === 0 ? (
                 <div className="text-center py-12">
                   <motion.div
                     initial={{ scale: 0 }}
@@ -931,12 +928,10 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                   </motion.div>
                   <p className="text-[14px] mb-1" style={{ color: DESIGN.colors.textSecondary }}>No events found</p>
                   <p className="text-[13px]" style={{ color: `${DESIGN.colors.textSecondary}70` }}>
-                    {search || selectedCategory !== 'All' 
-                      ? 'Try adjusting your search or filters'
-                      : 'There are no events available at the moment'}
+                    Try adjusting your search or filters
                   </p>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         )}
