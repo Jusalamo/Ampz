@@ -24,8 +24,8 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
-  // Define environment variables
+  // Define environment variables - no hardcoded fallbacks for security
   define: {
-    'process.env.VITE_MAPBOX_TOKEN': JSON.stringify(process.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoianVzYSIsImEiOiJjbWpjanh5amEwbDEwM2dzOXVhbjZ5dzcwIn0.stWdbPHCrf9sKrRJRmShlg'),
+    'process.env.VITE_MAPBOX_TOKEN': JSON.stringify(process.env.VITE_MAPBOX_TOKEN || ''),
   },
 }));
