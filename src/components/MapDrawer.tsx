@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Search, SlidersHorizontal, Plus, MapPin, Calendar, Clock, Heart, ChevronRight, Star } from 'lucide-react';
+import { Search, SlidersHorizontal, Plus, MapPin, Calendar, Clock, Heart, ChevronRight, Star, ChevronUp, ChevronDown } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { EventCard } from './EventCard';
 import { Input } from './ui/input';
@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useEvents } from '@/hooks/useEvents';
 
 // Design Constants
@@ -643,7 +643,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters, activeEvents }: MapDra
   const translateY = SNAP_POSITIONS[drawerPosition] * getDrawerHeight() + dragOffset;
   const isPro = user?.subscription?.tier === 'pro' || user?.subscription?.tier === 'max';
 
-  // Determine which events to show in mini cards (use cached if still loading)
+  // Determine which events to show in mini cards
   const eventsForMiniCards = useMemo(() => {
     if (activeEvents.length > 0) {
       return activeEvents.slice(0, 5);
@@ -669,126 +669,6 @@ export function MapDrawer({ onCreateEvent, onOpenFilters, activeEvents }: MapDra
         }}
       />
       
-      {/* Always Visible Mini Event Cards - Positioned absolutely above map */}
-      {eventsForMiniCards.length > 0 && (
-        <div 
-          className="absolute bottom-24 left-0 right-0 z-40 pointer-events-none"
-          style={{ 
-            zIndex: 40,
-            pointerEvents: 'none'
-          }}
-        >
-          <div 
-            className="flex gap-3 overflow-x-auto no-scrollbar pb-2 px-4"
-            style={{ pointerEvents: 'auto' }}
-          >
-            {eventsForMiniCards.map((event) => {
-              const isEnded = event.endedAt || event.isActive === false;
-              
-              return (
-                <div 
-                  key={event.id}
-                  onClick={() => handleEventCardClick(event)}
-                  className="flex-shrink-0 w-40 bg-card rounded-ampz-md overflow-hidden cursor-pointer ampz-interactive shadow-lg border border-border/20 hover:scale-105 transition-transform duration-200"
-                  style={{
-                    background: DESIGN.colors.card,
-                    border: `1px solid ${DESIGN.colors.textSecondary}20`,
-                    boxShadow: DESIGN.shadows.card
-                  }}
-                >
-                  <div className="relative">
-                    <img 
-                      src={event.coverImage || '/placeholder.svg'} 
-                      alt={event.name}
-                      className="w-full h-20 object-cover"
-                      loading="eager"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                    {isEnded && (
-                      <div 
-                        className="absolute top-1 left-1 px-2 py-0.5 rounded-full font-medium text-xs"
-                        style={{ 
-                          background: DESIGN.colors.textSecondary,
-                          color: DESIGN.colors.background
-                        }}
-                      >
-                        Ended
-                      </div>
-                    )}
-                    {event.isFeatured && !isEnded && (
-                      <div 
-                        className="absolute top-1 left-1 px-2 py-0.5 rounded-full font-medium text-xs"
-                        style={{ 
-                          background: DESIGN.colors.primary,
-                          color: DESIGN.colors.background
-                        }}
-                      >
-                        Featured
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-2">
-                    <p 
-                      className="text-xs font-semibold truncate"
-                      style={{ color: DESIGN.colors.textPrimary }}
-                    >
-                      {event.name}
-                    </p>
-                    <div className="flex items-center gap-1 mt-1">
-                      <Calendar className="w-3 h-3" style={{ color: DESIGN.colors.textSecondary }} />
-                      <span 
-                        className="text-[10px]"
-                        style={{ color: DESIGN.colors.textSecondary }}
-                      >
-                        {event.date}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Loading skeleton for mini cards during initial load */}
-      {isInitialLoad && eventsForMiniCards.length === 0 && (
-        <div className="absolute bottom-24 left-0 right-0 z-40 pointer-events-none">
-          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 px-4">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div 
-                key={i}
-                className="flex-shrink-0 w-40 bg-card rounded-ampz-md overflow-hidden"
-                style={{
-                  background: DESIGN.colors.card,
-                  border: `1px solid ${DESIGN.colors.textSecondary}20`,
-                  boxShadow: DESIGN.shadows.card
-                }}
-              >
-                <div 
-                  className="w-full h-20 bg-gradient-to-r from-gray-800 to-gray-700 animate-pulse"
-                />
-                <div className="p-2">
-                  <div 
-                    className="h-4 bg-gradient-to-r from-gray-800 to-gray-700 rounded animate-pulse mb-2"
-                  />
-                  <div className="flex items-center gap-1">
-                    <div 
-                      className="w-3 h-3 bg-gradient-to-r from-gray-800 to-gray-700 rounded animate-pulse"
-                    />
-                    <div 
-                      className="h-2 w-16 bg-gradient-to-r from-gray-800 to-gray-700 rounded animate-pulse"
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Map attribution */}
       <div className="absolute bottom-4 right-2 z-10 text-[12px] px-2 py-1 rounded backdrop-blur-sm"
         style={{ 
@@ -847,261 +727,403 @@ export function MapDrawer({ onCreateEvent, onOpenFilters, activeEvents }: MapDra
           </p>
         </div>
 
-        {/* Drawer Content - Only shows when not minimized */}
-        {drawerPosition !== 'minimum' && (
-          <div className="flex-1 flex flex-col px-4 overflow-hidden">
-            {/* Search and Create Row */}
-            <div className="flex items-center gap-2 mb-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" 
-                  style={{ color: DESIGN.colors.textSecondary }} />
-                <Input
-                  type="text"
-                  placeholder="Search events..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onFocus={() => setShowSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  className="pl-10 h-10 rounded-[12px] border-0 focus:ring-2"
-                  style={{
-                    background: DESIGN.colors.card,
-                    color: DESIGN.colors.textPrimary,
-                    boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.3)'
-                  }}
-                  aria-label="Search events"
-                />
-                
-                {/* Search Suggestions Dropdown */}
-                {showSuggestions && searchSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 rounded-[12px] shadow-lg z-50 overflow-hidden"
-                    style={{
-                      background: DESIGN.colors.card,
-                      border: `1px solid ${DESIGN.colors.textSecondary}20`,
-                      boxShadow: DESIGN.shadows.card
-                    }}>
-                    {searchSuggestions.map(event => (
-                      <motion.button
+        {/* Drawer Content - Shows different content based on position */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Mini Event Cards Section - Always visible inside drawer */}
+          <AnimatePresence>
+            <motion.div 
+              className="px-4 pb-2"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              {/* Section Header */}
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[14px] font-semibold" style={{ color: DESIGN.colors.textPrimary }}>
+                  Nearby Events
+                </h3>
+                <button 
+                  onClick={() => setDrawerPosition('half')}
+                  className="text-[12px] flex items-center gap-1"
+                  style={{ color: DESIGN.colors.primary }}
+                >
+                  See All
+                  {drawerPosition === 'minimum' ? 
+                    <ChevronUp className="w-3 h-3" /> : 
+                    <ChevronDown className="w-3 h-3" />
+                  }
+                </button>
+              </div>
+              
+              {/* Mini Cards Container */}
+              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                {eventsForMiniCards.length > 0 ? (
+                  eventsForMiniCards.map((event) => {
+                    const isEnded = event.endedAt || event.isActive === false;
+                    
+                    return (
+                      <div 
                         key={event.id}
-                        className="w-full px-3 py-2 text-left flex items-center gap-2"
-                        style={{ color: DESIGN.colors.textPrimary }}
-                        whileHover={{ background: `${DESIGN.colors.primary}15` }}
-                        onMouseDown={() => {
-                          setSearch(event.name);
-                          setShowSuggestions(false);
-                          handleEventMarkerClick(event);
+                        onClick={() => handleEventCardClick(event)}
+                        className="flex-shrink-0 w-40 bg-card rounded-ampz-md overflow-hidden cursor-pointer ampz-interactive hover:scale-105 transition-transform duration-200"
+                        style={{
+                          background: DESIGN.colors.card,
+                          border: `1px solid ${DESIGN.colors.textSecondary}20`,
+                          boxShadow: DESIGN.shadows.card
                         }}
-                        aria-label={`Select event: ${event.name}`}
                       >
-                        <img src={event.coverImage} alt="" className="w-8 h-8 rounded-[8px] object-cover" 
-                          style={{ border: `1px solid ${DESIGN.colors.primary}40` }} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[14px] font-medium truncate">{event.name}</p>
-                          <p className="text-[12px] truncate" style={{ color: DESIGN.colors.textSecondary }}>
-                            {event.date} • {event.location}
-                          </p>
+                        <div className="relative">
+                          <img 
+                            src={event.coverImage || '/placeholder.svg'} 
+                            alt={event.name}
+                            className="w-full h-20 object-cover"
+                            loading="eager"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                          {isEnded && (
+                            <div 
+                              className="absolute top-1 left-1 px-2 py-0.5 rounded-full font-medium text-xs"
+                              style={{ 
+                                background: DESIGN.colors.textSecondary,
+                                color: DESIGN.colors.background
+                              }}
+                            >
+                              Ended
+                            </div>
+                          )}
+                          {event.isFeatured && !isEnded && (
+                            <div 
+                              className="absolute top-1 left-1 px-2 py-0.5 rounded-full font-medium text-xs"
+                              style={{ 
+                                background: DESIGN.colors.primary,
+                                color: DESIGN.colors.background
+                              }}
+                            >
+                              Featured
+                            </div>
+                          )}
                         </div>
-                      </motion.button>
+                        <div className="p-2">
+                          <p 
+                            className="text-xs font-semibold truncate"
+                            style={{ color: DESIGN.colors.textPrimary }}
+                          >
+                            {event.name}
+                          </p>
+                          <div className="flex items-center gap-1 mt-1">
+                            <Calendar className="w-3 h-3" style={{ color: DESIGN.colors.textSecondary }} />
+                            <span 
+                              className="text-[10px]"
+                              style={{ color: DESIGN.colors.textSecondary }}
+                            >
+                              {event.date}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  // Loading skeleton for mini cards
+                  <div className="flex gap-3 w-full">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div 
+                        key={i}
+                        className="flex-shrink-0 w-40 bg-card rounded-ampz-md overflow-hidden"
+                        style={{
+                          background: DESIGN.colors.card,
+                          border: `1px solid ${DESIGN.colors.textSecondary}20`,
+                        }}
+                      >
+                        <div 
+                          className="w-full h-20 bg-gradient-to-r from-gray-800 to-gray-700 animate-pulse"
+                        />
+                        <div className="p-2">
+                          <div 
+                            className="h-4 bg-gradient-to-r from-gray-800 to-gray-700 rounded animate-pulse mb-2"
+                          />
+                          <div className="flex items-center gap-1">
+                            <div 
+                              className="w-3 h-3 bg-gradient-to-r from-gray-800 to-gray-700 rounded animate-pulse"
+                            />
+                            <div 
+                              className="h-2 w-16 bg-gradient-to-r from-gray-800 to-gray-700 rounded animate-pulse"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
               </div>
-              
-              <motion.button
-                onClick={onOpenFilters}
-                className="w-10 h-10 rounded-[12px] flex items-center justify-center"
-                style={{
-                  background: DESIGN.colors.card,
-                  border: `1px solid ${DESIGN.colors.textSecondary}30`,
-                  color: DESIGN.colors.textPrimary
-                }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                aria-label="Open filters"
-              >
-                <SlidersHorizontal className="w-4 h-4" />
-              </motion.button>
-              
-              {isPro && (
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Full Drawer Content - Only shows when drawer is in half or full position */}
+          {drawerPosition !== 'minimum' && (
+            <motion.div 
+              className="flex-1 flex flex-col px-4 overflow-hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              {/* Search and Create Row */}
+              <div className="flex items-center gap-2 mb-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" 
+                    style={{ color: DESIGN.colors.textSecondary }} />
+                  <Input
+                    type="text"
+                    placeholder="Search events..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onFocus={() => setShowSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                    className="pl-10 h-10 rounded-[12px] border-0 focus:ring-2"
+                    style={{
+                      background: DESIGN.colors.card,
+                      color: DESIGN.colors.textPrimary,
+                      boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.3)'
+                    }}
+                    aria-label="Search events"
+                  />
+                  
+                  {/* Search Suggestions Dropdown */}
+                  {showSuggestions && searchSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 rounded-[12px] shadow-lg z-50 overflow-hidden"
+                      style={{
+                        background: DESIGN.colors.card,
+                        border: `1px solid ${DESIGN.colors.textSecondary}20`,
+                        boxShadow: DESIGN.shadows.card
+                      }}>
+                      {searchSuggestions.map(event => (
+                        <motion.button
+                          key={event.id}
+                          className="w-full px-3 py-2 text-left flex items-center gap-2"
+                          style={{ color: DESIGN.colors.textPrimary }}
+                          whileHover={{ background: `${DESIGN.colors.primary}15` }}
+                          onMouseDown={() => {
+                            setSearch(event.name);
+                            setShowSuggestions(false);
+                            handleEventMarkerClick(event);
+                          }}
+                          aria-label={`Select event: ${event.name}`}
+                        >
+                          <img src={event.coverImage} alt="" className="w-8 h-8 rounded-[8px] object-cover" 
+                            style={{ border: `1px solid ${DESIGN.colors.primary}40` }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[14px] font-medium truncate">{event.name}</p>
+                            <p className="text-[12px] truncate" style={{ color: DESIGN.colors.textSecondary }}>
+                              {event.date} • {event.location}
+                            </p>
+                          </div>
+                        </motion.button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
                 <motion.button
-                  onClick={onCreateEvent}
-                  className="h-10 px-3 rounded-[12px] relative font-medium flex items-center gap-1"
+                  onClick={onOpenFilters}
+                  className="w-10 h-10 rounded-[12px] flex items-center justify-center"
                   style={{
-                    background: DESIGN.colors.primary,
-                    color: DESIGN.colors.background,
-                    boxShadow: DESIGN.shadows.button
+                    background: DESIGN.colors.card,
+                    border: `1px solid ${DESIGN.colors.textSecondary}30`,
+                    color: DESIGN.colors.textPrimary
                   }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  aria-label="Create new event"
+                  aria-label="Open filters"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span className="text-[13px]">Create</span>
-                  {user?.createdEvents?.length > 0 && (
-                    <span className="absolute -top-1 -right-1 text-[12px] rounded-full w-5 h-5 flex items-center justify-center"
-                      style={{
-                        background: DESIGN.colors.accentPink,
-                        color: DESIGN.colors.background
-                      }}>
-                      {user.createdEvents.length}
-                    </span>
-                  )}
+                  <SlidersHorizontal className="w-4 h-4" />
                 </motion.button>
+                
+                {isPro && (
+                  <motion.button
+                    onClick={onCreateEvent}
+                    className="h-10 px-3 rounded-[12px] relative font-medium flex items-center gap-1"
+                    style={{
+                      background: DESIGN.colors.primary,
+                      color: DESIGN.colors.background,
+                      boxShadow: DESIGN.shadows.button
+                    }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    aria-label="Create new event"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="text-[13px]">Create</span>
+                    {user?.createdEvents?.length > 0 && (
+                      <span className="absolute -top-1 -right-1 text-[12px] rounded-full w-5 h-5 flex items-center justify-center"
+                        style={{
+                          background: DESIGN.colors.accentPink,
+                          color: DESIGN.colors.background
+                        }}>
+                        {user.createdEvents.length}
+                      </span>
+                    )}
+                  </motion.button>
+                )}
+              </div>
+
+              {/* Category Pills */}
+              <div className="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-1">
+                {categories.map((category) => (
+                  <motion.button
+                    key={category}
+                    onClick={() => setSelectedCategory(category)}
+                    className={cn(
+                      'px-4 py-2 rounded-full text-[13px] font-medium whitespace-nowrap transition-all'
+                    )}
+                    style={
+                      selectedCategory === category
+                        ? {
+                            background: DESIGN.colors.primary,
+                            color: DESIGN.colors.background,
+                            boxShadow: DESIGN.shadows.button
+                          }
+                        : {
+                            background: DESIGN.colors.card,
+                            color: DESIGN.colors.textSecondary,
+                            border: `1px solid ${DESIGN.colors.textSecondary}30`
+                          }
+                    }
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    aria-label={`Filter by ${category}`}
+                    aria-pressed={selectedCategory === category}
+                  >
+                    {category}
+                </motion.button>
+                ))}
+              </div>
+
+              {/* Suggested For You Section */}
+              {suggestedEvents.length > 0 && selectedCategory === 'All' && !search && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-[15px] font-bold flex items-center gap-2" style={{ color: DESIGN.colors.textPrimary }}>
+                      <Star className="w-4 h-4" style={{ color: '#F59E0B' }} />
+                      Suggested For You
+                    </h3>
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                    {suggestedEvents.map((event) => (
+                      <div 
+                        key={event.id} 
+                        className="flex-shrink-0 w-[200px] cursor-pointer"
+                        onClick={() => navigate(`/event/${event.id}`)}
+                      >
+                        <div 
+                          className="rounded-[12px] overflow-hidden"
+                          style={{ background: DESIGN.colors.card, border: `1px solid ${DESIGN.colors.textSecondary}20` }}
+                        >
+                          <img 
+                            src={event.coverImage} 
+                            alt={event.name} 
+                            className="w-full h-24 object-cover"
+                          />
+                          <div className="p-2">
+                            <p className="text-[13px] font-semibold truncate" style={{ color: DESIGN.colors.textPrimary }}>
+                              {event.name}
+                            </p>
+                            <p className="text-[11px] truncate" style={{ color: DESIGN.colors.textSecondary }}>
+                              {event.date} • {event.location}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
-            </div>
 
-            {/* Category Pills */}
-            <div className="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-1">
-              {categories.map((category) => (
-                <motion.button
-                  key={category}
-                  onClick={() => setSelectedCategory(category)}
-                  className={cn(
-                    'px-4 py-2 rounded-full text-[13px] font-medium whitespace-nowrap transition-all'
-                  )}
-                  style={
-                    selectedCategory === category
-                      ? {
-                          background: DESIGN.colors.primary,
-                          color: DESIGN.colors.background,
-                          boxShadow: DESIGN.shadows.button
-                        }
-                      : {
-                          background: DESIGN.colors.card,
-                          color: DESIGN.colors.textSecondary,
-                          border: `1px solid ${DESIGN.colors.textSecondary}30`
-                        }
-                  }
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  aria-label={`Filter by ${category}`}
-                  aria-pressed={selectedCategory === category}
-                >
-                  {category}
-                </motion.button>
-              ))}
-            </div>
-
-            {/* Suggested For You Section */}
-            {suggestedEvents.length > 0 && selectedCategory === 'All' && !search && (
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-[15px] font-bold flex items-center gap-2" style={{ color: DESIGN.colors.textPrimary }}>
-                    <Star className="w-4 h-4" style={{ color: '#F59E0B' }} />
-                    Suggested For You
-                  </h3>
-                </div>
-                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-                  {suggestedEvents.map((event) => (
-                    <div 
-                      key={event.id} 
-                      className="flex-shrink-0 w-[200px] cursor-pointer"
-                      onClick={() => navigate(`/event/${event.id}`)}
+              {/* Upcoming Events Section */}
+              {upcomingEvents.length > 0 && selectedCategory === 'All' && !search && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-[15px] font-bold flex items-center gap-2" style={{ color: DESIGN.colors.textPrimary }}>
+                      <Calendar className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
+                      Upcoming Events
+                    </h3>
+                    <button 
+                      onClick={() => setSelectedCategory('All')}
+                      className="text-[12px] flex items-center gap-1"
+                      style={{ color: DESIGN.colors.primary }}
                     >
+                      See All <ChevronRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                    {upcomingEvents.map((event) => (
                       <div 
-                        className="rounded-[12px] overflow-hidden"
-                        style={{ background: DESIGN.colors.card, border: `1px solid ${DESIGN.colors.textSecondary}20` }}
+                        key={event.id} 
+                        className="flex-shrink-0 w-[200px] cursor-pointer"
+                        onClick={() => navigate(`/event/${event.id}`)}
                       >
-                        <img 
-                          src={event.coverImage} 
-                          alt={event.name} 
-                          className="w-full h-24 object-cover"
-                        />
-                        <div className="p-2">
-                          <p className="text-[13px] font-semibold truncate" style={{ color: DESIGN.colors.textPrimary }}>
-                            {event.name}
-                          </p>
-                          <p className="text-[11px] truncate" style={{ color: DESIGN.colors.textSecondary }}>
-                            {event.date} • {event.location}
-                          </p>
+                        <div 
+                          className="rounded-[12px] overflow-hidden"
+                          style={{ background: DESIGN.colors.card, border: `1px solid ${DESIGN.colors.textSecondary}20` }}
+                        >
+                          <img 
+                            src={event.coverImage} 
+                            alt={event.name} 
+                            className="w-full h-24 object-cover"
+                          />
+                          <div className="p-2">
+                            <p className="text-[13px] font-semibold truncate" style={{ color: DESIGN.colors.textPrimary }}>
+                              {event.name}
+                            </p>
+                            <p className="text-[11px] truncate" style={{ color: DESIGN.colors.textSecondary }}>
+                              {event.date} • {event.location}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Upcoming Events Section */}
-            {upcomingEvents.length > 0 && selectedCategory === 'All' && !search && (
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-[15px] font-bold flex items-center gap-2" style={{ color: DESIGN.colors.textPrimary }}>
-                    <Calendar className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
-                    Upcoming Events
-                  </h3>
-                  <button 
-                    onClick={() => setSelectedCategory('All')}
-                    className="text-[12px] flex items-center gap-1"
-                    style={{ color: DESIGN.colors.primary }}
-                  >
-                    See All <ChevronRight className="w-3 h-3" />
-                  </button>
-                </div>
-                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-                  {upcomingEvents.map((event) => (
-                    <div 
-                      key={event.id} 
-                      className="flex-shrink-0 w-[200px] cursor-pointer"
-                      onClick={() => navigate(`/event/${event.id}`)}
+              {/* All Events List */}
+              <div 
+                className="flex-1 overflow-y-auto space-y-3 pb-24"
+                style={{
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: `${DESIGN.colors.primary} ${DESIGN.colors.card}`
+                }}
+              >
+                {(search || selectedCategory !== 'All') && filteredEvents.length > 0 ? (
+                  filteredEvents.map((event) => (
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      onClick={() => handleEventCardClick(event)}
+                    />
+                  ))
+                ) : (search || selectedCategory !== 'All') && filteredEvents.length === 0 ? (
+                  <div className="text-center py-12">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 200 }}
                     >
-                      <div 
-                        className="rounded-[12px] overflow-hidden"
-                        style={{ background: DESIGN.colors.card, border: `1px solid ${DESIGN.colors.textSecondary}20` }}
-                      >
-                        <img 
-                          src={event.coverImage} 
-                          alt={event.name} 
-                          className="w-full h-24 object-cover"
-                        />
-                        <div className="p-2">
-                          <p className="text-[13px] font-semibold truncate" style={{ color: DESIGN.colors.textPrimary }}>
-                            {event.name}
-                          </p>
-                          <p className="text-[11px] truncate" style={{ color: DESIGN.colors.textSecondary }}>
-                            {event.date} • {event.location}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      <MapPin className="w-12 h-12 mx-auto mb-3" style={{ color: DESIGN.colors.textSecondary }} />
+                    </motion.div>
+                    <p className="text-[14px] mb-1" style={{ color: DESIGN.colors.textSecondary }}>No events found</p>
+                    <p className="text-[13px]" style={{ color: `${DESIGN.colors.textSecondary}70` }}>
+                      Try adjusting your search or filters
+                    </p>
+                  </div>
+                ) : null}
               </div>
-            )}
-
-            {/* All Events List */}
-            <div 
-              className="flex-1 overflow-y-auto space-y-3 pb-24"
-              style={{
-                scrollbarWidth: 'thin',
-                scrollbarColor: `${DESIGN.colors.primary} ${DESIGN.colors.card}`
-              }}
-            >
-              {(search || selectedCategory !== 'All') && filteredEvents.length > 0 ? (
-                filteredEvents.map((event) => (
-                  <EventCard
-                    key={event.id}
-                    event={event}
-                    onClick={() => handleEventCardClick(event)}
-                  />
-                ))
-              ) : (search || selectedCategory !== 'All') && filteredEvents.length === 0 ? (
-                <div className="text-center py-12">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 200 }}
-                  >
-                    <MapPin className="w-12 h-12 mx-auto mb-3" style={{ color: DESIGN.colors.textSecondary }} />
-                  </motion.div>
-                  <p className="text-[14px] mb-1" style={{ color: DESIGN.colors.textSecondary }}>No events found</p>
-                  <p className="text-[13px]" style={{ color: `${DESIGN.colors.textSecondary}70` }}>
-                    Try adjusting your search or filters
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </div>
       </div>
     </div>
   );
