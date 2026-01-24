@@ -65,6 +65,8 @@ export interface Event {
   };
   date: string;
   time: string;
+  endTime?: string;
+  endedAt?: string;
   price: number;
   currency: string;
   maxAttendees: number;

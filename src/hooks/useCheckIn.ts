@@ -23,12 +23,38 @@ export function useCheckIn(userId?: string) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get user location with permission handling
+  // Get user location with permission handling - FAST
   const getFastLocation = useCallback((): Promise<GeolocationResult> => {
-    return getUserLocation({
-      enableHighAccuracy: false,
-      timeout: 5000,
-      maximumAge: 30000,
+    return new Promise((resolve, reject) => {
+      // First try cached position (instant)
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy
+            });
+          },
+          (error) => {
+            // Fall back to high accuracy if cached fails
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                resolve({
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude,
+                  accuracy: position.coords.accuracy
+                });
+              },
+              (err) => reject(new Error('Location permission denied')),
+              { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+          },
+          { enableHighAccuracy: false, timeout: 3000, maximumAge: 60000 }
+        );
+      } else {
+        reject(new Error('Geolocation not supported'));
+      }
     });
   }, []);
 
