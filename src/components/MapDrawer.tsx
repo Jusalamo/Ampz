@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Search, SlidersHorizontal, Plus, MapPin, X, Calendar, Clock, Heart, ChevronRight, Star } from 'lucide-react';
+import { Search, SlidersHorizontal, Plus, MapPin, Calendar, Clock, Heart, ChevronRight, Star } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { EventCard } from './EventCard';
 import { Input } from './ui/input';
@@ -42,7 +42,7 @@ const DESIGN = {
   }
 };
 
-// Use environment variable for Mapbox token - no fallback for security
+// Use environment variable for Mapbox token
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 const isMapboxAvailable = !!MAPBOX_TOKEN;
 
@@ -96,6 +96,8 @@ interface Event {
   isFeatured?: boolean;
   customTheme?: string;
   geofenceRadius: number;
+  isActive?: boolean;
+  endedAt?: string;
 }
 
 interface MapDrawerProps {
@@ -105,16 +107,16 @@ interface MapDrawerProps {
 
 type DrawerPosition = 'minimum' | 'half' | 'full';
 
-// Updated snap positions - drawer covers entire screen in full state
+// Updated snap positions
 const SNAP_POSITIONS = {
   minimum: 0.75,   // 25% from bottom - shows most of map
   half: 0.5,       // 50% visible
-  full: 0,         // Covers entire screen (handle at top)
+  full: 0.05,      // 5% from top - mostly covers screen but shows a bit of map
 };
 
 export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const navigate = useNavigate();
-  const { events, user } = useApp();
+  const { user, events } = useApp();
   const { getSuggestedEvents, getUpcomingEvents } = useEvents(user?.id, user?.isDemo);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -125,7 +127,6 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const [searchSuggestions, setSearchSuggestions] = useState<Event[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [mapReady, setMapReady] = useState(false);
-  const [eventCards3D, setEventCards3D] = useState<Map<string, HTMLDivElement>>(new Map());
   
   // Get suggested and upcoming events using database queries
   const suggestedEvents = useMemo(() => 
@@ -272,7 +273,6 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     // Remove all 3D card markers
     cardMarkersRef.current.forEach(marker => marker.remove());
     cardMarkersRef.current.clear();
-    setEventCards3D(new Map());
   };
 
   // Update event markers when events change
@@ -427,7 +427,6 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
     // Store reference
     cardMarkersRef.current.set(event.id, cardMarker);
-    setEventCards3D(prev => new Map(prev).set(event.id, cardEl));
 
     // Add event listeners to the 3D card
     setTimeout(() => {
@@ -617,14 +616,20 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       <div 
         ref={mapContainer} 
         className="absolute inset-0 w-full h-full"
-        style={{ zIndex: 0 }}
+        style={{ 
+          zIndex: 0,
+          position: 'fixed',
+          top: 0,
+          left: 0
+        }}
       />
       
       {/* Map attribution */}
       <div className="absolute bottom-4 right-2 z-10 text-[12px] px-2 py-1 rounded backdrop-blur-sm"
         style={{ 
           color: DESIGN.colors.textPrimary,
-          background: 'rgba(0, 0, 0, 0.4)'
+          background: 'rgba(0, 0, 0, 0.4)',
+          pointerEvents: 'auto'
         }}>
         © Mapbox © OpenStreetMap
       </div>
@@ -633,7 +638,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       <div
         ref={drawerRef}
         className={cn(
-          'absolute left-0 right-0 z-20 flex flex-col',
+          'absolute left-0 right-0 z-50 flex flex-col',
           isDragging ? '' : 'transition-transform duration-300 ease-out'
         )}
         style={{
@@ -644,7 +649,8 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
           borderTopLeftRadius: DESIGN.borderRadius.large,
           borderTopRightRadius: DESIGN.borderRadius.large,
           borderTop: `1px solid ${DESIGN.colors.textSecondary}20`,
-          boxShadow: DESIGN.shadows.card
+          boxShadow: DESIGN.shadows.card,
+          position: 'relative'
         }}
       >
         {/* Drawer Handle - Always visible at top when drawer is up */}
@@ -905,7 +911,8 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                 scrollbarColor: `${DESIGN.colors.primary} ${DESIGN.colors.card}`
               }}
             >
-              {(search || selectedCategory !== 'All') && filteredEvents.length > 0 ? (
+              {/* FIXED: Show all events by default when no search/filters */}
+              {filteredEvents.length > 0 ? (
                 filteredEvents.map((event) => (
                   <EventCard
                     key={event.id}
@@ -913,7 +920,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                     onClick={() => handleEventCardClick(event)}
                   />
                 ))
-              ) : (search || selectedCategory !== 'All') && filteredEvents.length === 0 ? (
+              ) : (
                 <div className="text-center py-12">
                   <motion.div
                     initial={{ scale: 0 }}
@@ -924,10 +931,12 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
                   </motion.div>
                   <p className="text-[14px] mb-1" style={{ color: DESIGN.colors.textSecondary }}>No events found</p>
                   <p className="text-[13px]" style={{ color: `${DESIGN.colors.textSecondary}70` }}>
-                    Try adjusting your search or filters
+                    {search || selectedCategory !== 'All' 
+                      ? 'Try adjusting your search or filters'
+                      : 'There are no events available at the moment'}
                   </p>
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
         )}

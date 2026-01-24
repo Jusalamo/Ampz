@@ -8,18 +8,14 @@ import { SubscriptionModal } from '@/components/modals/SubscriptionModal';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
-// Create a persistent cache outside of React component lifecycle
-const PERSISTENT_CACHE_KEY = 'ampz_events_cache_v1';
-
 export default function Events() {
   const navigate = useNavigate();
-  const { user, events, isLoadingEvents } = useApp();
+  const { user, events } = useApp();
   const { toast } = useToast();
   const [showEventWizard, setShowEventWizard] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
-  const [cachedEvents, setCachedEvents] = useState([]);
 
   const handleCreateEvent = () => {
     if (user?.subscription?.tier === 'free') {
@@ -33,16 +29,29 @@ export default function Events() {
     }
   };
 
-  // Load cached events immediately on component mount
+  // Cache events in localStorage for faster load times
+  useEffect(() => {
+    if (events.length > 0) {
+      try {
+        localStorage.setItem('cached_events', JSON.stringify({
+          data: events,
+          timestamp: Date.now()
+        }));
+      } catch (error) {
+        console.warn('Failed to cache events:', error);
+      }
+    }
+  }, [events]);
+
+  // Get cached events on initial load
   useEffect(() => {
     try {
-      const cached = localStorage.getItem(PERSISTENT_CACHE_KEY);
+      const cached = localStorage.getItem('cached_events');
       if (cached) {
         const parsed = JSON.parse(cached);
-        // Cache is valid for 24 hours (86400000ms)
-        if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
-          console.log('Loaded events from persistent cache');
-          setCachedEvents(parsed.data);
+        // Cache is valid for 5 minutes
+        if (Date.now() - parsed.timestamp < 5 * 60 * 1000) {
+          console.log('Loaded events from cache');
         }
       }
     } catch (error) {
@@ -50,30 +59,12 @@ export default function Events() {
     }
   }, []);
 
-  // Cache events persistently when they load
-  useEffect(() => {
-    if (events.length > 0) {
-      try {
-        localStorage.setItem(PERSISTENT_CACHE_KEY, JSON.stringify({
-          data: events,
-          timestamp: Date.now()
-        }));
-        console.log('Updated persistent cache with', events.length, 'events');
-      } catch (error) {
-        console.warn('Failed to cache events:', error);
-      }
-    }
-  }, [events]);
-
   // Filter active events and sort by date
   const activeEvents = useMemo(() => {
-    // Use cached events if real events are still loading
-    const eventsToUse = events.length > 0 ? events : cachedEvents;
-    
     const now = new Date();
     const fourDaysAgo = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000);
     
-    return eventsToUse
+    return events
       .filter(e => {
         // Show active events OR events that ended within 4 days (with badge)
         if (e.isActive !== false) return true;
@@ -84,7 +75,7 @@ export default function Events() {
         return false;
       })
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [events, cachedEvents]);
+  }, [events]);
 
   return (
     <div className="app-container h-screen bg-background overflow-hidden flex flex-col">
@@ -94,8 +85,6 @@ export default function Events() {
           onCreateEvent={handleCreateEvent}
           onOpenFilters={() => setShowFilters(true)}
           activeEvents={activeEvents}
-          isLoadingEvents={isLoadingEvents}
-          cachedEvents={cachedEvents}
         />
       </div>
       
