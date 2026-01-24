@@ -96,14 +96,11 @@ interface Event {
   isFeatured?: boolean;
   customTheme?: string;
   geofenceRadius: number;
-  isActive?: boolean;
-  endedAt?: string;
 }
 
 interface MapDrawerProps {
   onCreateEvent: () => void;
   onOpenFilters: () => void;
-  activeEvents: Event[];
 }
 
 type DrawerPosition = 'minimum' | 'half' | 'full';
@@ -115,7 +112,7 @@ const SNAP_POSITIONS = {
   full: 0.05,      // 5% from top - mostly covers screen but shows a bit of map
 };
 
-export function MapDrawer({ onCreateEvent, onOpenFilters, activeEvents }: MapDrawerProps) {
+export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const navigate = useNavigate();
   const { user, events } = useApp();
   const { getSuggestedEvents, getUpcomingEvents } = useEvents(user?.id, user?.isDemo);
@@ -128,6 +125,17 @@ export function MapDrawer({ onCreateEvent, onOpenFilters, activeEvents }: MapDra
   const [searchSuggestions, setSearchSuggestions] = useState<Event[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+  
+  // Get suggested and upcoming events using database queries
+  const suggestedEvents = useMemo(() => 
+    getSuggestedEvents(user?.profile?.interests || [], 4), 
+    [getSuggestedEvents, user?.profile?.interests]
+  );
+  
+  const upcomingEvents = useMemo(() => 
+    getUpcomingEvents(6), 
+    [getUpcomingEvents]
+  );
   
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -143,21 +151,19 @@ export function MapDrawer({ onCreateEvent, onOpenFilters, activeEvents }: MapDra
 
   // Memoized filtered events for performance
   const filteredEvents = useMemo(() => {
-    const eventsToFilter = activeEvents.length > 0 ? activeEvents : events;
-    
-    return eventsToFilter.filter((event) => {
+    return events.filter((event) => {
       const matchesSearch =
         event.name.toLowerCase().includes(search.toLowerCase()) ||
         event.location.toLowerCase().includes(search.toLowerCase());
       const matchesCategory = selectedCategory === 'All' || event.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [events, activeEvents, search, selectedCategory]);
+  }, [events, search, selectedCategory]);
 
   // Handle search suggestions
   useEffect(() => {
     if (search.length > 0) {
-      const suggestions = activeEvents
+      const suggestions = events
         .filter(e => 
           e.name.toLowerCase().includes(search.toLowerCase()) ||
           e.location.toLowerCase().includes(search.toLowerCase())
@@ -169,7 +175,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters, activeEvents }: MapDra
       setSearchSuggestions([]);
       setShowSuggestions(false);
     }
-  }, [search, activeEvents]);
+  }, [search, events]);
 
   // Initialize map immediately on component mount
   useEffect(() => {
@@ -258,12 +264,21 @@ export function MapDrawer({ onCreateEvent, onOpenFilters, activeEvents }: MapDra
     };
   }, []);
 
+  // Clear event selection
+  const clearEventSelection = () => {
+    setSelectedEvent(null);
+    removeGeofenceCircle();
+    // Remove all 3D card markers
+    cardMarkersRef.current.forEach(marker => marker.remove());
+    cardMarkersRef.current.clear();
+  };
+
   // Update event markers when events change
   useEffect(() => {
     if (map.current && mapReady) {
       updateEventMarkers();
     }
-  }, [events, activeEvents, selectedCategory, filteredEvents, mapReady]);
+  }, [events, selectedCategory, filteredEvents, mapReady]);
 
   const updateEventMarkers = () => {
     if (!map.current || !mapReady) return;
@@ -305,15 +320,6 @@ export function MapDrawer({ onCreateEvent, onOpenFilters, activeEvents }: MapDra
 
       markersRef.current.push(marker);
     });
-  };
-
-  // Clear event selection
-  const clearEventSelection = () => {
-    setSelectedEvent(null);
-    removeGeofenceCircle();
-    // Remove all 3D card markers
-    cardMarkersRef.current.forEach(marker => marker.remove());
-    cardMarkersRef.current.clear();
   };
 
   const handleEventMarkerClick = (event: Event) => {
@@ -610,7 +616,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters, activeEvents }: MapDra
         className="absolute inset-0 w-full h-full"
         style={{ 
           zIndex: 0,
-          position: 'fixed',
+          position: 'fixed', // Changed to fixed to ensure map stays in background
           top: 0,
           left: 0
         }}
@@ -621,7 +627,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters, activeEvents }: MapDra
         style={{ 
           color: DESIGN.colors.textPrimary,
           background: 'rgba(0, 0, 0, 0.4)',
-          pointerEvents: 'auto'
+          pointerEvents: 'auto' // Ensure it's clickable
         }}>
         © Mapbox © OpenStreetMap
       </div>
@@ -630,7 +636,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters, activeEvents }: MapDra
       <div
         ref={drawerRef}
         className={cn(
-          'absolute left-0 right-0 z-50 flex flex-col',
+          'absolute left-0 right-0 z-50 flex flex-col', // Increased z-index to 50
           isDragging ? '' : 'transition-transform duration-300 ease-out'
         )}
         style={{
@@ -642,7 +648,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters, activeEvents }: MapDra
           borderTopRightRadius: DESIGN.borderRadius.large,
           borderTop: `1px solid ${DESIGN.colors.textSecondary}20`,
           boxShadow: DESIGN.shadows.card,
-          position: 'relative'
+          position: 'relative' // Ensure it's above the map
         }}
       >
         {/* Drawer Handle - Always visible at top when drawer is up */}
