@@ -96,11 +96,14 @@ interface Event {
   isFeatured?: boolean;
   customTheme?: string;
   geofenceRadius: number;
+  isActive?: boolean;
+  endedAt?: string;
 }
 
 interface MapDrawerProps {
   onCreateEvent: () => void;
   onOpenFilters: () => void;
+  activeEvents: Event[];
 }
 
 type DrawerPosition = 'minimum' | 'half' | 'full';
@@ -112,9 +115,9 @@ const SNAP_POSITIONS = {
   full: 0.05,      // 5% from top - mostly covers screen but shows a bit of map
 };
 
-export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
+export function MapDrawer({ onCreateEvent, onOpenFilters, activeEvents }: MapDrawerProps) {
   const navigate = useNavigate();
-  const { events, user } = useApp();
+  const { user, events } = useApp();
   const { getSuggestedEvents, getUpcomingEvents } = useEvents(user?.id, user?.isDemo);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -125,6 +128,10 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const [searchSuggestions, setSearchSuggestions] = useState<Event[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  
+  // Load cached events for faster initial display
+  const [cachedEvents, setCachedEvents] = useState<Event[]>([]);
   
   // Get suggested and upcoming events using database queries
   const suggestedEvents = useMemo(() => 
@@ -151,19 +158,21 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
   // Memoized filtered events for performance
   const filteredEvents = useMemo(() => {
-    return events.filter((event) => {
+    const eventsToFilter = activeEvents.length > 0 ? activeEvents : events;
+    
+    return eventsToFilter.filter((event) => {
       const matchesSearch =
         event.name.toLowerCase().includes(search.toLowerCase()) ||
         event.location.toLowerCase().includes(search.toLowerCase());
       const matchesCategory = selectedCategory === 'All' || event.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [events, search, selectedCategory]);
+  }, [events, activeEvents, search, selectedCategory]);
 
   // Handle search suggestions
   useEffect(() => {
     if (search.length > 0) {
-      const suggestions = events
+      const suggestions = activeEvents
         .filter(e => 
           e.name.toLowerCase().includes(search.toLowerCase()) ||
           e.location.toLowerCase().includes(search.toLowerCase())
@@ -175,7 +184,31 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       setSearchSuggestions([]);
       setShowSuggestions(false);
     }
-  }, [search, events]);
+  }, [search, activeEvents]);
+
+  // Load cached events on initial mount
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem('cached_events');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        // Cache is valid for 5 minutes (300000ms)
+        if (Date.now() - parsed.timestamp < 300000) {
+          console.log('Loaded events from cache for faster display');
+          setCachedEvents(parsed.data);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load cached events:', error);
+    }
+    
+    // Set a timeout to mark initial load as complete
+    const timer = setTimeout(() => {
+      setIsInitialLoad(false);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   // Initialize map immediately on component mount
   useEffect(() => {
@@ -264,21 +297,12 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     };
   }, []);
 
-  // Clear event selection
-  const clearEventSelection = () => {
-    setSelectedEvent(null);
-    removeGeofenceCircle();
-    // Remove all 3D card markers
-    cardMarkersRef.current.forEach(marker => marker.remove());
-    cardMarkersRef.current.clear();
-  };
-
   // Update event markers when events change
   useEffect(() => {
     if (map.current && mapReady) {
       updateEventMarkers();
     }
-  }, [events, selectedCategory, filteredEvents, mapReady]);
+  }, [events, activeEvents, selectedCategory, filteredEvents, mapReady]);
 
   const updateEventMarkers = () => {
     if (!map.current || !mapReady) return;
@@ -291,8 +315,10 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     });
     markersRef.current = userMarkerRef.current ? [userMarkerRef.current] : [];
 
-    // Add markers for filtered events
-    filteredEvents.forEach((event) => {
+    // Add markers for filtered events (use cached if no real data yet)
+    const eventsToShow = filteredEvents.length > 0 ? filteredEvents : cachedEvents.slice(0, 10);
+    
+    eventsToShow.forEach((event) => {
       const markerEl = document.createElement('div');
       markerEl.className = 'event-marker cursor-pointer group';
       markerEl.innerHTML = `
@@ -320,6 +346,15 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
       markersRef.current.push(marker);
     });
+  };
+
+  // Clear event selection
+  const clearEventSelection = () => {
+    setSelectedEvent(null);
+    removeGeofenceCircle();
+    // Remove all 3D card markers
+    cardMarkersRef.current.forEach(marker => marker.remove());
+    cardMarkersRef.current.clear();
   };
 
   const handleEventMarkerClick = (event: Event) => {
@@ -608,6 +643,18 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const translateY = SNAP_POSITIONS[drawerPosition] * getDrawerHeight() + dragOffset;
   const isPro = user?.subscription?.tier === 'pro' || user?.subscription?.tier === 'max';
 
+  // Determine which events to show in mini cards (use cached if still loading)
+  const eventsForMiniCards = useMemo(() => {
+    if (activeEvents.length > 0) {
+      return activeEvents.slice(0, 5);
+    } else if (cachedEvents.length > 0 && isInitialLoad) {
+      return cachedEvents.slice(0, 5);
+    } else if (events.length > 0) {
+      return events.slice(0, 5);
+    }
+    return [];
+  }, [activeEvents, cachedEvents, events, isInitialLoad]);
+
   return (
     <div className="h-screen w-full relative overflow-hidden" style={{ background: DESIGN.colors.background }}>
       {/* Map Container - Full screen behind everything */}
@@ -616,18 +663,138 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         className="absolute inset-0 w-full h-full"
         style={{ 
           zIndex: 0,
-          position: 'fixed', // Changed to fixed to ensure map stays in background
+          position: 'fixed',
           top: 0,
           left: 0
         }}
       />
       
+      {/* Always Visible Mini Event Cards - Positioned absolutely above map */}
+      {eventsForMiniCards.length > 0 && (
+        <div 
+          className="absolute bottom-24 left-0 right-0 z-40 pointer-events-none"
+          style={{ 
+            zIndex: 40,
+            pointerEvents: 'none'
+          }}
+        >
+          <div 
+            className="flex gap-3 overflow-x-auto no-scrollbar pb-2 px-4"
+            style={{ pointerEvents: 'auto' }}
+          >
+            {eventsForMiniCards.map((event) => {
+              const isEnded = event.endedAt || event.isActive === false;
+              
+              return (
+                <div 
+                  key={event.id}
+                  onClick={() => handleEventCardClick(event)}
+                  className="flex-shrink-0 w-40 bg-card rounded-ampz-md overflow-hidden cursor-pointer ampz-interactive shadow-lg border border-border/20 hover:scale-105 transition-transform duration-200"
+                  style={{
+                    background: DESIGN.colors.card,
+                    border: `1px solid ${DESIGN.colors.textSecondary}20`,
+                    boxShadow: DESIGN.shadows.card
+                  }}
+                >
+                  <div className="relative">
+                    <img 
+                      src={event.coverImage || '/placeholder.svg'} 
+                      alt={event.name}
+                      className="w-full h-20 object-cover"
+                      loading="eager"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                    {isEnded && (
+                      <div 
+                        className="absolute top-1 left-1 px-2 py-0.5 rounded-full font-medium text-xs"
+                        style={{ 
+                          background: DESIGN.colors.textSecondary,
+                          color: DESIGN.colors.background
+                        }}
+                      >
+                        Ended
+                      </div>
+                    )}
+                    {event.isFeatured && !isEnded && (
+                      <div 
+                        className="absolute top-1 left-1 px-2 py-0.5 rounded-full font-medium text-xs"
+                        style={{ 
+                          background: DESIGN.colors.primary,
+                          color: DESIGN.colors.background
+                        }}
+                      >
+                        Featured
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-2">
+                    <p 
+                      className="text-xs font-semibold truncate"
+                      style={{ color: DESIGN.colors.textPrimary }}
+                    >
+                      {event.name}
+                    </p>
+                    <div className="flex items-center gap-1 mt-1">
+                      <Calendar className="w-3 h-3" style={{ color: DESIGN.colors.textSecondary }} />
+                      <span 
+                        className="text-[10px]"
+                        style={{ color: DESIGN.colors.textSecondary }}
+                      >
+                        {event.date}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Loading skeleton for mini cards during initial load */}
+      {isInitialLoad && eventsForMiniCards.length === 0 && (
+        <div className="absolute bottom-24 left-0 right-0 z-40 pointer-events-none">
+          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 px-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div 
+                key={i}
+                className="flex-shrink-0 w-40 bg-card rounded-ampz-md overflow-hidden"
+                style={{
+                  background: DESIGN.colors.card,
+                  border: `1px solid ${DESIGN.colors.textSecondary}20`,
+                  boxShadow: DESIGN.shadows.card
+                }}
+              >
+                <div 
+                  className="w-full h-20 bg-gradient-to-r from-gray-800 to-gray-700 animate-pulse"
+                />
+                <div className="p-2">
+                  <div 
+                    className="h-4 bg-gradient-to-r from-gray-800 to-gray-700 rounded animate-pulse mb-2"
+                  />
+                  <div className="flex items-center gap-1">
+                    <div 
+                      className="w-3 h-3 bg-gradient-to-r from-gray-800 to-gray-700 rounded animate-pulse"
+                    />
+                    <div 
+                      className="h-2 w-16 bg-gradient-to-r from-gray-800 to-gray-700 rounded animate-pulse"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Map attribution */}
       <div className="absolute bottom-4 right-2 z-10 text-[12px] px-2 py-1 rounded backdrop-blur-sm"
         style={{ 
           color: DESIGN.colors.textPrimary,
           background: 'rgba(0, 0, 0, 0.4)',
-          pointerEvents: 'auto' // Ensure it's clickable
+          pointerEvents: 'auto'
         }}>
         © Mapbox © OpenStreetMap
       </div>
@@ -636,7 +803,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       <div
         ref={drawerRef}
         className={cn(
-          'absolute left-0 right-0 z-50 flex flex-col', // Increased z-index to 50
+          'absolute left-0 right-0 z-50 flex flex-col',
           isDragging ? '' : 'transition-transform duration-300 ease-out'
         )}
         style={{
@@ -648,7 +815,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
           borderTopRightRadius: DESIGN.borderRadius.large,
           borderTop: `1px solid ${DESIGN.colors.textSecondary}20`,
           boxShadow: DESIGN.shadows.card,
-          position: 'relative' // Ensure it's above the map
+          position: 'relative'
         }}
       >
         {/* Drawer Handle - Always visible at top when drawer is up */}
