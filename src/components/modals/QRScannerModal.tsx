@@ -93,23 +93,64 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
     }
   }, []);
 
-  // Process QR code
+  // Process QR code - OPTIMIZED for speed
   const processQRCode = useCallback(async (code: string) => {
     setStep('verifying');
     setErrorMessage('');
     setDebugInfo(`Processing QR code...`);
     
     try {
-      // First, validate the QR code
-      const validationResult = await validateQRCode(code);
+      console.log('Processing QR code:', code);
       
-      if (!validationResult.valid || !validationResult.event) {
-        setErrorMessage(validationResult.error || 'Invalid QR code. Please try again.');
+      // Extract event ID from QR code/URL
+      let eventId: string | null = null;
+      
+      // Handle different QR code formats
+      if (code.includes('/event/')) {
+        // URL format: .../event/{id}/checkin or .../event/{id}
+        const match = code.match(/\/event\/([a-f0-9-]+)/i);
+        if (match) eventId = match[1];
+      } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)) {
+        // Direct UUID format
+        eventId = code;
+      }
+      
+      if (!eventId) {
+        setErrorMessage('Invalid QR code format. Please scan a valid event QR code.');
         setStep('error');
         return;
       }
       
-      const event = validationResult.event;
+      console.log('Event ID extracted:', eventId);
+      
+      // Fast event lookup
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .select('id, name, latitude, longitude, geofence_radius, is_active, location')
+        .eq('id', eventId)
+        .single();
+      
+      if (eventError || !eventData) {
+        setErrorMessage('Event not found. Please check the QR code.');
+        setStep('error');
+        return;
+      }
+      
+      if (!eventData.is_active) {
+        setErrorMessage('This event is no longer active.');
+        setStep('error');
+        return;
+      }
+      
+      const event: Event = {
+        id: eventData.id,
+        name: eventData.name,
+        location: eventData.location,
+        coordinates: { lat: eventData.latitude, lng: eventData.longitude },
+        geofenceRadius: eventData.geofence_radius || 50,
+        isActive: eventData.is_active,
+      } as Event;
+      
       setScannedEvent(event);
       setDebugInfo(`Event found: ${event.name}`);
       
@@ -130,29 +171,29 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
         }
       }
       
-      // Perform the actual check-in (which includes geofence check)
+      // Perform the actual check-in using secure RPC
       setStep('geofence_check');
-      setDebugInfo('Checking in...');
+      setDebugInfo('Verifying location and checking in...');
       
       const result = await processQRCodeScan(code, 'public');
       
       if (result.success) {
-        setSuccessMessage(result.message || 'Check-in successful!');
+        setSuccessMessage(result.message || `Successfully checked in to ${event.name}!`);
         setDistance(result.distance || null);
         setStep('success');
-        onCheckInSuccess?.(result.eventId || '');
+        onCheckInSuccess?.(result.eventId || event.id);
       } else {
         // Check if error is about geofence
-        if (result.error?.includes('away from') || result.error?.includes('move within')) {
+        if (result.error?.includes('away') || result.error?.includes('within') || result.error?.includes('meters')) {
           setDistance(result.distance || null);
-          setErrorMessage(result.error || 'Outside event area');
+          setErrorMessage(result.error || 'You are outside the event area');
           setStep('outside_geofence');
-        } else if (result.error?.includes('already checked in')) {
+        } else if (result.error?.includes('already')) {
           setSuccessMessage(`Already checked in to ${event.name}!`);
           setStep('success');
           onCheckInSuccess?.(event.id);
         } else {
-          setErrorMessage(result.error || 'Check-in failed');
+          setErrorMessage(result.error || 'Check-in failed. Please try again.');
           setStep('error');
         }
       }
@@ -161,7 +202,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       setErrorMessage(err?.message || 'Failed to process QR code. Please try again.');
       setStep('error');
     }
-  }, [validateQRCode, processQRCodeScan, userId, onCheckInSuccess]);
+  }, [processQRCodeScan, userId, onCheckInSuccess]);
 
   // Stop scanning
   const stopScanning = useCallback(() => {

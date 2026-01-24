@@ -349,6 +349,8 @@ export type Database = {
           custom_theme: string | null
           date: string
           description: string | null
+          end_time: string | null
+          ended_at: string | null
           geofence_radius: number | null
           has_video: boolean | null
           id: string
@@ -384,6 +386,8 @@ export type Database = {
           custom_theme?: string | null
           date: string
           description?: string | null
+          end_time?: string | null
+          ended_at?: string | null
           geofence_radius?: number | null
           has_video?: boolean | null
           id?: string
@@ -419,6 +423,8 @@ export type Database = {
           custom_theme?: string | null
           date?: string
           description?: string | null
+          end_time?: string | null
+          ended_at?: string | null
           geofence_radius?: number | null
           has_video?: boolean | null
           id?: string

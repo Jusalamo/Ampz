@@ -85,7 +85,7 @@ const profileToUser = (profile: any, supabaseUser?: SupabaseUser): User => ({
   isDemo: profile.is_demo_account || false,
 });
 
-// Convert database row to Event type
+// Convert database row to Event type with all new fields
 const rowToEvent = (row: any): Event => ({
   id: row.id,
   name: row.name,
@@ -96,6 +96,8 @@ const rowToEvent = (row: any): Event => ({
   coordinates: { lat: row.latitude, lng: row.longitude },
   date: row.date,
   time: row.time,
+  endTime: row.end_time,
+  endedAt: row.ended_at,
   price: row.price || 0,
   currency: row.currency || 'NAD',
   maxAttendees: row.max_attendees || 500,
@@ -117,7 +119,7 @@ const rowToEvent = (row: any): Event => ({
   notificationsEnabled: row.notifications_enabled ?? true,
   updatedAt: row.updated_at,
   ticketLink: row.ticket_link || '',
-  webTicketsLink: row.ticket_link || '', // Map ticket_link to webTicketsLink
+  webTicketsLink: row.ticket_link || '',
   accessCode: row.access_code || '',
 });
 
@@ -546,7 +548,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return rowToEvent(data);
   };
 
-  // Update event in database
+  // Update event in database - now saves ALL fields including images/videos/coordinates
   const updateEvent = async (eventId: string, updates: Partial<Event>): Promise<boolean> => {
     const dbUpdates: Record<string, any> = {};
     
@@ -561,6 +563,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     if (updates.date !== undefined) dbUpdates.date = updates.date;
     if (updates.time !== undefined) dbUpdates.time = updates.time;
+    if (updates.endTime !== undefined) dbUpdates.end_time = updates.endTime;
     if (updates.price !== undefined) dbUpdates.price = updates.price;
     if (updates.geofenceRadius !== undefined) dbUpdates.geofence_radius = updates.geofenceRadius;
     if (updates.customTheme !== undefined) dbUpdates.custom_theme = updates.customTheme;
@@ -574,8 +577,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (updates.mediaType !== undefined) dbUpdates.media_type = updates.mediaType;
     if (updates.webTicketsLink !== undefined) dbUpdates.ticket_link = updates.webTicketsLink;
     if ((updates as any).ticketLink !== undefined) dbUpdates.ticket_link = (updates as any).ticketLink;
+    if (updates.maxAttendees !== undefined) dbUpdates.max_attendees = updates.maxAttendees;
+    if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
+    if (updates.endedAt !== undefined) dbUpdates.ended_at = updates.endedAt;
+
+    // Add updated_at timestamp
+    dbUpdates.updated_at = new Date().toISOString();
 
     const { error } = await supabase.from('events').update(dbUpdates).eq('id', eventId);
+    
+    if (!error) {
+      // Update local state immediately for optimistic UI
+      setEvents(prev => prev.map(e => e.id === eventId ? { ...e, ...updates } : e));
+    }
+    
     return !error;
   };
 
