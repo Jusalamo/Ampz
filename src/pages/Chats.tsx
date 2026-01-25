@@ -39,48 +39,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type Tab = 'matches' | 'friends';
-
-// Design Constants
-const DESIGN = {
-  colors: {
-    primary: '#C4B5FD',
-    lavenderLight: '#E9D5FF',
-    accentPink: '#FFB8E6',
-    background: '#1A1A1A',
-    card: '#2D2D2D',
-    textPrimary: '#FFFFFF',
-    textSecondary: '#B8B8B8'
-  },
-  borderRadius: {
-    card: '24px',
-    cardInner: '20px',
-    button: '12px',
-    roundButton: '50%',
-    modalTop: '20px',
-    smallPill: '8px',
-    message: '20px',
-    input: '9999px'
-  },
-  shadows: {
-    card: '0 8px 32px rgba(0, 0, 0, 0.4)',
-    button: '0 4px 16px rgba(0, 0, 0, 0.3)',
-    likeButton: '0 4px 16px rgba(255, 184, 230, 0.4)'
-  },
-  typography: {
-    h1: '28px',
-    h2: '24px',
-    h3: '22px',
-    bodyLarge: '15px',
-    body: '14px',
-    small: '13px',
-    caption: '13px',
-    button: '16px'
-  }
-};
 
 // Quick Add Modal Component
 function QuickAddModal({ 
@@ -97,11 +59,9 @@ function QuickAddModal({
   const [searchResults, setSearchResults] = useState<ConnectionProfile[]>([]);
   const { connectionProfiles = [] } = useApp();
   
-  // Stub implementations - friend features not yet implemented
   const friends: ConnectionProfile[] = [];
   const sentRequests: { toUserId: string }[] = [];
   const searchUsers = async (query: string): Promise<ConnectionProfile[]> => {
-    // Filter connectionProfiles by name
     return connectionProfiles.filter(p => 
       p.name.toLowerCase().includes(query.toLowerCase())
     );
@@ -115,14 +75,12 @@ function QuickAddModal({
 
     setIsSearching(true);
     try {
-      // Call the searchUsers function from context which should query the database
       const results = await searchUsers(query);
-      // Filter out already friends and people with pending requests
       const filteredResults = results.filter(profile => 
         !friends.some(friend => friend.id === profile.id) &&
         !sentRequests.some(request => request.toUserId === profile.id)
       );
-      setSearchResults(filteredResults.slice(0, 10)); // Limit to 10 results
+      setSearchResults(filteredResults.slice(0, 10));
     } catch (error) {
       console.error('Error searching users:', error);
       setSearchResults([]);
@@ -131,56 +89,36 @@ function QuickAddModal({
     }
   };
 
-  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       handleSearch(searchQuery);
     }, 300);
-
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Get suggestions - you might want to replace this with actual suggestions from your backend
-  const suggestions = searchResults.slice(0, 4);
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md" style={{
-        background: DESIGN.colors.background,
-        borderColor: DESIGN.colors.card,
-        borderRadius: DESIGN.borderRadius.card
-      }}>
+      <DialogContent className="max-w-md bg-background border-card rounded-ampz-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2" style={{
-            fontSize: DESIGN.typography.h2,
-            color: DESIGN.colors.textPrimary
-          }}>
-            <UserPlus className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+          <DialogTitle className="flex items-center gap-2 text-2xl text-foreground">
+            <UserPlus className="w-5 h-5 text-primary" />
             Quick Add Friends
           </DialogTitle>
         </DialogHeader>
         
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" 
-            style={{ color: DESIGN.colors.textSecondary }} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             type="text"
             placeholder="Search by name or username..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-            style={{
-              background: DESIGN.colors.card,
-              borderColor: DESIGN.colors.card,
-              borderRadius: DESIGN.borderRadius.input,
-              color: DESIGN.colors.textPrimary
-            }}
+            className="pl-10 bg-card border-card rounded-full text-foreground"
           />
           {isSearching && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <div className="w-4 h-4 border-2 border-transparent border-t-current rounded-full animate-spin"
-                style={{ color: DESIGN.colors.primary }} />
+              <div className="w-4 h-4 border-2 border-transparent border-t-primary rounded-full animate-spin" />
             </div>
           )}
         </div>
@@ -188,38 +126,21 @@ function QuickAddModal({
         {/* Search Results */}
         {searchQuery && (
           <div className="space-y-2">
-            <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-              Search Results
-            </p>
+            <p className="text-xs text-muted-foreground">Search Results</p>
             {searchResults.length > 0 ? (
               <div className="space-y-2">
                 {searchResults.map(user => (
-                  <div key={user.id} className="flex items-center gap-3 p-3 rounded-xl"
-                    style={{
-                      background: DESIGN.colors.card,
-                      border: `1px solid ${DESIGN.colors.card}`,
-                      borderRadius: DESIGN.borderRadius.card
-                    }}>
+                  <div key={user.id} className="flex items-center gap-3 p-3 rounded-ampz-lg bg-card border border-card">
                     <img src={user.photo} alt={user.name} 
-                      className="w-10 h-10 rounded-full object-cover" 
-                      style={{ border: `2px solid ${DESIGN.colors.background}` }} />
+                      className="w-10 h-10 rounded-full object-cover border-2 border-background" />
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm" style={{ color: DESIGN.colors.textPrimary }}>
-                        {user.name}
-                      </p>
-                      <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                        {user.location || 'User'}
-                      </p>
+                      <p className="font-medium text-sm text-foreground">{user.name}</p>
+                      <p className="text-xs text-muted-foreground">{user.location || 'User'}</p>
                     </div>
                     <Button 
                       size="sm" 
                       onClick={() => onSendRequest(user.id)}
-                      className="h-8 rounded-[8px]"
-                      style={{
-                        background: DESIGN.colors.primary,
-                        color: DESIGN.colors.background,
-                        borderRadius: DESIGN.borderRadius.smallPill
-                      }}
+                      className="h-8 rounded-ampz-sm bg-primary text-primary-foreground"
                     >
                       <UserPlus className="w-4 h-4 mr-1" />
                       Add
@@ -228,42 +149,28 @@ function QuickAddModal({
                 ))}
               </div>
             ) : !isSearching ? (
-              <p className="text-sm text-center py-4" style={{ color: DESIGN.colors.textSecondary }}>
-                No users found
-              </p>
+              <p className="text-sm text-center py-4 text-muted-foreground">No users found</p>
             ) : null}
           </div>
         )}
 
-        {/* Suggestions - Show when no search query */}
+        {/* Suggestions */}
         {!searchQuery && (
           <div className="space-y-2">
-            <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-              Start typing to search for users
-            </p>
+            <p className="text-xs text-muted-foreground">Start typing to search for users</p>
             <div className="text-center py-8">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-                style={{
-                  background: `${DESIGN.colors.primary}10`,
-                  borderRadius: DESIGN.borderRadius.roundButton
-                }}>
-                <Search className="w-8 h-8" style={{ color: DESIGN.colors.primary }} />
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-primary/10">
+                <Search className="w-8 h-8 text-primary" />
               </div>
-              <p className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
-                Type a name or username to find people
-              </p>
+              <p className="text-sm text-muted-foreground">Type a name or username to find people</p>
             </div>
           </div>
         )}
 
-        {/* Loading State */}
         {isSearching && searchQuery && (
           <div className="text-center py-8">
-            <div className="w-8 h-8 border-2 border-transparent border-t-current rounded-full animate-spin mx-auto mb-4"
-              style={{ color: DESIGN.colors.primary }} />
-            <p className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
-              Searching users...
-            </p>
+            <div className="w-8 h-8 border-2 border-transparent border-t-primary rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-sm text-muted-foreground">Searching users...</p>
           </div>
         )}
       </DialogContent>
@@ -283,7 +190,6 @@ function FriendRequestsModal({
   const { toast } = useToast();
   const { connectionProfiles = [] } = useApp();
   
-  // Stub implementations - friend request features not yet implemented
   const friendRequests: FriendRequest[] = [];
   const sentRequests: FriendRequest[] = [];
   const acceptFriendRequest = async (requestId: string): Promise<void> => {
@@ -296,12 +202,6 @@ function FriendRequestsModal({
     console.log('Cancel friend request:', requestId);
   };
 
-  // Safe default functions
-  const safeAcceptFriendRequest = acceptFriendRequest;
-  const safeDeclineFriendRequest = declineFriendRequest;
-  const safeCancelFriendRequest = cancelFriendRequest;
-
-  // Enrich requests with user data
   const enrichedReceivedRequests = friendRequests.map(request => {
     const user = connectionProfiles.find(p => p.id === request.fromUser?.id);
     return {
@@ -324,49 +224,28 @@ function FriendRequestsModal({
 
   const handleAcceptRequest = async (requestId: string) => {
     try {
-      await safeAcceptFriendRequest(requestId);
-      toast({
-        title: 'Friend request accepted!',
-        description: 'You can now message each other.',
-      });
+      await acceptFriendRequest(requestId);
+      toast({ title: 'Friend request accepted!', description: 'You can now message each other.' });
     } catch (error) {
-      toast({
-        title: 'Error accepting request',
-        description: 'Please try again.',
-        variant: 'destructive'
-      });
+      toast({ title: 'Error accepting request', description: 'Please try again.', variant: 'destructive' });
     }
   };
 
   const handleDeclineRequest = async (requestId: string) => {
     try {
-      await safeDeclineFriendRequest(requestId);
-      toast({
-        title: 'Request declined',
-        description: 'The request has been removed.',
-      });
+      await declineFriendRequest(requestId);
+      toast({ title: 'Request declined', description: 'The request has been removed.' });
     } catch (error) {
-      toast({
-        title: 'Error declining request',
-        description: 'Please try again.',
-        variant: 'destructive'
-      });
+      toast({ title: 'Error declining request', description: 'Please try again.', variant: 'destructive' });
     }
   };
 
   const handleCancelRequest = async (requestId: string) => {
     try {
-      await safeCancelFriendRequest(requestId);
-      toast({
-        title: 'Request cancelled',
-        description: 'Your friend request has been cancelled.',
-      });
+      await cancelFriendRequest(requestId);
+      toast({ title: 'Request cancelled', description: 'Your friend request has been cancelled.' });
     } catch (error) {
-      toast({
-        title: 'Error cancelling request',
-        description: 'Please try again.',
-        variant: 'destructive'
-      });
+      toast({ title: 'Error cancelling request', description: 'Please try again.', variant: 'destructive' });
     }
   };
 
@@ -391,17 +270,10 @@ function FriendRequestsModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md h-[80vh]" style={{
-        background: DESIGN.colors.background,
-        borderColor: DESIGN.colors.card,
-        borderRadius: DESIGN.borderRadius.card
-      }}>
+      <DialogContent className="max-w-md h-[80vh] bg-background border-card rounded-ampz-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2" style={{
-            fontSize: DESIGN.typography.h2,
-            color: DESIGN.colors.textPrimary
-          }}>
-            <UserCheck className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
+          <DialogTitle className="flex items-center gap-2 text-2xl text-foreground">
+            <UserCheck className="w-5 h-5 text-primary" />
             Friend Requests
           </DialogTitle>
         </DialogHeader>
@@ -411,76 +283,43 @@ function FriendRequestsModal({
           <button
             onClick={() => setActiveTab('received')}
             className={cn(
-              'px-4 py-1.5 text-sm font-medium transition-all',
-              activeTab === 'received' ? '' : ''
+              'px-4 py-1.5 text-sm font-medium ampz-transition rounded-full',
+              activeTab === 'received' 
+                ? 'bg-primary text-primary-foreground' 
+                : 'bg-card border border-card text-muted-foreground'
             )}
-            style={{
-              borderRadius: DESIGN.borderRadius.input,
-              ...(activeTab === 'received' 
-                ? { 
-                    background: DESIGN.colors.primary, 
-                    color: DESIGN.colors.background 
-                  }
-                : { 
-                    background: DESIGN.colors.card, 
-                    border: `1px solid ${DESIGN.colors.card}`,
-                    color: DESIGN.colors.textSecondary 
-                  })
-            }}
           >
             Received {enrichedReceivedRequests.length > 0 && `(${enrichedReceivedRequests.length})`}
           </button>
           <button
             onClick={() => setActiveTab('sent')}
             className={cn(
-              'px-4 py-1.5 text-sm font-medium transition-all',
-              activeTab === 'sent' ? '' : ''
+              'px-4 py-1.5 text-sm font-medium ampz-transition rounded-full',
+              activeTab === 'sent' 
+                ? 'bg-primary text-primary-foreground' 
+                : 'bg-card border border-card text-muted-foreground'
             )}
-            style={{
-              borderRadius: DESIGN.borderRadius.input,
-              ...(activeTab === 'sent' 
-                ? { 
-                    background: DESIGN.colors.primary, 
-                    color: DESIGN.colors.background 
-                  }
-                : { 
-                    background: DESIGN.colors.card, 
-                    border: `1px solid ${DESIGN.colors.card}`,
-                    color: DESIGN.colors.textSecondary 
-                  })
-            }}
           >
             Sent {enrichedSentRequests.length > 0 && `(${enrichedSentRequests.length})`}
           </button>
         </div>
 
         {/* Requests List */}
-        <div className="flex-1 overflow-y-auto pb-4" style={{ 
-          marginBottom: '-16px',
-          paddingBottom: 'env(safe-area-inset-bottom, 16px)'
-        }}>
+        <div className="flex-1 overflow-y-auto pb-safe">
           {activeTab === 'received' ? (
             enrichedReceivedRequests.length > 0 ? (
               <div className="space-y-3">
                 {enrichedReceivedRequests.map(request => (
-                  <div key={request.id} className="flex items-center gap-3 p-4"
-                    style={{
-                      background: DESIGN.colors.card,
-                      border: `1px solid ${DESIGN.colors.card}`,
-                      borderRadius: DESIGN.borderRadius.card
-                    }}>
+                  <div key={request.id} className="flex items-center gap-3 p-4 bg-card border border-card rounded-ampz-lg">
                     <img src={request.photo} alt={request.name} 
-                      className="w-12 h-12 rounded-full object-cover" 
-                      style={{ border: `2px solid ${DESIGN.colors.background}` }} />
+                      className="w-12 h-12 rounded-full object-cover border-2 border-background" />
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm" style={{ color: DESIGN.colors.textPrimary }}>
-                        {request.name}
-                      </p>
-                      <p className="text-xs flex items-center gap-1" style={{ color: DESIGN.colors.textSecondary }}>
+                      <p className="font-medium text-sm text-foreground">{request.name}</p>
+                      <p className="text-xs flex items-center gap-1 text-muted-foreground">
                         <Users className="w-3 h-3" />
                         {request.mutualFriends} mutual friends
                       </p>
-                      <p className="text-xs mt-1" style={{ color: DESIGN.colors.textSecondary }}>
+                      <p className="text-xs mt-1 text-muted-foreground">
                         {formatTime(request.timestamp || new Date().toISOString())}
                       </p>
                     </div>
@@ -488,24 +327,15 @@ function FriendRequestsModal({
                       <Button 
                         size="sm" 
                         variant="outline" 
-                        className="h-9 w-9 p-0 rounded-full"
+                        className="h-9 w-9 p-0 rounded-full border-card"
                         onClick={() => handleDeclineRequest(request.id)}
-                        style={{
-                          borderColor: DESIGN.colors.card,
-                          borderRadius: DESIGN.borderRadius.roundButton
-                        }}
                       >
                         <X className="w-4 h-4" />
                       </Button>
                       <Button 
                         size="sm" 
-                        className="h-9 w-9 p-0 rounded-full"
+                        className="h-9 w-9 p-0 rounded-full bg-primary text-primary-foreground"
                         onClick={() => handleAcceptRequest(request.id)}
-                        style={{
-                          background: DESIGN.colors.primary,
-                          color: DESIGN.colors.background,
-                          borderRadius: DESIGN.borderRadius.roundButton
-                        }}
                       >
                         <Check className="w-4 h-4" />
                       </Button>
@@ -515,63 +345,41 @@ function FriendRequestsModal({
               </div>
             ) : (
               <div className="text-center py-12">
-                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
-                  style={{
-                    background: `${DESIGN.colors.primary}10`,
-                    borderRadius: DESIGN.borderRadius.roundButton
-                  }}>
-                  <UserCheck className="w-10 h-10" style={{ color: DESIGN.colors.primary }} />
+                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 bg-primary/10">
+                  <UserCheck className="w-10 h-10 text-primary" />
                 </div>
-                <p className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
-                  No friend requests at the moment
-                </p>
+                <p className="text-sm text-muted-foreground">No friend requests at the moment</p>
               </div>
             )
           ) : (
             enrichedSentRequests.length > 0 ? (
               <div className="space-y-3">
                 {enrichedSentRequests.map(request => (
-                  <div key={request.id} className="flex items-center gap-3 p-4"
-                    style={{
-                      background: DESIGN.colors.card,
-                      border: `1px solid ${DESIGN.colors.card}`,
-                      borderRadius: DESIGN.borderRadius.card
-                    }}>
+                  <div key={request.id} className="flex items-center gap-3 p-4 bg-card border border-card rounded-ampz-lg">
                     <img src={request.photo} alt={request.name} 
-                      className="w-12 h-12 rounded-full object-cover" 
-                      style={{ border: `2px solid ${DESIGN.colors.background}` }} />
+                      className="w-12 h-12 rounded-full object-cover border-2 border-background" />
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm" style={{ color: DESIGN.colors.textPrimary }}>
-                        {request.name}
-                      </p>
-                      <p className="text-xs flex items-center gap-1" style={{ color: DESIGN.colors.textSecondary }}>
+                      <p className="font-medium text-sm text-foreground">{request.name}</p>
+                      <p className="text-xs flex items-center gap-1 text-muted-foreground">
                         <Users className="w-3 h-3" />
                         {request.mutualFriends} mutual friends
                       </p>
                       <div className="flex items-center gap-1 mt-1">
-                        <Clock className="w-3 h-3" style={{ color: DESIGN.colors.textSecondary }} />
-                        <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                        <Clock className="w-3 h-3 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground">
                           {formatTime(request.timestamp || new Date().toISOString())}
                         </p>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <span className="text-xs px-2 py-1 rounded-full"
-                        style={{
-                          color: DESIGN.colors.primary,
-                          background: `${DESIGN.colors.primary}10`,
-                          borderRadius: DESIGN.borderRadius.smallPill
-                        }}>
+                      <span className="text-xs px-2 py-1 rounded-ampz-sm text-primary bg-primary/10">
                         Pending
                       </span>
                       <Button 
                         size="sm" 
                         variant="ghost"
                         onClick={() => handleCancelRequest(request.id)}
-                        className="h-8 text-xs"
-                        style={{
-                          color: DESIGN.colors.textSecondary
-                        }}
+                        className="h-8 text-xs text-muted-foreground"
                       >
                         Cancel
                       </Button>
@@ -581,16 +389,10 @@ function FriendRequestsModal({
               </div>
             ) : (
               <div className="text-center py-12">
-                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4"
-                  style={{
-                    background: `${DESIGN.colors.primary}10`,
-                    borderRadius: DESIGN.borderRadius.roundButton
-                  }}>
-                  <Send className="w-10 h-10" style={{ color: DESIGN.colors.primary }} />
+                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 bg-primary/10">
+                  <Send className="w-10 h-10 text-primary" />
                 </div>
-                <p className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
-                  No sent friend requests
-                </p>
+                <p className="text-sm text-muted-foreground">No sent friend requests</p>
               </div>
             )
           )}
@@ -602,14 +404,8 @@ function FriendRequestsModal({
 
 export default function Chats() {
   const navigate = useNavigate();
-  const { 
-    matches = [], 
-    user, 
-    isDemo, 
-    connectionProfiles = [] 
-  } = useApp();
+  const { matches = [], user, isDemo, connectionProfiles = [] } = useApp();
   
-  // Stub implementations - friend features not yet implemented
   const friends: ConnectionProfile[] = [];
   const friendRequests: FriendRequest[] = [];
   const sentRequests: FriendRequest[] = [];
@@ -658,7 +454,6 @@ export default function Chats() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Filter matches based on search
   const filteredMatches = matches.filter(match =>
     match?.matchProfile?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     match?.eventName?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -669,12 +464,10 @@ export default function Chats() {
   const hasFriends = friends && friends.length > 0;
   const hasFriendRequests = friendRequests.length > 0;
 
-  // Scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Simulate typing indicator
   useEffect(() => {
     if (selectedMatch && Math.random() > 0.7) {
       const typingTimeout = setTimeout(() => {
@@ -721,7 +514,6 @@ export default function Chats() {
     setMessages([...messages, message]);
     setNewMessage('');
 
-    // Simulate reply
     setTimeout(() => {
       const replies = [
         'That sounds great! 😊',
@@ -753,70 +545,46 @@ export default function Chats() {
     try {
       if (sendFriendRequest) {
         await sendFriendRequest(userId);
-        toast({
-          title: 'Friend request sent!',
-          description: 'They will be notified of your request.',
-        });
+        toast({ title: 'Friend request sent!', description: 'They will be notified of your request.' });
       } else {
-        toast({
-          title: 'Feature not available',
-          description: 'Friend requests are not implemented yet.',
-        });
+        toast({ title: 'Feature not available', description: 'Friend requests are not implemented yet.' });
       }
       setShowQuickAdd(false);
     } catch (error) {
-      toast({
-        title: 'Error sending request',
-        description: 'Please try again.',
-        variant: 'destructive'
-      });
+      toast({ title: 'Error sending request', description: 'Please try again.', variant: 'destructive' });
     }
   };
 
   // Conversation View
   if (selectedMatch) {
     return (
-      <div className="app-container min-h-screen flex flex-col" style={{
-        background: DESIGN.colors.background
-      }}>
+      <div className="app-container min-h-screen flex flex-col bg-background">
         {/* Chat Header */}
-        <header className="sticky top-0 z-30 border-b" style={{
-          background: DESIGN.colors.background,
-          borderColor: DESIGN.colors.card
-        }}>
+        <header className="sticky top-0 z-30 border-b bg-background border-card">
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setSelectedMatch(null)}
-                className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
-                style={{
-                  background: DESIGN.colors.card,
-                  borderRadius: DESIGN.borderRadius.roundButton
-                }}
+                className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 ampz-transition bg-card"
               >
-                <ArrowLeft className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
+                <ArrowLeft className="w-5 h-5 text-foreground" />
               </button>
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <img
                     src={selectedMatch.matchProfile?.photo}
                     alt={selectedMatch.matchProfile?.name}
-                    className="w-10 h-10 rounded-full object-cover"
-                    style={{ border: `2px solid ${DESIGN.colors.background}` }}
+                    className="w-10 h-10 rounded-full object-cover border-2 border-background"
                   />
                   {selectedMatch.online && (
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full" 
-                      style={{ border: `2px solid ${DESIGN.colors.background}` }} />
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
                   )}
                 </div>
                 <div>
-                  <h3 className="font-semibold" style={{
-                    fontSize: DESIGN.typography.bodyLarge,
-                    color: DESIGN.colors.textPrimary
-                  }}>
+                  <h3 className="font-semibold text-[15px] text-foreground">
                     {selectedMatch.matchProfile?.name || 'Unknown'}
                   </h3>
-                  <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                  <p className="text-xs text-muted-foreground">
                     {selectedMatch.online ? 'Online' : `Active ${formatTime(selectedMatch.timestamp)}`}
                   </p>
                 </div>
@@ -826,44 +594,31 @@ export default function Chats() {
             <div className="relative">
               <button 
                 onClick={() => setShowMoreOptions(!showMoreOptions)}
-                className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
-                style={{
-                  background: DESIGN.colors.card,
-                  borderRadius: DESIGN.borderRadius.roundButton
-                }}
+                className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 ampz-transition bg-card"
               >
-                <MoreVertical className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
+                <MoreVertical className="w-5 h-5 text-foreground" />
               </button>
               
               {showMoreOptions && (
-                <div className="absolute right-0 top-full mt-2 w-48 py-2 z-50"
-                  style={{
-                    background: DESIGN.colors.card,
-                    border: `1px solid ${DESIGN.colors.card}`,
-                    borderRadius: DESIGN.borderRadius.card,
-                    boxShadow: DESIGN.shadows.card
-                  }}>
-                  <button className="w-full px-4 py-3 text-left hover:opacity-80 transition-opacity text-sm flex items-center gap-3"
-                    style={{ color: DESIGN.colors.textPrimary }}>
+                <div className="absolute right-0 top-full mt-2 w-48 py-2 z-50 bg-card border border-card rounded-ampz-lg shadow-lg">
+                  <button className="w-full px-4 py-3 text-left hover:opacity-80 ampz-transition text-sm flex items-center gap-3 text-foreground">
                     <Users className="w-4 h-4" />
                     View Profile
                   </button>
-                  <button className="w-full px-4 py-3 text-left hover:opacity-80 transition-opacity text-sm flex items-center gap-3"
-                    style={{ color: DESIGN.colors.textPrimary }}>
+                  <button className="w-full px-4 py-3 text-left hover:opacity-80 ampz-transition text-sm flex items-center gap-3 text-foreground">
                     <Pin className="w-4 h-4" />
                     Pin Conversation
                   </button>
-                  <button className="w-full px-4 py-3 text-left hover:opacity-80 transition-opacity text-sm flex items-center gap-3"
-                    style={{ color: DESIGN.colors.textPrimary }}>
+                  <button className="w-full px-4 py-3 text-left hover:opacity-80 ampz-transition text-sm flex items-center gap-3 text-foreground">
                     <BellOff className="w-4 h-4" />
                     Mute Notifications
                   </button>
-                  <div className="my-1" style={{ borderTop: `1px solid ${DESIGN.colors.textSecondary}20` }} />
-                  <button className="w-full px-4 py-3 text-left hover:opacity-80 transition-opacity text-sm flex items-center gap-3 text-red-500">
+                  <div className="my-1 border-t border-muted-foreground/20" />
+                  <button className="w-full px-4 py-3 text-left hover:opacity-80 ampz-transition text-sm flex items-center gap-3 text-destructive">
                     <Trash2 className="w-4 h-4" />
                     Unmatch
                   </button>
-                  <button className="w-full px-4 py-3 text-left hover:opacity-80 transition-opacity text-sm flex items-center gap-3 text-red-500">
+                  <button className="w-full px-4 py-3 text-left hover:opacity-80 ampz-transition text-sm flex items-center gap-3 text-destructive">
                     <Flag className="w-4 h-4" />
                     Report
                   </button>
@@ -881,25 +636,16 @@ export default function Chats() {
               <img
                 src={selectedMatch.matchProfile?.photo}
                 alt={selectedMatch.matchProfile?.name}
-                className="w-full h-full rounded-full object-cover"
-                style={{ border: `4px solid ${DESIGN.colors.primary}20` }}
+                className="w-full h-full rounded-full object-cover border-4 border-primary/20"
               />
             </div>
-            <h3 className="font-bold" style={{
-              fontSize: DESIGN.typography.h3,
-              color: DESIGN.colors.textPrimary
-            }}>
+            <h3 className="font-bold text-[22px] text-foreground">
               {selectedMatch.matchProfile?.name || 'Unknown'}
             </h3>
-            <p className="text-sm mb-2" style={{ color: DESIGN.colors.textSecondary }}>
+            <p className="text-sm mb-2 text-muted-foreground">
               Matched at {selectedMatch.eventName}
             </p>
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium"
-              style={{
-                background: `${DESIGN.colors.primary}10`,
-                color: DESIGN.colors.primary,
-                borderRadius: DESIGN.borderRadius.smallPill
-              }}>
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-ampz-sm text-xs font-medium bg-primary/10 text-primary">
               <Heart className="w-3 h-3" />
               {formatTime(selectedMatch.timestamp)}
             </span>
@@ -914,7 +660,7 @@ export default function Chats() {
             return (
               <div key={message.id}>
                 {showTime && (
-                  <p className="text-center text-xs my-4" style={{ color: DESIGN.colors.textSecondary }}>
+                  <p className="text-center text-xs my-4 text-muted-foreground">
                     {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 )}
@@ -924,37 +670,26 @@ export default function Chats() {
                   className={cn('flex', isMe ? 'justify-end' : 'justify-start')}
                 >
                   <div className={cn(
-                    'max-w-[75%] px-4 py-2.5',
+                    'max-w-[75%] px-4 py-2.5 rounded-ampz-lg',
                     isMe 
-                      ? 'rounded-br-md' 
-                      : 'rounded-bl-md'
-                  )}
-                  style={{
-                    borderRadius: DESIGN.borderRadius.message,
-                    ...(isMe 
-                      ? { 
-                          background: DESIGN.colors.primary, 
-                          color: DESIGN.colors.background 
-                        }
-                      : { 
-                          background: DESIGN.colors.card, 
-                          border: `1px solid ${DESIGN.colors.card}`,
-                          color: DESIGN.colors.textPrimary 
-                        })
-                  }}>
+                      ? 'rounded-br-md bg-primary text-primary-foreground' 
+                      : 'rounded-bl-md bg-card text-foreground'
+                  )}>
                     <p className="text-sm">{message.text}</p>
                     <div className={cn(
                       'flex items-center gap-1 mt-1',
                       isMe ? 'justify-end' : 'justify-start'
                     )}>
-                      <span className="text-[10px]" style={{ opacity: 0.7 }}>
-                        {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <span className="text-[10px] opacity-70">
+                        {new Date(message.timestamp).toLocaleTimeString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
                       </span>
                       {isMe && (
-                        <CheckCheck className={cn(
-                          'w-3 h-3',
-                          message.read ? 'text-primary-foreground' : 'opacity-50'
-                        )} />
+                        message.read 
+                          ? <CheckCheck className="w-3 h-3 text-primary-foreground/70" />
+                          : <Check className="w-3 h-3 text-primary-foreground/70" />
                       )}
                     </div>
                   </div>
@@ -965,101 +700,57 @@ export default function Chats() {
 
           {/* Typing Indicator */}
           {isTyping && (
-            <div className="flex justify-start">
-              <div className="px-4 py-3" style={{
-                background: DESIGN.colors.card,
-                border: `1px solid ${DESIGN.colors.card}`,
-                borderRadius: DESIGN.borderRadius.message,
-                borderBottomLeftRadius: '4px'
-              }}>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex justify-start"
+            >
+              <div className="px-4 py-3 rounded-ampz-lg bg-card">
                 <div className="flex gap-1">
-                  <span className="w-2 h-2 rounded-full animate-bounce" 
-                    style={{ 
-                      background: `${DESIGN.colors.textSecondary}80`,
-                      animationDelay: '0ms' 
-                    }} />
-                  <span className="w-2 h-2 rounded-full animate-bounce" 
-                    style={{ 
-                      background: `${DESIGN.colors.textSecondary}80`,
-                      animationDelay: '150ms' 
-                    }} />
-                  <span className="w-2 h-2 rounded-full animate-bounce" 
-                    style={{ 
-                      background: `${DESIGN.colors.textSecondary}80`,
-                      animationDelay: '300ms' 
-                    }} />
+                  <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
               </div>
-            </div>
+            </motion.div>
           )}
-
           <div ref={messagesEndRef} />
         </div>
 
         {/* Message Input */}
-        <div className="sticky bottom-0 border-t p-4" style={{
-          background: DESIGN.colors.background,
-          borderColor: DESIGN.colors.card
-        }}>
+        <div className="sticky bottom-0 p-4 border-t bg-background border-card pb-safe">
           <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-            <button
-              type="button"
-              className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
-              style={{
-                background: DESIGN.colors.card,
-                borderRadius: DESIGN.borderRadius.roundButton
-              }}
+            <button 
+              type="button" 
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 ampz-transition bg-card"
             >
-              <Paperclip className="w-5 h-5" style={{ color: DESIGN.colors.textSecondary }} />
+              <Camera className="w-5 h-5 text-muted-foreground" />
             </button>
-            <button
-              type="button"
-              className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
-              style={{
-                background: DESIGN.colors.card,
-                borderRadius: DESIGN.borderRadius.roundButton
-              }}
-            >
-              <Camera className="w-5 h-5" style={{ color: DESIGN.colors.textSecondary }} />
-            </button>
-            <Input
-              type="text"
-              placeholder="Type a message..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={handleKeyPress}
-              className="flex-1 h-10"
-              style={{
-                background: DESIGN.colors.card,
-                borderColor: DESIGN.colors.card,
-                borderRadius: DESIGN.borderRadius.input,
-                color: DESIGN.colors.textPrimary
-              }}
-            />
-            <button
-              type="button"
-              className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
-              style={{
-                background: DESIGN.colors.card,
-                borderRadius: DESIGN.borderRadius.roundButton
-              }}
-            >
-              <Smile className="w-5 h-5" style={{ color: DESIGN.colors.textSecondary }} />
-            </button>
+            <div className="flex-1 relative">
+              <Input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type a message..."
+                className="pr-10 h-11 bg-card border-card rounded-full text-foreground placeholder:text-muted-foreground"
+              />
+              <button 
+                type="button" 
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground ampz-transition"
+              >
+                <Smile className="w-5 h-5" />
+              </button>
+            </div>
             <button
               type="submit"
               disabled={!newMessage.trim()}
               className={cn(
-                'w-10 h-10 rounded-full flex items-center justify-center transition-all',
-                newMessage.trim()
-                  ? 'hover:opacity-90'
-                  : ''
+                'w-10 h-10 rounded-full flex items-center justify-center ampz-transition',
+                newMessage.trim() 
+                  ? 'bg-primary text-primary-foreground shadow-lg' 
+                  : 'bg-card text-muted-foreground'
               )}
-              style={{
-                background: newMessage.trim() ? DESIGN.colors.primary : DESIGN.colors.card,
-                color: newMessage.trim() ? DESIGN.colors.background : DESIGN.colors.textSecondary,
-                borderRadius: DESIGN.borderRadius.roundButton
-              }}
             >
               <Send className="w-5 h-5" />
             </button>
@@ -1071,336 +762,189 @@ export default function Chats() {
 
   // Main Chats List View
   return (
-    <div className="app-container min-h-screen pb-nav" style={{
-      background: DESIGN.colors.background
-    }}>
+    <div className="app-container min-h-screen flex flex-col pb-20 bg-background">
       {/* Header */}
-      <div className="sticky top-0 z-30 border-b" style={{
-        background: DESIGN.colors.background,
-        borderColor: DESIGN.colors.card
-      }}>
+      <header className="sticky top-0 z-30 border-b bg-background border-card">
         <div className="flex items-center justify-between p-4">
-          <h1 className="font-bold" style={{
-            fontSize: DESIGN.typography.h1,
-            color: DESIGN.colors.textPrimary
-          }}>
-            Chats
-          </h1>
+          <h1 className="text-2xl font-bold text-foreground">Messages</h1>
           <div className="flex items-center gap-2">
             <button 
               onClick={() => setShowFriendRequests(true)}
-              className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity relative"
-              style={{
-                background: DESIGN.colors.card,
-                borderRadius: DESIGN.borderRadius.roundButton
-              }}>
-              <UserCheck className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
+              className="relative w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 ampz-transition bg-card"
+            >
+              <UserCheck className="w-5 h-5 text-foreground" />
               {friendRequestsCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs"
-                  style={{
-                    background: DESIGN.colors.primary,
-                    color: DESIGN.colors.background
-                  }}>
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center bg-destructive text-destructive-foreground">
                   {friendRequestsCount}
                 </span>
               )}
             </button>
-            {activeTab === 'friends' && (
-              <button 
-                onClick={() => setShowQuickAdd(true)}
-                className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
-                style={{
-                  background: `${DESIGN.colors.primary}10`,
-                  borderRadius: DESIGN.borderRadius.roundButton
-                }}
-              >
-                <UserPlus className="w-5 h-5" style={{ color: DESIGN.colors.primary }} />
-              </button>
-            )}
+            <button 
+              onClick={() => setShowQuickAdd(true)}
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 ampz-transition bg-primary text-primary-foreground"
+            >
+              <UserPlus className="w-5 h-5" />
+            </button>
           </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex px-4 pb-3 gap-2">
-          <button
-            onClick={() => setActiveTab('matches')}
-            className={cn(
-              'flex-1 py-2.5 text-sm font-medium transition-all flex items-center justify-center gap-2',
-              activeTab === 'matches' 
-                ? '' 
-                : ''
-            )}
-            style={{
-              borderRadius: DESIGN.borderRadius.card,
-              ...(activeTab === 'matches' 
-                ? { 
-                    background: DESIGN.colors.primary, 
-                    color: DESIGN.colors.background 
-                  }
-                : { 
-                    background: DESIGN.colors.card, 
-                    border: `1px solid ${DESIGN.colors.card}`,
-                    color: DESIGN.colors.textSecondary 
-                  })
-            }}
-          >
-            <Heart className="w-4 h-4" />
-            Matches
-            {unreadMatchesCount > 0 && (
-              <span className={cn(
-                'px-2 py-0.5 rounded-full text-xs',
-                activeTab === 'matches' ? 'bg-white/20' : 'bg-red-500 text-white'
-              )}>
-                {unreadMatchesCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('friends')}
-            className={cn(
-              'flex-1 py-2.5 text-sm font-medium transition-all flex items-center justify-center gap-2',
-              activeTab === 'friends' 
-                ? '' 
-                : ''
-            )}
-            style={{
-              borderRadius: DESIGN.borderRadius.card,
-              ...(activeTab === 'friends' 
-                ? { 
-                    background: DESIGN.colors.primary, 
-                    color: DESIGN.colors.background 
-                  }
-                : { 
-                    background: DESIGN.colors.card, 
-                    border: `1px solid ${DESIGN.colors.card}`,
-                    color: DESIGN.colors.textSecondary 
-                  })
-            }}
-          >
-            <Users className="w-4 h-4" />
-            Friends
-          </button>
         </div>
 
         {/* Search */}
         <div className="px-4 pb-3">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" 
-              style={{ color: DESIGN.colors.textSecondary }} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder={`Search ${activeTab}...`}
+              placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-10 pl-10"
-              style={{
-                background: DESIGN.colors.card,
-                borderColor: DESIGN.colors.card,
-                borderRadius: DESIGN.borderRadius.card,
-                color: DESIGN.colors.textPrimary
-              }}
+              className="pl-10 h-10 bg-card border-card rounded-full text-foreground placeholder:text-muted-foreground"
             />
           </div>
         </div>
-      </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-card">
+          <button
+            onClick={() => setActiveTab('matches')}
+            className={cn(
+              'flex-1 py-3 text-sm font-medium ampz-transition relative',
+              activeTab === 'matches' ? 'text-primary' : 'text-muted-foreground'
+            )}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <Heart className="w-4 h-4" />
+              Matches
+              {unreadMatchesCount > 0 && (
+                <span className="w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center bg-primary text-primary-foreground">
+                  {unreadMatchesCount}
+                </span>
+              )}
+            </div>
+            {activeTab === 'matches' && (
+              <motion.div 
+                layoutId="tabIndicator"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
+              />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('friends')}
+            className={cn(
+              'flex-1 py-3 text-sm font-medium ampz-transition relative',
+              activeTab === 'friends' ? 'text-primary' : 'text-muted-foreground'
+            )}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <Users className="w-4 h-4" />
+              Friends
+              {hasFriendRequests && (
+                <span className="w-2 h-2 rounded-full bg-primary" />
+              )}
+            </div>
+            {activeTab === 'friends' && (
+              <motion.div 
+                layoutId="tabIndicator"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
+              />
+            )}
+          </button>
+        </div>
+      </header>
 
       {/* Content */}
-      <div className="p-4">
+      <div className="flex-1 overflow-y-auto">
         {activeTab === 'matches' ? (
-          <>
-            {/* Matches List */}
-            {filteredMatches.length > 0 ? (
-              <div className="space-y-2">
-                {filteredMatches.map((match) => (
-                  <button
-                    key={match.id}
-                    onClick={() => setSelectedMatch(match)}
-                    className={cn(
-                      'w-full p-4 flex items-center gap-4 text-left hover:opacity-80 transition-all',
-                      match.unread && 'border-l-4'
+          filteredMatches.length > 0 ? (
+            <div className="divide-y divide-card">
+              {filteredMatches.map((match) => (
+                <button
+                  key={match.id}
+                  onClick={() => setSelectedMatch(match)}
+                  className="w-full flex items-center gap-3 p-4 hover:bg-card/50 ampz-transition text-left"
+                >
+                  <div className="relative">
+                    <img
+                      src={match.matchProfile?.photo}
+                      alt={match.matchProfile?.name}
+                      className="w-14 h-14 rounded-full object-cover border-2 border-background"
+                    />
+                    {match.online && (
+                      <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-background" />
                     )}
-                    style={{
-                      background: DESIGN.colors.card,
-                      border: `1px solid ${DESIGN.colors.card}`,
-                      borderRadius: DESIGN.borderRadius.card,
-                      ...(match.unread && {
-                        borderLeftColor: DESIGN.colors.primary,
-                        background: `${DESIGN.colors.primary}05`
-                      })
-                    }}
-                  >
-                    <div className="relative">
-                      <img
-                        src={match.matchProfile?.photo}
-                        alt={match.matchProfile?.name}
-                        className="w-14 h-14 rounded-full object-cover"
-                        style={{ border: `2px solid ${DESIGN.colors.background}` }}
-                      />
-                      {match.online && (
-                        <span className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full"
-                          style={{ border: `2px solid ${DESIGN.colors.background}` }} />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className={cn('font-semibold', match.unread && 'font-bold')}
-                          style={{ color: DESIGN.colors.textPrimary }}>
-                          {match.matchProfile?.name || 'Unknown'}
-                        </h3>
-                        <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                          {formatTime(match.timestamp)}
-                        </span>
-                      </div>
-                      <p className="text-sm truncate mb-1.5" style={{ color: DESIGN.colors.textSecondary }}>
-                        {match.lastMessage || 'Say hi 👋'}
-                      </p>
-                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
-                        style={{
-                          color: DESIGN.colors.primary,
-                          background: `${DESIGN.colors.primary}10`,
-                          borderRadius: DESIGN.borderRadius.smallPill
-                        }}>
-                        <Star className="w-3 h-3" />
-                        {match.eventName}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="font-semibold text-foreground">
+                        {match.matchProfile?.name || 'Unknown'}
+                      </h3>
+                      <span className="text-xs text-muted-foreground">
+                        {formatTime(match.timestamp)}
                       </span>
                     </div>
-                    {match.unread && (
-                      <span className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ background: DESIGN.colors.primary }} />
-                    )}
-                  </button>
-                ))}
+                    <p className="text-sm truncate text-muted-foreground">
+                      {match.lastMessage || 'Start a conversation!'}
+                    </p>
+                    <p className="text-xs mt-1 text-primary">
+                      {match.eventName}
+                    </p>
+                  </div>
+                  {match.unread && (
+                    <span className="w-3 h-3 rounded-full bg-primary" />
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-64 px-8 text-center">
+              <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 bg-primary/10">
+                <Heart className="w-10 h-10 text-primary" />
               </div>
-            ) : (
-              // Empty State for Matches
-              <div className="text-center py-16">
-                <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"
-                  style={{
-                    background: `${DESIGN.colors.primary}10`,
-                    borderRadius: DESIGN.borderRadius.roundButton
-                  }}>
-                  <Heart className="w-12 h-12" style={{ color: DESIGN.colors.primary }} />
-                </div>
-                <h3 className="font-bold mb-2" style={{
-                  fontSize: DESIGN.typography.h3,
-                  color: DESIGN.colors.textPrimary
-                }}>
-                  No Matches Yet
-                </h3>
-                <p className="text-sm mb-6 max-w-xs mx-auto" style={{ color: DESIGN.colors.textSecondary }}>
-                  Visit the Connect page to start meeting people at events! You'll see matches here once someone likes you back.
-                </p>
-                <Button onClick={() => navigate('/connect')} 
-                  className="rounded-xl"
-                  style={{
-                    background: DESIGN.colors.primary,
-                    color: DESIGN.colors.background,
-                    borderRadius: DESIGN.borderRadius.button
-                  }}>
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Go to Connect
-                </Button>
-              </div>
-            )}
-          </>
+              <h3 className="text-lg font-semibold mb-2 text-foreground">No matches yet</h3>
+              <p className="text-sm text-muted-foreground">
+                Start swiping to find your connections!
+              </p>
+              <Button 
+                onClick={() => navigate('/connect')}
+                className="mt-4 bg-primary text-primary-foreground"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Start Connecting
+              </Button>
+            </div>
+          )
         ) : (
-          <>
-            {/* Friends List */}
-            {hasFriends ? (
-              <div className="space-y-2">
-                {friends.map((friend) => (
-                  <button
-                    key={friend.id}
-                    onClick={() => {/* Navigate to friend chat */}}
-                    className="w-full p-4 flex items-center gap-4 text-left hover:opacity-80 transition-all"
-                    style={{
-                      background: DESIGN.colors.card,
-                      border: `1px solid ${DESIGN.colors.card}`,
-                      borderRadius: DESIGN.borderRadius.card
-                    }}
-                  >
-                    <div className="relative">
-                      <img
-                        src={friend.photo}
-                        alt={friend.name}
-                        className="w-14 h-14 rounded-full object-cover"
-                        style={{ border: `2px solid ${DESIGN.colors.background}` }}
-                      />
-                      {friend.isPublic && (
-                        <span className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full"
-                          style={{ border: `2px solid ${DESIGN.colors.background}` }} />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-semibold"
-                          style={{ color: DESIGN.colors.textPrimary }}>
-                          {friend.name}
-                        </h3>
-                        <span className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                          {friend.location || ''}
-                        </span>
-                      </div>
-                      <p className="text-sm truncate" style={{ color: DESIGN.colors.textSecondary }}>
-                        {friend.bio || 'Start a conversation'}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              // Empty State for Friends - Only show if no friend requests and no friends
-              !hasFriendRequests && !hasFriends && (
-                <div className="text-center py-16">
-                  <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"
-                    style={{
-                      background: `${DESIGN.colors.primary}10`,
-                      borderRadius: DESIGN.borderRadius.roundButton
-                    }}>
-                    <Users className="w-12 h-12" style={{ color: DESIGN.colors.primary }} />
-                  </div>
-                  <h3 className="font-bold mb-2" style={{
-                    fontSize: DESIGN.typography.h3,
-                    color: DESIGN.colors.textPrimary
-                  }}>
-                    Build Your Network
-                  </h3>
-                  <p className="text-sm mb-6 max-w-xs mx-auto" style={{ color: DESIGN.colors.textSecondary }}>
-                    Add friends to see their event plans, chat anytime, and make the most of your social experiences!
-                  </p>
-                  <div className="flex justify-center">
-                    <Button onClick={() => setShowQuickAdd(true)} 
-                      className="rounded-xl w-full max-w-xs"
-                      style={{
-                        background: DESIGN.colors.primary,
-                        color: DESIGN.colors.background,
-                        borderRadius: DESIGN.borderRadius.button
-                      }}>
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      Quick Add Friends
-                    </Button>
-                  </div>
-                </div>
-              )
-            )}
-          </>
+          <div className="flex flex-col items-center justify-center h-64 px-8 text-center">
+            <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 bg-primary/10">
+              <Users className="w-10 h-10 text-primary" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Add Friends</h3>
+            <p className="text-sm text-muted-foreground">
+              Search and add friends to start chatting!
+            </p>
+            <Button 
+              onClick={() => setShowQuickAdd(true)}
+              className="mt-4 bg-primary text-primary-foreground"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Quick Add
+            </Button>
+          </div>
         )}
       </div>
 
-      {/* Friend Requests Modal */}
-      <FriendRequestsModal 
-        isOpen={showFriendRequests} 
-        onClose={() => setShowFriendRequests(false)}
-      />
+      {/* Bottom Navigation */}
+      <BottomNav />
 
-      {/* Quick Add Modal */}
+      {/* Modals */}
       <QuickAddModal 
         isOpen={showQuickAdd} 
-        onClose={() => setShowQuickAdd(false)}
+        onClose={() => setShowQuickAdd(false)} 
         onSendRequest={handleSendFriendRequest}
       />
-
-      <BottomNav />
+      <FriendRequestsModal 
+        isOpen={showFriendRequests} 
+        onClose={() => setShowFriendRequests(false)} 
+      />
     </div>
   );
 }
