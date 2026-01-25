@@ -10,29 +10,12 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-// Design Constants
-const DESIGN = {
-  colors: {
-    primary: '#C4B5FD',
-    lavenderLight: '#E9D5FF',
-    accentPink: '#FFB8E6',
-    background: '#1A1A1A',
-    card: '#2D2D2D',
-    textPrimary: '#FFFFFF',
-    textSecondary: '#B8B8B8',
-    gold: '#D4AF37',
-    red: '#EF4444',
-    purple: '#8B5CF6'
-  }
-};
-
-// Adjusted heights for better spacing
 // Adjusted heights for better spacing
 const HEIGHTS = {
-  header: '85px',       // Reduced header height
-  cardStack: '440px',   // Increased card height to reduce gap with buttons
-  buttons: '110px',     // Increased button area for better spacing
-  bottomSpacing: '35px' // Increased space above bottom nav
+  header: '85px',
+  cardStack: '440px',
+  buttons: '110px',
+  bottomSpacing: '35px'
 };
 
 interface ProfileCardProps {
@@ -85,24 +68,12 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
         damping: 30 
       }}
     >
-      {/* Card with Light Purple Hue - Taller design */}
+      {/* Card with gradient - using semantic colors */}
       <div 
-        className="w-full h-full rounded-[20px] overflow-hidden relative rotate-[-2deg]"
-        style={{
-          background: 'linear-gradient(135deg, rgba(196, 181, 253, 0.95) 0%, rgba(233, 213, 255, 0.95) 100%)',
-          boxShadow: '0 12px 40px rgba(0, 0, 0, 0.5)',
-          border: '2px solid #D4AF37',
-          position: 'relative'
-        }}
+        className="w-full h-full rounded-ampz-lg overflow-hidden relative rotate-[-2deg] border-2 border-primary shadow-xl bg-gradient-to-br from-primary/95 to-accent/95"
       >
         {/* Overlay for light purple hue */}
-        <div 
-          className="absolute inset-0"
-          style={{
-            background: 'rgba(196, 181, 253, 0.15)',
-            mixBlendMode: 'overlay'
-          }}
-        />
+        <div className="absolute inset-0 bg-primary/15 mix-blend-overlay" />
         
         {/* Profile Photo - Centered properly */}
         <div className="relative h-[72%] flex items-center justify-center">
@@ -110,13 +81,10 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
             <img
               src={profile.photo}
               alt={profile.name}
-              className="w-full h-full object-cover rounded-[16px]"
-              style={{
-                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)'
-              }}
+              className="w-full h-full object-cover rounded-ampz-md shadow-lg"
               draggable={false}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent rounded-[16px]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent rounded-ampz-md" />
             
             {/* Info Button */}
             <button
@@ -124,11 +92,7 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
                 e.stopPropagation();
                 onViewProfile();
               }}
-              className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center backdrop-blur-md hover:scale-105 transition-transform"
-              style={{
-                background: 'rgba(0, 0, 0, 0.5)',
-                border: '1px solid rgba(255, 255, 255, 0.2)'
-              }}
+              className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center backdrop-blur-md hover:scale-105 ampz-transition bg-black/50 border border-white/20"
             >
               <Info className="w-4 h-4 text-white" />
             </button>
@@ -138,10 +102,10 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
         {/* Simple Info - Only name, age, and tags */}
         <div className="absolute bottom-0 left-0 right-0 p-4 pt-2">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <h2 className="text-[26px] font-bold" style={{ color: DESIGN.colors.background }}>
+            <h2 className="text-[26px] font-bold text-background">
               {profile.name}
             </h2>
-            <span className="text-[26px] font-medium" style={{ color: DESIGN.colors.card, opacity: 0.9 }}>
+            <span className="text-[26px] font-medium text-card opacity-90">
               {profile.age}
             </span>
           </div>
@@ -152,28 +116,17 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
               {profile.interests.slice(0, 3).map((interest, index) => (
                 <div 
                   key={index}
-                  className="px-3 py-1.5 rounded-full flex items-center"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.95)',
-                    backdropFilter: 'blur(10px)',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
-                  }}
+                  className="px-3 py-1.5 rounded-full flex items-center bg-white/95 backdrop-blur-sm shadow-sm"
                 >
-                  <Tag className="w-3 h-3 mr-1.5" style={{ color: DESIGN.colors.background }} />
-                  <span className="text-[12px] font-semibold" style={{ color: DESIGN.colors.background }}>
+                  <Tag className="w-3 h-3 mr-1.5 text-background" />
+                  <span className="text-[12px] font-semibold text-background">
                     {interest}
                   </span>
                 </div>
               ))}
               {profile.interests.length > 3 && (
-                <div 
-                  className="px-3 py-1.5 rounded-full flex items-center"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.8)',
-                    backdropFilter: 'blur(10px)'
-                  }}
-                >
-                  <span className="text-[12px] font-semibold" style={{ color: DESIGN.colors.background }}>
+                <div className="px-3 py-1.5 rounded-full flex items-center bg-white/80 backdrop-blur-sm">
+                  <span className="text-[12px] font-semibold text-background">
                     +{profile.interests.length - 3}
                   </span>
                 </div>
@@ -252,28 +205,21 @@ export default function Connect() {
 
   if (!hasActiveEvents) {
     return (
-      <div 
-        className="fixed inset-0 overflow-hidden"
-        style={{ background: DESIGN.colors.background }}
-      >
+      <div className="fixed inset-0 overflow-hidden bg-background">
         <div className="h-full flex flex-col">
           <div className="flex-1 flex flex-col items-center justify-center px-4">
-            <div 
-              className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
-              style={{ background: `${DESIGN.colors.primary}20`, borderRadius: '50%' }}
-            >
-              <Lock className="w-10 h-10" style={{ color: DESIGN.colors.primary }} />
+            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-primary/20">
+              <Lock className="w-10 h-10 text-primary" />
             </div>
-            <h2 className="text-2xl font-bold mb-3 text-center" style={{ color: DESIGN.colors.textPrimary }}>
+            <h2 className="text-2xl font-bold mb-3 text-center text-foreground">
               Check In to Connect
             </h2>
-            <p className="text-center mb-6 max-w-xs" style={{ color: DESIGN.colors.textSecondary }}>
+            <p className="text-center mb-6 max-w-xs text-muted-foreground">
               Get tickets and check in to see who's there!
             </p>
             <Button 
               onClick={() => navigate('/events')} 
-              className="w-full max-w-[280px] h-[50px] rounded-[12px]"
-              style={{ background: DESIGN.colors.primary, color: DESIGN.colors.background }}
+              className="w-full max-w-[280px] h-[50px] rounded-ampz-md bg-primary text-primary-foreground"
             >
               <Sparkles className="w-5 h-5 mr-2" />
               Browse Events
@@ -288,14 +234,7 @@ export default function Connect() {
   }
 
   return (
-    <div 
-      className="fixed inset-0 overflow-hidden"
-      style={{ 
-        background: DESIGN.colors.background,
-        display: 'flex',
-        flexDirection: 'column'
-      }}
-    >
+    <div className="fixed inset-0 overflow-hidden bg-background flex flex-col">
       {/* Fixed Header - Reduced height */}
       <div 
         className="flex-shrink-0 px-4 pt-4 pb-2"
@@ -303,22 +242,16 @@ export default function Connect() {
       >
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-[26px] font-bold mb-1" style={{ color: DESIGN.colors.textPrimary }}>
+            <h1 className="text-[26px] font-bold mb-1 text-foreground">
               {currentEventName}
             </h1>
-            <p className="text-[13px]" style={{ color: DESIGN.colors.textSecondary }}>
+            <p className="text-[13px] text-muted-foreground">
               {availableProfiles.length - currentIndex} people here
             </p>
           </div>
-          <div 
-            className="flex items-center gap-2 px-3 py-2 rounded-full"
-            style={{ 
-              background: `${DESIGN.colors.accentPink}20`,
-              border: `1px solid ${DESIGN.colors.accentPink}30`
-            }}
-          >
-            <ThumbsUp className="w-4 h-4" style={{ color: DESIGN.colors.accentPink }} />
-            <span className="text-sm font-bold" style={{ color: DESIGN.colors.accentPink }}>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-brand-pink/20 border border-brand-pink/30">
+            <ThumbsUp className="w-4 h-4 text-brand-pink" />
+            <span className="text-sm font-bold text-brand-pink">
               {likesRemaining}
             </span>
           </div>
@@ -334,20 +267,13 @@ export default function Connect() {
           {noMoreProfiles ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center px-4">
-                <div 
-                  className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-                  style={{ 
-                    background: `${DESIGN.colors.primary}20`,
-                    borderRadius: '50%',
-                    border: `2px solid ${DESIGN.colors.primary}30`
-                  }}
-                >
-                  <ThumbsUp className="w-8 h-8" style={{ color: DESIGN.colors.primary }} />
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-primary/20 border-2 border-primary/30">
+                  <ThumbsUp className="w-8 h-8 text-primary" />
                 </div>
-                <h3 className="text-[22px] font-bold mb-2" style={{ color: DESIGN.colors.textPrimary }}>
+                <h3 className="text-[22px] font-bold mb-2 text-foreground">
                   That's Everyone!
                 </h3>
-                <p className="text-sm mb-4" style={{ color: DESIGN.colors.textSecondary }}>
+                <p className="text-sm mb-4 text-muted-foreground">
                   Check back later for more connections.
                 </p>
               </div>
@@ -368,7 +294,7 @@ export default function Connect() {
         </div>
       </div>
 
-      {/* Fixed Buttons Area - Professional icons with purple theme */}
+      {/* Fixed Buttons Area */}
       <div 
         className="flex-shrink-0 px-4"
         style={{ 
@@ -385,37 +311,21 @@ export default function Connect() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => handleSwipe('left')}
-                className="flex items-center justify-center"
-                style={{
-                  width: '70px',
-                  height: '70px',
-                  background: DESIGN.colors.red,
-                  color: DESIGN.colors.textPrimary,
-                  borderRadius: '50%',
-                  boxShadow: `0 6px 20px ${DESIGN.colors.red}40`
-                }}
+                className="flex items-center justify-center w-[70px] h-[70px] bg-destructive text-destructive-foreground rounded-full shadow-lg"
               >
                 <ThumbsDown className="w-8 h-8" />
               </motion.button>
 
-              {/* Undo Button - Purple outline */}
+              {/* Undo Button - Primary outline */}
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleUndo}
                 disabled={history.length === 0}
                 className={cn(
-                  "flex items-center justify-center",
+                  "flex items-center justify-center w-12 h-12 bg-transparent text-muted-foreground rounded-full border-2 border-primary",
                   history.length === 0 && "opacity-30 cursor-not-allowed"
                 )}
-                style={{
-                  width: '48px',
-                  height: '48px',
-                  background: 'transparent',
-                  color: DESIGN.colors.textSecondary,
-                  borderRadius: '50%',
-                  border: `2px solid ${DESIGN.colors.primary}`
-                }}
               >
                 <RotateCcw className="w-5 h-5" />
               </motion.button>
@@ -425,29 +335,16 @@ export default function Connect() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => handleSwipe('right')}
-                className="flex items-center justify-center"
-                style={{
-                  width: '70px',
-                  height: '70px',
-                  background: DESIGN.colors.accentPink,
-                  color: DESIGN.colors.background,
-                  borderRadius: '50%',
-                  boxShadow: `0 6px 20px ${DESIGN.colors.accentPink}40`,
-                  fontWeight: '600'
-                }}
+                className="flex items-center justify-center w-[70px] h-[70px] bg-brand-pink text-background rounded-full shadow-lg font-semibold"
               >
                 <ThumbsUp className="w-8 h-8" />
               </motion.button>
             </div>
 
-            {/* Maybe Later Button - Purple text */}
+            {/* Maybe Later Button */}
             <motion.button
               whileTap={{ scale: 0.95 }}
-              className="mx-auto block text-sm italic mt-4"
-              style={{ 
-                color: DESIGN.colors.primary,
-                opacity: 0.8
-              }}
+              className="mx-auto block text-sm italic mt-4 text-primary opacity-80"
             >
               Maybe Later
             </motion.button>
@@ -456,12 +353,7 @@ export default function Connect() {
           <div className="flex justify-center">
             <Button
               onClick={() => navigate('/events')}
-              className="w-full max-w-[200px] h-[50px] rounded-[12px]"
-              style={{ 
-                background: DESIGN.colors.primary,
-                color: DESIGN.colors.background,
-                boxShadow: `0 4px 16px ${DESIGN.colors.primary}40`
-              }}
+              className="w-full max-w-[200px] h-[50px] rounded-ampz-md bg-primary text-primary-foreground shadow-lg"
             >
               Find More Events
             </Button>
@@ -477,10 +369,8 @@ export default function Connect() {
       {/* Match Modal - Bottom Sheet with smooth animation */}
       <Dialog open={!!matchModal} onOpenChange={() => setMatchModal(null)}>
         <DialogContent 
-          className="p-0 border-0 rounded-t-[24px] rounded-b-none bottom-0 fixed max-w-none w-full"
+          className="p-0 border-0 rounded-t-[24px] rounded-b-none bottom-0 fixed max-w-none w-full bg-card m-0"
           style={{
-            background: DESIGN.colors.card,
-            margin: 0,
             bottom: 0,
             left: 0,
             right: 0,
@@ -491,10 +381,7 @@ export default function Connect() {
         >
           {/* Drag handle with top spacing */}
           <div className="w-full flex justify-center pt-4 pb-1">
-            <div className="w-12 h-1 rounded-full" style={{ 
-              background: DESIGN.colors.textSecondary,
-              opacity: 0.5
-            }} />
+            <div className="w-12 h-1 rounded-full bg-muted-foreground/50" />
           </div>
 
           <motion.div 
@@ -510,31 +397,20 @@ export default function Connect() {
           >
             <div className="relative w-24 h-24 mx-auto mb-5">
               <motion.div 
-                className="absolute inset-0 rounded-full"
-                style={{
-                  background: `linear-gradient(135deg, ${DESIGN.colors.primary} 0%, ${DESIGN.colors.lavenderLight} 100%)`
-                }}
+                className="absolute inset-0 rounded-full gradient-primary"
                 animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.2, 0.5] }}
                 transition={{ duration: 2, repeat: Infinity }}
               />
               <img
                 src={matchModal?.photo}
                 alt={matchModal?.name}
-                className="w-full h-full rounded-full object-cover border-4 relative z-10"
-                style={{ 
-                  borderColor: DESIGN.colors.card,
-                  objectPosition: 'center center'
-                }}
+                className="w-full h-full rounded-full object-cover border-4 border-card relative z-10 object-center"
               />
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.2, type: 'spring' }}
-                className="absolute -top-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center z-20 border-2"
-                style={{ 
-                  background: DESIGN.colors.gold,
-                  borderColor: DESIGN.colors.card 
-                }}
+                className="absolute -top-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center z-20 border-2 border-card bg-brand-gold"
               >
                 <ThumbsUp className="w-3 h-3 text-white fill-white" />
               </motion.div>
@@ -544,8 +420,7 @@ export default function Connect() {
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.1 }}
-              className="text-[28px] font-bold mb-2 text-center"
-              style={{ color: DESIGN.colors.textPrimary }}
+              className="text-[28px] font-bold mb-2 text-center text-foreground"
             >
               It's a Match!
             </motion.h2>
@@ -553,28 +428,17 @@ export default function Connect() {
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.15 }}
-              className="mb-6 text-center"
-              style={{ 
-                color: DESIGN.colors.textSecondary,
-                fontSize: '16px'
-              }}
+              className="mb-6 text-center text-muted-foreground text-base"
             >
               You and {matchModal?.name} liked each other
             </motion.p>
             
-            {/* Purple buttons for match modal */}
+            {/* Buttons for match modal */}
             <div className="flex gap-3">
               <Button
                 variant="outline"
                 onClick={() => setMatchModal(null)}
-                className="flex-1 h-12 rounded-[12px] hover:bg-purple-50/10 transition-colors"
-                style={{ 
-                  borderColor: DESIGN.colors.primary,
-                  color: DESIGN.colors.primary,
-                  background: 'transparent',
-                  fontSize: '16px',
-                  fontWeight: '600'
-                }}
+                className="flex-1 h-12 rounded-ampz-md border-primary text-primary bg-transparent hover:bg-primary/10 text-base font-semibold"
               >
                 Keep Swiping
               </Button>
@@ -583,14 +447,7 @@ export default function Connect() {
                   setMatchModal(null);
                   navigate('/matches');
                 }}
-                className="flex-1 h-12 rounded-[12px] hover:bg-purple-700 transition-colors"
-                style={{ 
-                  background: DESIGN.colors.primary,
-                  color: DESIGN.colors.background,
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  boxShadow: `0 4px 16px ${DESIGN.colors.primary}40`
-                }}
+                className="flex-1 h-12 rounded-ampz-md bg-primary text-primary-foreground hover:bg-accent text-base font-semibold shadow-lg"
               >
                 Message
               </Button>
@@ -602,10 +459,8 @@ export default function Connect() {
       {/* Profile View Modal - Bottom Sheet with smooth animation */}
       <Dialog open={!!viewingProfile} onOpenChange={() => setViewingProfile(null)}>
         <DialogContent 
-          className="p-0 border-0 rounded-t-[24px] rounded-b-none bottom-0 fixed max-w-none w-full"
+          className="p-0 border-0 rounded-t-[24px] rounded-b-none bottom-0 fixed max-w-none w-full bg-card m-0"
           style={{
-            background: DESIGN.colors.card,
-            margin: 0,
             bottom: 0,
             left: 0,
             right: 0,
@@ -615,12 +470,9 @@ export default function Connect() {
           }}
         >
           {/* Drag handle with top spacing */}
-        <div className="w-full flex justify-center pt-4 pb-1">
-          <div className="w-12 h-1 rounded-full" style={{ 
-            background: DESIGN.colors.textSecondary,
-            opacity: 0.5
-          }} />
-        </div>
+          <div className="w-full flex justify-center pt-4 pb-1">
+            <div className="w-12 h-1 rounded-full bg-muted-foreground/50" />
+          </div>
 
           <motion.div 
             className="overflow-y-auto max-h-[90vh]"
@@ -640,37 +492,31 @@ export default function Connect() {
                   <img
                     src={viewingProfile.photo}
                     alt={viewingProfile.name}
-                    className="w-full h-full object-cover"
-                    style={{ objectPosition: 'center center' }}
+                    className="w-full h-full object-cover object-center"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
                   
                   {/* Single close button - improved styling */}
                   <button
                     onClick={() => setViewingProfile(null)}
-                    className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md hover:scale-105 transition-transform"
-                    style={{
-                      background: 'rgba(0, 0, 0, 0.6)',
-                      border: `1px solid ${DESIGN.colors.primary}30`,
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-                    }}
+                    className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md hover:scale-105 ampz-transition bg-black/60 border border-primary/30 shadow-lg"
                   >
-                    <X className="w-5 h-5" style={{ color: DESIGN.colors.textPrimary }} />
+                    <X className="w-5 h-5 text-foreground" />
                   </button>
                 </div>
                 
                 {/* Profile Details */}
                 <div className="p-5 space-y-6">
                   <div>
-                    <h2 className="text-[28px] font-bold mb-1" style={{ color: DESIGN.colors.textPrimary }}>
+                    <h2 className="text-[28px] font-bold mb-1 text-foreground">
                       {viewingProfile.name}, {viewingProfile.age}
                     </h2>
                     
                     {/* Occupation */}
                     {viewingProfile.occupation && (
                       <div className="flex items-center gap-2 mb-3">
-                        <Briefcase className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
-                        <span className="text-[16px]" style={{ color: DESIGN.colors.primary }}>
+                        <Briefcase className="w-4 h-4 text-primary" />
+                        <span className="text-base text-primary">
                           {viewingProfile.occupation}
                         </span>
                       </div>
@@ -679,14 +525,8 @@ export default function Connect() {
                     {/* Gender (if available) */}
                     {viewingProfile.gender && (
                       <div className="mb-2">
-                        <div 
-                          className="inline-flex items-center px-3 py-1.5 rounded-full"
-                          style={{ 
-                            background: 'rgba(196, 181, 253, 0.15)',
-                            border: `1px solid ${DESIGN.colors.primary}30`
-                          }}
-                        >
-                          <span className="text-[14px] font-medium" style={{ color: DESIGN.colors.primary }}>
+                        <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-primary/15 border border-primary/30">
+                          <span className="text-sm font-medium text-primary">
                             {viewingProfile.gender}
                           </span>
                         </div>
@@ -696,24 +536,22 @@ export default function Connect() {
 
                   {/* About Section */}
                   <div>
-                    <h3 className="text-[13px] font-semibold mb-3 uppercase tracking-wider" 
-                      style={{ color: DESIGN.colors.textSecondary }}>
+                    <h3 className="text-[13px] font-semibold mb-3 uppercase tracking-wider text-muted-foreground">
                       About
                     </h3>
-                    <p className="text-[15px] leading-relaxed" style={{ color: DESIGN.colors.textSecondary }}>
+                    <p className="text-[15px] leading-relaxed text-muted-foreground">
                       {viewingProfile.bio}
                     </p>
                   </div>
 
                   {/* Location Section */}
                   <div>
-                    <h3 className="text-[13px] font-semibold mb-3 uppercase tracking-wider" 
-                      style={{ color: DESIGN.colors.textSecondary }}>
+                    <h3 className="text-[13px] font-semibold mb-3 uppercase tracking-wider text-muted-foreground">
                       Location
                     </h3>
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4" style={{ color: DESIGN.colors.primary }} />
-                      <span className="text-[15px]" style={{ color: DESIGN.colors.textSecondary }}>
+                      <MapPin className="w-4 h-4 text-primary" />
+                      <span className="text-[15px] text-muted-foreground">
                         {viewingProfile.location}
                       </span>
                     </div>
@@ -722,22 +560,17 @@ export default function Connect() {
                   {/* Tags/Interests Section */}
                   {viewingProfile.interests && viewingProfile.interests.length > 0 && (
                     <div>
-                      <h3 className="text-[13px] font-semibold mb-3 uppercase tracking-wider" 
-                        style={{ color: DESIGN.colors.textSecondary }}>
+                      <h3 className="text-[13px] font-semibold mb-3 uppercase tracking-wider text-muted-foreground">
                         Interests
                       </h3>
                       <div className="flex flex-wrap gap-2">
                         {viewingProfile.interests.map((interest, index) => (
                           <div 
                             key={index}
-                            className="flex items-center px-3 py-1.5 rounded-full"
-                            style={{
-                              background: 'rgba(196, 181, 253, 0.1)',
-                              border: `1px solid ${DESIGN.colors.primary}30`
-                            }}
+                            className="flex items-center px-3 py-1.5 rounded-full bg-primary/10 border border-primary/30"
                           >
-                            <Tag className="w-3 h-3 mr-2" style={{ color: DESIGN.colors.primary }} />
-                            <span className="text-[13px] font-medium" style={{ color: DESIGN.colors.primary }}>
+                            <Tag className="w-3 h-3 mr-2 text-primary" />
+                            <span className="text-[13px] font-medium text-primary">
                               {interest}
                             </span>
                           </div>
@@ -747,14 +580,8 @@ export default function Connect() {
                   )}
                 </div>
 
-                {/* Action buttons - Purple theme */}
-                <div 
-                  className="p-5 border-t"
-                  style={{ 
-                    borderColor: `${DESIGN.colors.textSecondary}20`,
-                    paddingBottom: 'calc(20px + env(safe-area-inset-bottom, 0px))'
-                  }}
-                >
+                {/* Action buttons */}
+                <div className="p-5 border-t border-muted-foreground/20 pb-safe">
                   <div className="flex gap-3">
                     <Button
                       variant="outline"
@@ -762,14 +589,7 @@ export default function Connect() {
                         setViewingProfile(null);
                         handleSwipe('left');
                       }}
-                      className="flex-1 h-12 rounded-[12px] hover:bg-gray-800 transition-colors"
-                      style={{ 
-                        borderColor: DESIGN.colors.red,
-                        color: DESIGN.colors.red,
-                        background: 'transparent',
-                        fontSize: '16px',
-                        fontWeight: '600'
-                      }}
+                      className="flex-1 h-12 rounded-ampz-md border-destructive text-destructive bg-transparent hover:bg-destructive/10 text-base font-semibold"
                     >
                       <ThumbsDown className="w-5 h-5 mr-2" />
                       Pass
@@ -779,14 +599,7 @@ export default function Connect() {
                         setViewingProfile(null);
                         handleSwipe('right');
                       }}
-                      className="flex-1 h-12 rounded-[12px] hover:bg-purple-700 transition-colors"
-                      style={{ 
-                        background: DESIGN.colors.primary,
-                        color: DESIGN.colors.background,
-                        fontSize: '16px',
-                        fontWeight: '600',
-                        boxShadow: `0 4px 16px ${DESIGN.colors.primary}40`
-                      }}
+                      className="flex-1 h-12 rounded-ampz-md bg-primary text-primary-foreground hover:bg-accent text-base font-semibold shadow-lg"
                     >
                       <ThumbsUp className="w-5 h-5 mr-2" />
                       Like
