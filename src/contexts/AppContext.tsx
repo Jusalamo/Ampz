@@ -139,11 +139,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [communityPhotos, setCommunityPhotos] = useState<CommunityPhoto[]>([]);
   const [communityComments, setCommunityComments] = useState<CommunityComment[]>([]);
 
-  // Fetch user profile from database
+  // Fetch user profile from database - only select needed columns
   const fetchProfile = useCallback(async (userId: string): Promise<any> => {
+    // Select only the columns needed for the user's own profile
+    // This prevents accidental exposure of sensitive fields
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select(`
+        id, email, name, age, bio, occupation, company, location, gender, 
+        interests, profile_photo, phone, subscription_tier, subscription_expires_at,
+        settings, blocked_users, bookmarked_events, created_events, 
+        likes_remaining, last_like_reset, is_demo_account, created_at, updated_at
+      `)
       .eq('id', userId)
       .single();
 
