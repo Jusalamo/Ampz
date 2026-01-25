@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/lib/types';
@@ -12,9 +12,20 @@ export interface AuthState {
   error: string | null;
 }
 
-// Demo user credentials
+// Demo user credentials - sandboxed with RLS and is_demo_account flag
 const DEMO_EMAIL = 'demo@amps.app';
 const DEMO_PASSWORD = 'demo123456';
+
+// Rate limiting configuration
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 30 * 1000; // 30 seconds
+const ATTEMPT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
+interface LoginAttempt {
+  count: number;
+  firstAttemptAt: number;
+  lockedUntil: number | null;
+}
 
 export function useAuth() {
   const [state, setState] = useState<AuthState>({
@@ -25,6 +36,60 @@ export function useAuth() {
     isDemo: false,
     error: null,
   });
+
+  // Client-side rate limiting state (per email)
+  const loginAttemptsRef = useRef<Map<string, LoginAttempt>>(new Map());
+
+  // Check if login is rate limited
+  const checkRateLimit = useCallback((email: string): { allowed: boolean; waitTime?: number } => {
+    const attempts = loginAttemptsRef.current.get(email);
+    const now = Date.now();
+
+    if (!attempts) {
+      return { allowed: true };
+    }
+
+    // Check if locked out
+    if (attempts.lockedUntil && attempts.lockedUntil > now) {
+      return { allowed: false, waitTime: Math.ceil((attempts.lockedUntil - now) / 1000) };
+    }
+
+    // Reset if outside attempt window
+    if (now - attempts.firstAttemptAt > ATTEMPT_WINDOW_MS) {
+      loginAttemptsRef.current.delete(email);
+      return { allowed: true };
+    }
+
+    // Check if max attempts exceeded
+    if (attempts.count >= MAX_LOGIN_ATTEMPTS) {
+      const lockedUntil = now + LOCKOUT_DURATION_MS;
+      loginAttemptsRef.current.set(email, { ...attempts, lockedUntil });
+      return { allowed: false, waitTime: Math.ceil(LOCKOUT_DURATION_MS / 1000) };
+    }
+
+    return { allowed: true };
+  }, []);
+
+  // Record a failed login attempt
+  const recordFailedAttempt = useCallback((email: string) => {
+    const attempts = loginAttemptsRef.current.get(email);
+    const now = Date.now();
+
+    if (!attempts || now - attempts.firstAttemptAt > ATTEMPT_WINDOW_MS) {
+      loginAttemptsRef.current.set(email, { count: 1, firstAttemptAt: now, lockedUntil: null });
+    } else {
+      loginAttemptsRef.current.set(email, { 
+        ...attempts, 
+        count: attempts.count + 1,
+        lockedUntil: attempts.count + 1 >= MAX_LOGIN_ATTEMPTS ? now + LOCKOUT_DURATION_MS : null
+      });
+    }
+  }, []);
+
+  // Clear login attempts on successful login
+  const clearLoginAttempts = useCallback((email: string) => {
+    loginAttemptsRef.current.delete(email);
+  }, []);
 
   // Convert Supabase profile to app User type
   const profileToUser = useCallback((profile: any, supabaseUser: SupabaseUser): User => {
@@ -63,11 +128,17 @@ export function useAuth() {
     };
   }, []);
 
-  // Fetch user profile from database
+  // Fetch user profile from database - only select needed columns for own profile
   const fetchProfile = useCallback(async (userId: string): Promise<any> => {
+    // Select only the columns needed for the user's own profile
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select(`
+        id, email, name, age, bio, occupation, company, location, gender, 
+        interests, profile_photo, phone, subscription_tier, subscription_expires_at,
+        settings, blocked_users, bookmarked_events, created_events, 
+        likes_remaining, last_like_reset, is_demo_account, created_at, updated_at
+      `)
       .eq('id', userId)
       .single();
 
@@ -171,11 +242,19 @@ export function useAuth() {
     }
   }, []);
 
-  // Sign in with email and password
+  // Sign in with email and password - with rate limiting
   const login = useCallback(async (
     email: string,
     password: string
   ): Promise<{ success: boolean; error?: string }> => {
+    // Check rate limit before attempting login
+    const rateLimitCheck = checkRateLimit(email);
+    if (!rateLimitCheck.allowed) {
+      const errorMsg = `Too many login attempts. Please wait ${rateLimitCheck.waitTime} seconds.`;
+      setState(prev => ({ ...prev, error: errorMsg }));
+      return { success: false, error: errorMsg };
+    }
+
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
@@ -185,17 +264,21 @@ export function useAuth() {
       });
 
       if (error) {
+        recordFailedAttempt(email);
         setState(prev => ({ ...prev, isLoading: false, error: error.message }));
         return { success: false, error: error.message };
       }
 
+      // Clear attempts on successful login
+      clearLoginAttempts(email);
       return { success: true };
     } catch (error: any) {
+      recordFailedAttempt(email);
       const message = error?.message || 'Login failed';
       setState(prev => ({ ...prev, isLoading: false, error: message }));
       return { success: false, error: message };
     }
-  }, []);
+  }, [checkRateLimit, recordFailedAttempt, clearLoginAttempts]);
 
   // Sign in with Google
   const loginWithGoogle = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
