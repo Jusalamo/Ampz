@@ -84,7 +84,6 @@ export default function Events() {
         <MapDrawer 
           onCreateEvent={handleCreateEvent}
           onOpenFilters={() => setShowFilters(true)}
-          activeEvents={activeEvents}
         />
       </div>
       
