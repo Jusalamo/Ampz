@@ -133,7 +133,7 @@ function scannerReducer(state: ScannerState, action: ScannerAction): ScannerStat
 }
 
 export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess }: QRScannerModalProps) {
-  const { processQRCodeScan, isLoading } = useCheckIn(userId);
+  const { processQRCodeScan, checkInToEventFast, isLoading } = useCheckIn(userId);
   
   const [state, dispatch] = useReducer(scannerReducer, initialState);
   
@@ -283,13 +283,17 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
           .limit(1);
 
         if (existingCheckIn && existingCheckIn.length > 0) {
-          dispatch({ type: 'SET_SUCCESS', message: `Already checked in to ${event.name}!` });
+          dispatch({ 
+            type: 'SET_SUCCESS', 
+            message: `Already checked in to ${event.name}!`,
+            distance: 0 
+          });
           onCheckInSuccess?.(event.id);
           return;
         }
       }
       
-      // Perform geofence check (this will validate location)
+      // Perform geofence check
       dispatch({ type: 'SET_GEOFENCE_CHECK' });
       
       const result = await processQRCodeScan(code, 'public');
@@ -307,7 +311,11 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
             distance: result.distance || null,
           });
         } else if (result.error?.includes('already')) {
-          dispatch({ type: 'SET_SUCCESS', message: `Already checked in to ${event.name}!` });
+          dispatch({ 
+            type: 'SET_SUCCESS', 
+            message: `Already checked in to ${event.name}!`,
+            distance: 0 
+          });
           onCheckInSuccess?.(event.id);
         } else {
           dispatch({ type: 'SET_ERROR', message: result.error || 'Check-in failed. Please try again.' });
@@ -395,15 +403,21 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
   }, [state.manualCode, processQRCode]);
 
   // Handle privacy choice
-  const handlePrivacyChoice = useCallback((isPublic: boolean) => {
+  const handlePrivacyChoice = useCallback(async (isPublic: boolean) => {
     dispatch({ type: 'SET_PRIVACY', isPublic });
+    
+    if (!state.scannedEvent || !userId) {
+      dispatch({ type: 'SET_ERROR', message: 'Event or user information missing' });
+      return;
+    }
+    
     if (isPublic) {
       dispatch({ type: 'SET_STEP', step: 'photo' });
     } else {
-      // Complete check-in without photo
-      completeCheckIn(isPublic, null);
+      // Complete check-in immediately for private mode
+      await completeCheckIn(isPublic, null);
     }
-  }, []);
+  }, [state.scannedEvent, userId]);
 
   // Capture photo
   const capturePhoto = useCallback(() => {
@@ -424,38 +438,58 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
 
   // Complete check-in with privacy settings and optional photo
   const completeCheckIn = useCallback(async (isPublic?: boolean, photo?: string | null) => {
-    if (!state.scannedEvent || !userId) return;
+    if (!state.scannedEvent || !userId) {
+      dispatch({ type: 'SET_ERROR', message: 'Event or user information missing' });
+      return;
+    }
     
     const privacyMode = isPublic ?? state.isPublic ?? false;
     const eventPhoto = photo ?? state.capturedPhoto;
     
     try {
-      // Update check-in record with privacy and photo
-      const { error } = await supabase
-        .from('check_ins')
-        .update({
-          privacy_mode: privacyMode ? 'public' : 'private',
-          event_photo: eventPhoto,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId)
-        .eq('event_id', state.scannedEvent.id);
-
-      if (error) {
-        console.error('Error updating check-in:', error);
-      }
-
-      dispatch({
-        type: 'SET_SUCCESS',
-        message: `Successfully checked in to ${state.scannedEvent.name}!`,
-      });
+      dispatch({ type: 'SET_STEP', step: 'verifying' });
       
-      onCheckInSuccess?.(state.scannedEvent.id);
-    } catch (err) {
+      // Use the existing check-in function with privacy mode
+      const result = await checkInToEventFast(
+        state.scannedEvent.id,
+        privacyMode ? 'public' : 'private'
+      );
+      
+      if (result.success) {
+        // Update check-in record with photo if provided
+        if (eventPhoto) {
+          await supabase
+            .from('check_ins')
+            .update({ 
+              event_photo: eventPhoto,
+              updated_at: new Date().toISOString()
+            })
+            .eq('event_id', state.scannedEvent.id)
+            .eq('user_id', userId);
+        }
+        
+        // Success!
+        dispatch({
+          type: 'SET_SUCCESS',
+          message: `Successfully checked in to ${state.scannedEvent.name}!`,
+          distance: result.distance || 0
+        });
+        
+        onCheckInSuccess?.(state.scannedEvent.id);
+      } else {
+        dispatch({ 
+          type: 'SET_ERROR', 
+          message: result.error || 'Check-in failed. Please try again.' 
+        });
+      }
+    } catch (err: any) {
       console.error('Error completing check-in:', err);
-      dispatch({ type: 'SET_ERROR', message: 'Failed to complete check-in' });
+      dispatch({ 
+        type: 'SET_ERROR', 
+        message: err?.message || 'Failed to complete check-in. Please try again.' 
+      });
     }
-  }, [state.scannedEvent, state.isPublic, state.capturedPhoto, userId, onCheckInSuccess]);
+  }, [state.scannedEvent, state.isPublic, state.capturedPhoto, userId, checkInToEventFast, onCheckInSuccess]);
 
   const handleClose = useCallback(() => {
     stopScanning();
@@ -621,10 +655,12 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
             <>
               <Loader2 className="w-16 h-16 animate-spin mb-6" style={{ color: DESIGN.colors.primary }} />
               <h3 className="text-xl font-bold mb-2" style={{ color: DESIGN.colors.textPrimary }}>
-                Verifying Event
+                {state.scannedEvent ? 'Completing Check-In...' : 'Verifying Event'}
               </h3>
               <p className="text-center mb-4" style={{ color: DESIGN.colors.textSecondary }}>
-                Checking event details...
+                {state.scannedEvent 
+                  ? 'Finalizing your check-in...' 
+                  : 'Checking event details...'}
               </p>
               {state.scannedEvent && (
                 <p className="text-sm font-medium text-center">
@@ -677,6 +713,7 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
                     borderRadius: DESIGN.borderRadius.card,
                     border: `2px solid ${DESIGN.colors.card}`
                   }}
+                  disabled={isLoading}
                 >
                   <div className="flex items-center gap-4 mb-3">
                     <div 
@@ -711,6 +748,7 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
                     borderRadius: DESIGN.borderRadius.card,
                     border: `2px solid ${DESIGN.colors.card}`
                   }}
+                  disabled={isLoading}
                 >
                   <div className="flex items-center gap-4 mb-3">
                     <div 
@@ -741,6 +779,7 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
                 variant="outline" 
                 onClick={handleClose} 
                 className="w-full h-12"
+                disabled={isLoading}
               >
                 Cancel
               </Button>
@@ -796,6 +835,7 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
                     color: DESIGN.colors.textPrimary,
                     borderRadius: DESIGN.borderRadius.round
                   }}
+                  disabled={isLoading}
                 >
                   <X className="w-6 h-6" />
                 </motion.button>
@@ -809,6 +849,7 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
                     borderRadius: DESIGN.borderRadius.round,
                     boxShadow: DESIGN.shadows.glowPurple
                   }}
+                  disabled={isLoading}
                 >
                   <Camera className="w-8 h-8" />
                 </motion.button>
@@ -890,6 +931,7 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
                   variant="outline"
                   className="flex-1 h-12"
                   onClick={() => dispatch({ type: 'SET_STEP', step: 'photo' })}
+                  disabled={isLoading}
                 >
                   <RotateCcw className="w-4 h-4 mr-2" />
                   Retake
@@ -902,9 +944,16 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
                     boxShadow: DESIGN.shadows.glowPurple
                   }}
                   onClick={() => completeCheckIn()}
+                  disabled={isLoading}
                 >
-                  <Check className="w-4 h-4 mr-2" />
-                  Looks Good!
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Looks Good!
+                    </>
+                  )}
                 </Button>
               </div>
             </>
@@ -934,7 +983,7 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
               <h4 className="text-2xl font-bold mb-8" style={{ color: DESIGN.colors.primary }}>
                 {state.scannedEvent.name}
               </h4>
-              {state.distance !== null && (
+              {state.distance !== null && state.distance > 0 && (
                 <div className="mb-6 p-3 rounded-lg" style={{ background: `${DESIGN.colors.brandGreen}10`, border: `1px solid ${DESIGN.colors.brandGreen}30` }}>
                   <p className="text-sm" style={{ color: DESIGN.colors.brandGreen }}>
                     <MapPin className="w-4 h-4 inline mr-1" />
@@ -987,6 +1036,10 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
                   className="h-12" 
                   onClick={() => dispatch({ type: 'SET_STEP', step: 'code' })}
                   disabled={isLoading}
+                  style={{ 
+                    background: DESIGN.colors.primary,
+                    color: DESIGN.colors.background,
+                  }}
                 >
                   Enter Code
                 </Button>
