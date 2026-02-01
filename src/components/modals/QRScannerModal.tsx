@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useReducer, useRef, useEffect, useCallback } from 'react';
 import { X, QrCode, Keyboard, Loader2, MapPin, AlertCircle, Check, ExternalLink, Navigation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCheckIn } from '@/hooks/useCheckIn';
 import { Event } from '@/lib/types';
-import { BrowserMultiFormatReader } from '@zxing/browser';
 import { supabase } from '@/integrations/supabase/client';
 
 interface QRScannerModalProps {
@@ -18,86 +17,106 @@ interface QRScannerModalProps {
 
 type ScannerStep = 'scan' | 'code' | 'verifying' | 'geofence_check' | 'success' | 'error' | 'outside_geofence';
 
+interface ScannerState {
+  step: ScannerStep;
+  manualCode: string;
+  scannedEvent: Event | null;
+  errorMessage: string;
+  successMessage: string;
+  distance: number | null;
+}
+
+type ScannerAction =
+  | { type: 'RESET' }
+  | { type: 'SET_STEP'; step: ScannerStep }
+  | { type: 'SET_MANUAL_CODE'; code: string }
+  | { type: 'SET_EVENT'; event: Event | null }
+  | { type: 'SET_ERROR'; message: string }
+  | { type: 'SET_SUCCESS'; message: string; distance?: number | null }
+  | { type: 'SET_VERIFYING'; event?: Event | null }
+  | { type: 'SET_GEOFENCE_CHECK' }
+  | { type: 'SET_OUTSIDE_GEOFENCE'; message: string; distance?: number | null };
+
+const initialState: ScannerState = {
+  step: 'scan',
+  manualCode: '',
+  scannedEvent: null,
+  errorMessage: '',
+  successMessage: '',
+  distance: null,
+};
+
+function scannerReducer(state: ScannerState, action: ScannerAction): ScannerState {
+  switch (action.type) {
+    case 'RESET':
+      return initialState;
+    case 'SET_STEP':
+      return { ...state, step: action.step };
+    case 'SET_MANUAL_CODE':
+      return { ...state, manualCode: action.code };
+    case 'SET_EVENT':
+      return { ...state, scannedEvent: action.event };
+    case 'SET_ERROR':
+      return { ...state, step: 'error', errorMessage: action.message };
+    case 'SET_SUCCESS':
+      return {
+        ...state,
+        step: 'success',
+        successMessage: action.message,
+        distance: action.distance ?? state.distance,
+      };
+    case 'SET_VERIFYING':
+      return {
+        ...state,
+        step: 'verifying',
+        errorMessage: '',
+        scannedEvent: action.event ?? state.scannedEvent,
+      };
+    case 'SET_GEOFENCE_CHECK':
+      return { ...state, step: 'geofence_check' };
+    case 'SET_OUTSIDE_GEOFENCE':
+      return {
+        ...state,
+        step: 'outside_geofence',
+        errorMessage: action.message,
+        distance: action.distance ?? state.distance,
+      };
+    default:
+      return state;
+  }
+}
+
 export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QRScannerModalProps) {
   const navigate = useNavigate();
-  const { processQRCodeScan, isLoading, validateQRCode } = useCheckIn(userId);
+  const { processQRCodeScan, isLoading } = useCheckIn(userId);
   
-  const [step, setStep] = useState<ScannerStep>('scan');
-  const [manualCode, setManualCode] = useState('');
-  const [scannedEvent, setScannedEvent] = useState<Event | null>(null);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-  const [distance, setDistance] = useState<number | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string>('');
+  const [state, dispatch] = useReducer(scannerReducer, initialState);
   
   const videoRef = useRef<HTMLVideoElement>(null);
-  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+  const codeReaderRef = useRef<any>(null);
   const controlsRef = useRef<{ stop: () => void } | null>(null);
   const isStartingRef = useRef(false);
 
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
-      setStep('scan');
-      setManualCode('');
-      setScannedEvent(null);
-      setErrorMessage('');
-      setSuccessMessage('');
-      setDistance(null);
-      setDebugInfo('');
+      dispatch({ type: 'RESET' });
     }
   }, [isOpen]);
 
-  // Fetch event details by ID
-  const fetchEventDetails = useCallback(async (eventId: string): Promise<Event | null> => {
-    try {
-      const { data: eventData, error } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', eventId)
-        .single();
-
-      if (error || !eventData) {
-        return null;
-      }
-
-      return {
-        id: eventData.id,
-        name: eventData.name,
-        description: eventData.description || '',
-        category: eventData.category,
-        location: eventData.location,
-        address: eventData.address,
-        coordinates: { lat: eventData.latitude, lng: eventData.longitude },
-        date: eventData.date,
-        time: eventData.time,
-        price: eventData.price || 0,
-        currency: eventData.currency || 'NAD',
-        maxAttendees: eventData.max_attendees || 500,
-        attendees: eventData.attendees_count || 0,
-        organizerId: eventData.organizer_id,
-        qrCode: eventData.qr_code,
-        geofenceRadius: eventData.geofence_radius || 50,
-        customTheme: eventData.custom_theme || '#8B5CF6',
-        coverImage: eventData.cover_image || '',
-        images: eventData.images || [],
-        videos: eventData.videos || [],
-        tags: eventData.tags || [],
-        isFeatured: eventData.is_featured || false,
-        isDemo: eventData.is_demo || false,
-        isActive: eventData.is_active ?? true,
-      };
-    } catch (error) {
-      console.error('Error fetching event details:', error);
-      return null;
+  // Stop scanning
+  const stopScanning = useCallback(() => {
+    if (controlsRef.current) {
+      controlsRef.current.stop();
+      controlsRef.current = null;
     }
+    codeReaderRef.current = null;
+    isStartingRef.current = false;
   }, []);
 
   // Process QR code - OPTIMIZED for speed
   const processQRCode = useCallback(async (code: string) => {
-    setStep('verifying');
-    setErrorMessage('');
-    setDebugInfo(`Processing QR code...`);
+    dispatch({ type: 'SET_VERIFYING' });
     
     try {
       console.log('Processing QR code:', code);
@@ -116,8 +135,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       }
       
       if (!eventId) {
-        setErrorMessage('Invalid QR code format. Please scan a valid event QR code.');
-        setStep('error');
+        dispatch({ type: 'SET_ERROR', message: 'Invalid QR code format. Please scan a valid event QR code.' });
         return;
       }
       
@@ -131,14 +149,12 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
         .single();
       
       if (eventError || !eventData) {
-        setErrorMessage('Event not found. Please check the QR code.');
-        setStep('error');
+        dispatch({ type: 'SET_ERROR', message: 'Event not found. Please check the QR code.' });
         return;
       }
       
       if (!eventData.is_active) {
-        setErrorMessage('This event is no longer active.');
-        setStep('error');
+        dispatch({ type: 'SET_ERROR', message: 'This event is no longer active.' });
         return;
       }
       
@@ -151,8 +167,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
         isActive: eventData.is_active,
       } as Event;
       
-      setScannedEvent(event);
-      setDebugInfo(`Event found: ${event.name}`);
+      dispatch({ type: 'SET_EVENT', event });
       
       // Check if user has already checked in
       if (userId) {
@@ -164,64 +179,57 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
           .limit(1);
 
         if (existingCheckIn && existingCheckIn.length > 0) {
-          setSuccessMessage(`Already checked in to ${event.name}!`);
-          setStep('success');
+          dispatch({ type: 'SET_SUCCESS', message: `Already checked in to ${event.name}!` });
           onCheckInSuccess?.(event.id);
           return;
         }
       }
       
       // Perform the actual check-in using secure RPC
-      setStep('geofence_check');
-      setDebugInfo('Verifying location and checking in...');
+      dispatch({ type: 'SET_GEOFENCE_CHECK' });
       
       const result = await processQRCodeScan(code, 'public');
       
       if (result.success) {
-        setSuccessMessage(result.message || `Successfully checked in to ${event.name}!`);
-        setDistance(result.distance || null);
-        setStep('success');
+        dispatch({
+          type: 'SET_SUCCESS',
+          message: result.message || `Successfully checked in to ${event.name}!`,
+          distance: result.distance || null,
+        });
         onCheckInSuccess?.(result.eventId || event.id);
       } else {
         // Check if error is about geofence
         if (result.error?.includes('away') || result.error?.includes('within') || result.error?.includes('meters')) {
-          setDistance(result.distance || null);
-          setErrorMessage(result.error || 'You are outside the event area');
-          setStep('outside_geofence');
+          dispatch({
+            type: 'SET_OUTSIDE_GEOFENCE',
+            message: result.error || 'You are outside the event area',
+            distance: result.distance || null,
+          });
         } else if (result.error?.includes('already')) {
-          setSuccessMessage(`Already checked in to ${event.name}!`);
-          setStep('success');
+          dispatch({ type: 'SET_SUCCESS', message: `Already checked in to ${event.name}!` });
           onCheckInSuccess?.(event.id);
         } else {
-          setErrorMessage(result.error || 'Check-in failed. Please try again.');
-          setStep('error');
+          dispatch({ type: 'SET_ERROR', message: result.error || 'Check-in failed. Please try again.' });
         }
       }
     } catch (err: any) {
       console.error('Error processing QR code:', err);
-      setErrorMessage(err?.message || 'Failed to process QR code. Please try again.');
-      setStep('error');
+      dispatch({ type: 'SET_ERROR', message: err?.message || 'Failed to process QR code. Please try again.' });
     }
   }, [processQRCodeScan, userId, onCheckInSuccess]);
 
-  // Stop scanning
-  const stopScanning = useCallback(() => {
-    if (controlsRef.current) {
-      controlsRef.current.stop();
-      controlsRef.current = null;
-    }
-    codeReaderRef.current = null;
-    isStartingRef.current = false;
-  }, []);
-
-  // Start QR code scanning
+  // Start QR code scanning - with lazy loading
   const startScanning = useCallback(async () => {
     if (!videoRef.current) return;
     if (isStartingRef.current) return;
     isStartingRef.current = true;
     
     try {
-      codeReaderRef.current = new BrowserMultiFormatReader();
+      // Lazy load the QR code library
+      if (!codeReaderRef.current) {
+        const { BrowserMultiFormatReader } = await import('@zxing/browser');
+        codeReaderRef.current = new BrowserMultiFormatReader();
+      }
 
       // Try to get the environment/rear camera
       let preferredDeviceId: string | undefined;
@@ -237,19 +245,22 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       controlsRef.current = await codeReaderRef.current.decodeFromVideoDevice(
         preferredDeviceId,
         videoRef.current,
-        async (result, error) => {
+        async (result: any) => {
           if (result) {
             stopScanning();
             const code = result.getText();
-            setManualCode(code);
+            dispatch({ type: 'SET_MANUAL_CODE', code });
             await processQRCode(code);
           }
         }
       );
     } catch (err) {
       console.error('Camera access error:', err);
-      setErrorMessage('Camera access required. Please enable camera permissions or use manual code entry.');
-      setStep('code');
+      dispatch({
+        type: 'SET_ERROR',
+        message: 'Camera access required. Please enable camera permissions or use manual code entry.',
+      });
+      dispatch({ type: 'SET_STEP', step: 'code' });
     } finally {
       isStartingRef.current = false;
     }
@@ -257,52 +268,52 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
 
   // Start/stop scanning based on step
   useEffect(() => {
-    if (isOpen && step === 'scan') {
+    if (isOpen && state.step === 'scan') {
       startScanning();
     } else {
       stopScanning();
     }
 
     return () => stopScanning();
-  }, [isOpen, step, startScanning, stopScanning]);
+  }, [isOpen, state.step, startScanning, stopScanning]);
 
   // Handle manual code submission
-  const handleCodeSubmit = async () => {
-    if (!manualCode.trim()) {
-      setErrorMessage('Please enter a code or URL');
+  const handleCodeSubmit = useCallback(async () => {
+    if (!state.manualCode.trim()) {
+      dispatch({ type: 'SET_ERROR', message: 'Please enter a code or URL' });
       return;
     }
-    await processQRCode(manualCode);
-  };
+    await processQRCode(state.manualCode);
+  }, [state.manualCode, processQRCode]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     stopScanning();
     onClose();
     
-    if (step === 'success' && scannedEvent) {
-      navigate(`/event/${scannedEvent.id}`);
+    if (state.step === 'success' && state.scannedEvent) {
+      navigate(`/event/${state.scannedEvent.id}`);
     }
-  };
+  }, [stopScanning, onClose, state.step, state.scannedEvent, navigate]);
 
-  const handleViewEvent = () => {
-    if (scannedEvent) {
-      navigate(`/event/${scannedEvent.id}`);
+  const handleViewEvent = useCallback(() => {
+    if (state.scannedEvent) {
+      navigate(`/event/${state.scannedEvent.id}`);
     }
     onClose();
-  };
+  }, [state.scannedEvent, navigate, onClose]);
 
-  const handleRetry = async () => {
-    if (!manualCode.trim() && !scannedEvent) {
-      setStep('scan');
+  const handleRetry = useCallback(async () => {
+    if (!state.manualCode.trim() && !state.scannedEvent) {
+      dispatch({ type: 'SET_STEP', step: 'scan' });
       return;
     }
     
-    if (scannedEvent && manualCode) {
-      await processQRCode(manualCode);
+    if (state.scannedEvent && state.manualCode) {
+      await processQRCode(state.manualCode);
     } else {
-      setStep('scan');
+      dispatch({ type: 'SET_STEP', step: 'scan' });
     }
-  };
+  }, [state.manualCode, state.scannedEvent, processQRCode]);
 
   if (!isOpen) return null;
 
@@ -317,13 +328,13 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-xl font-bold text-foreground">
-            {step === 'scan' && 'Scan QR Code'}
-            {step === 'code' && 'Enter Event Code'}
-            {step === 'verifying' && 'Verifying...'}
-            {step === 'geofence_check' && 'Checking In...'}
-            {step === 'success' && 'Check-In Complete!'}
-            {step === 'error' && 'Check-In Failed'}
-            {step === 'outside_geofence' && 'Outside Event Area'}
+            {state.step === 'scan' && 'Scan QR Code'}
+            {state.step === 'code' && 'Enter Event Code'}
+            {state.step === 'verifying' && 'Verifying...'}
+            {state.step === 'geofence_check' && 'Checking In...'}
+            {state.step === 'success' && 'Check-In Complete!'}
+            {state.step === 'error' && 'Check-In Failed'}
+            {state.step === 'outside_geofence' && 'Outside Event Area'}
           </h2>
           <button
             onClick={handleClose}
@@ -336,7 +347,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
 
         {/* Content */}
         <div className="flex-1 flex flex-col items-center justify-center p-6">
-          {step === 'scan' && (
+          {state.step === 'scan' && (
             <>
               <div className="relative w-64 h-64 mb-6 rounded-3xl overflow-hidden">
                 <video
@@ -362,7 +373,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
               <Button 
                 variant="outline" 
                 className="h-12"
-                onClick={() => setStep('code')}
+                onClick={() => dispatch({ type: 'SET_STEP', step: 'code' })}
                 disabled={isLoading}
               >
                 <Keyboard className="w-4 h-4 mr-2" />
@@ -371,7 +382,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
             </>
           )}
 
-          {step === 'code' && (
+          {state.step === 'code' && (
             <>
               <QrCode className="w-16 h-16 text-primary mb-6" />
               <h3 className="text-xl font-bold mb-2">Enter Event Code</h3>
@@ -379,8 +390,8 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 Enter the event code or scan the QR code
               </p>
               <Input
-                value={manualCode}
-                onChange={(e) => setManualCode(e.target.value)}
+                value={state.manualCode}
+                onChange={(e) => dispatch({ type: 'SET_MANUAL_CODE', code: e.target.value })}
                 placeholder="Enter code or event URL..."
                 className="text-center text-lg font-medium h-14 max-w-xs mb-6"
                 onKeyDown={(e) => e.key === 'Enter' && handleCodeSubmit()}
@@ -389,7 +400,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 <Button 
                   variant="outline" 
                   className="flex-1 h-12" 
-                  onClick={() => setStep('scan')}
+                  onClick={() => dispatch({ type: 'SET_STEP', step: 'scan' })}
                   disabled={isLoading}
                 >
                   Back to Scan
@@ -397,7 +408,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 <Button 
                   className="flex-1 h-12" 
                   onClick={handleCodeSubmit} 
-                  disabled={!manualCode.trim() || isLoading}
+                  disabled={!state.manualCode.trim() || isLoading}
                 >
                   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Check In'}
                 </Button>
@@ -405,20 +416,20 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
             </>
           )}
 
-          {step === 'verifying' && (
+          {state.step === 'verifying' && (
             <>
               <Loader2 className="w-16 h-16 text-primary animate-spin mb-6" />
               <h3 className="text-xl font-bold mb-2">Verifying Event</h3>
               <p className="text-muted-foreground text-center mb-4">Checking event details...</p>
-              {scannedEvent && (
+              {state.scannedEvent && (
                 <p className="text-sm font-medium text-center">
-                  {scannedEvent.name}
+                  {state.scannedEvent.name}
                 </p>
               )}
             </>
           )}
 
-          {step === 'geofence_check' && (
+          {state.step === 'geofence_check' && (
             <>
               <div className="relative">
                 <Navigation className="w-16 h-16 text-primary mb-6" />
@@ -428,26 +439,26 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
               <p className="text-muted-foreground text-center mb-4">
                 Verifying your location and checking you in...
               </p>
-              {scannedEvent && (
+              {state.scannedEvent && (
                 <p className="text-sm text-muted-foreground text-center">
-                  Event: <span className="font-medium">{scannedEvent.name}</span>
+                  Event: <span className="font-medium">{state.scannedEvent.name}</span>
                 </p>
               )}
             </>
           )}
 
-          {step === 'success' && (
+          {state.step === 'success' && (
             <>
               <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mb-6">
                 <Check className="w-10 h-10 text-green-500" />
               </div>
-              <h3 className="text-xl font-bold mb-2">{successMessage}</h3>
+              <h3 className="text-xl font-bold mb-2">{state.successMessage}</h3>
               <p className="text-muted-foreground text-center mb-6">You're now checked in!</p>
-              {distance !== null && (
+              {state.distance !== null && (
                 <div className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
                   <p className="text-sm text-green-600 dark:text-green-400">
                     <MapPin className="w-4 h-4 inline mr-1" />
-                    Checked in from {distance}m away
+                    Checked in from {state.distance}m away
                   </p>
                 </div>
               )}
@@ -458,7 +469,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 >
                   Close
                 </Button>
-                {scannedEvent && (
+                {state.scannedEvent && (
                   <Button 
                     variant="outline" 
                     className="h-12 px-6"
@@ -472,13 +483,13 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
             </>
           )}
 
-          {step === 'error' && (
+          {state.step === 'error' && (
             <>
               <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center mb-6">
                 <AlertCircle className="w-10 h-10 text-red-500" />
               </div>
               <h3 className="text-xl font-bold mb-2">Check-In Failed</h3>
-              <p className="text-muted-foreground text-center mb-6 max-w-xs">{errorMessage}</p>
+              <p className="text-muted-foreground text-center mb-6 max-w-xs">{state.errorMessage}</p>
               <div className="flex gap-3">
                 <Button 
                   variant="outline" 
@@ -490,7 +501,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 </Button>
                 <Button 
                   className="h-12" 
-                  onClick={() => setStep('code')}
+                  onClick={() => dispatch({ type: 'SET_STEP', step: 'code' })}
                   disabled={isLoading}
                 >
                   Enter Code
@@ -499,36 +510,36 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
             </>
           )}
 
-          {step === 'outside_geofence' && (
+          {state.step === 'outside_geofence' && (
             <>
               <div className="w-20 h-20 rounded-full bg-yellow-500/20 flex items-center justify-center mb-6">
                 <MapPin className="w-10 h-10 text-yellow-500" />
               </div>
               <h3 className="text-xl font-bold mb-2">Outside Event Area</h3>
-              <p className="text-muted-foreground text-center mb-4 max-w-xs">{errorMessage}</p>
+              <p className="text-muted-foreground text-center mb-4 max-w-xs">{state.errorMessage}</p>
               
-              {scannedEvent && (
+              {state.scannedEvent && (
                 <div className="w-full max-w-xs mb-6">
                   <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-4">
                     <h4 className="font-medium text-yellow-600 dark:text-yellow-400 mb-2">
                       Event Details
                     </h4>
                     <p className="text-sm text-foreground mb-1">
-                      <span className="font-medium">Event:</span> {scannedEvent.name}
+                      <span className="font-medium">Event:</span> {state.scannedEvent.name}
                     </p>
                     <p className="text-sm text-foreground">
-                      <span className="font-medium">Location:</span> {scannedEvent.location}
+                      <span className="font-medium">Location:</span> {state.scannedEvent.location}
                     </p>
                   </div>
                   
-                  {distance !== null && (
+                  {state.distance !== null && (
                     <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
                       <p className="text-sm text-red-600 dark:text-red-400">
                         <MapPin className="w-4 h-4 inline mr-1" />
-                        You are {distance}m away from the event
+                        You are {state.distance}m away from the event
                       </p>
                       <p className="text-xs text-red-500/80 mt-1">
-                        You need to be within {scannedEvent.geofenceRadius || 50}m to check in
+                        You need to be within {state.scannedEvent.geofenceRadius || 50}m to check in
                       </p>
                     </div>
                   )}
@@ -550,7 +561,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 <Button 
                   variant="outline" 
                   className="h-12 w-full" 
-                  onClick={() => setStep('scan')}
+                  onClick={() => dispatch({ type: 'SET_STEP', step: 'scan' })}
                   disabled={isLoading}
                 >
                   Scan Different QR Code
