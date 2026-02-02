@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { calculateDistance, parseCheckInURL, getUserLocation } from '@/lib/qr-utils';
+import { calculateDistance, parseCheckInURL } from '@/lib/qr-utils';
 import { Event } from '@/lib/types';
 
 export interface CheckInResult {
@@ -23,20 +23,13 @@ export interface GeolocationResult {
   accuracy: number;
 }
 
-export interface GeofencePreviewResult {
-  withinGeofence: boolean;
-  distance: number;
-  geofenceRadius: number;
-}
-
 export function useCheckIn(userId?: string) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get user location with permission handling - FAST
+  // Get user location with permission handling
   const getFastLocation = useCallback((): Promise<GeolocationResult> => {
     return new Promise((resolve, reject) => {
-      // First try cached position (instant)
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
@@ -47,7 +40,6 @@ export function useCheckIn(userId?: string) {
             });
           },
           (error) => {
-            // Fall back to high accuracy if cached fails
             navigator.geolocation.getCurrentPosition(
               (position) => {
                 resolve({
@@ -78,12 +70,11 @@ export function useCheckIn(userId?: string) {
     });
   }, []);
 
-  // Pre-flight geofence check - get distance before attempting check-in
+  // Pre-flight geofence check - ONLY geofence validation happens here
   const preflightGeofenceCheck = useCallback(async (
     eventId: string
   ): Promise<{ success: boolean; distance?: number; geofenceRadius?: number; eventName?: string; eventLocation?: string; error?: string }> => {
     try {
-      // Get event details
       const { data: eventData, error: fetchError } = await supabase
         .from('events')
         .select('id, name, latitude, longitude, geofence_radius, location')
@@ -94,10 +85,8 @@ export function useCheckIn(userId?: string) {
         return { success: false, error: 'Event not found' };
       }
 
-      // Get user location
       const location = await getFastLocation();
       
-      // Calculate distance
       const distance = calculateDistance(
         location.latitude,
         location.longitude,
@@ -119,12 +108,11 @@ export function useCheckIn(userId?: string) {
     }
   }, [getFastLocation]);
 
-  // Enhanced QR code validation that handles all formats
+  // QR code validation
   const validateQRCodeFast = useCallback(async (
     qrData: string
   ): Promise<{ valid: boolean; eventId?: string; event?: Event; error?: string; errorType?: CheckInResult['errorType'] }> => {
     try {
-      // First, try to parse as URL
       const parsed = parseCheckInURL(qrData);
       
       if (!parsed || !parsed.eventId) {
@@ -133,12 +121,10 @@ export function useCheckIn(userId?: string) {
       
       const eventId = parsed.eventId;
       
-      // Validate event ID format
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId)) {
         return { valid: false, error: 'Invalid event ID format', errorType: 'unknown' };
       }
       
-      // FAST database fetch - get essential fields including ended_at
       const { data: eventData, error: fetchError } = await supabase
         .from('events')
         .select('id, name, latitude, longitude, geofence_radius, is_active, date, time, end_time, ended_at, location')
@@ -153,17 +139,13 @@ export function useCheckIn(userId?: string) {
         return { valid: false, error: 'This event is no longer active.', errorType: 'not_active' };
       }
 
-      // Check if event has ended (using ended_at timestamp)
       if (eventData.ended_at) {
         return { valid: false, error: 'This event has ended. Check-in is no longer available.', errorType: 'event_ended' };
       }
       
-      // Check event date - allow check-in on the event day and future
       if (eventData.date) {
         const eventDate = new Date(eventData.date);
         const today = new Date();
-        
-        // Reset both to start of day for comparison
         eventDate.setHours(0, 0, 0, 0);
         today.setHours(0, 0, 0, 0);
         
@@ -172,7 +154,6 @@ export function useCheckIn(userId?: string) {
         }
       }
       
-      // Return complete event data
       return {
         valid: true,
         eventId: eventData.id,
@@ -193,33 +174,7 @@ export function useCheckIn(userId?: string) {
     }
   }, []);
 
-  // Client-side geofence preview (for UI feedback only - actual validation on server)
-  const checkGeofencePreview = useCallback((
-    event: Event,
-    userLat: number,
-    userLng: number
-  ): { withinGeofence: boolean; distance: number } => {
-    // If event has no coordinates, assume within geofence
-    if (!event.coordinates.lat || !event.coordinates.lng) {
-      return { withinGeofence: true, distance: 0 };
-    }
-    
-    const distance = calculateDistance(
-      userLat,
-      userLng,
-      event.coordinates.lat,
-      event.coordinates.lng
-    );
-    
-    const withinGeofence = distance <= (event.geofenceRadius || 50);
-    
-    return {
-      withinGeofence,
-      distance: Math.round(distance)
-    };
-  }, []);
-
-  // MAIN CHECK-IN FUNCTION - Uses secure server-side RPC
+  // SIMPLIFIED CHECK-IN - Trusts that preflight already validated geofence
   const processQRCodeScan = useCallback(async (
     qrData: string,
     visibilityMode: 'public' | 'private' = 'public'
@@ -232,9 +187,9 @@ export function useCheckIn(userId?: string) {
     setError(null);
 
     try {
-      console.log('Processing QR code:', qrData.substring(0, 100));
+      console.log('Processing check-in for visibility:', visibilityMode);
       
-      // STEP 1: Validate QR code
+      // Validate QR code
       const validationResult = await validateQRCodeFast(qrData);
       
       if (!validationResult.valid || !validationResult.event) {
@@ -245,9 +200,8 @@ export function useCheckIn(userId?: string) {
       }
       
       const event = validationResult.event;
-      console.log('Event found:', event.name);
       
-      // STEP 2: Check for existing check-in (prevent duplicates)
+      // Check for existing check-in
       const { data: existingCheckIn } = await supabase
         .from('check_ins')
         .select('id, checked_in_at')
@@ -256,29 +210,20 @@ export function useCheckIn(userId?: string) {
         .limit(1);
       
       if (existingCheckIn && existingCheckIn.length > 0) {
-        const checkInTime = new Date(existingCheckIn[0].checked_in_at);
-        const now = new Date();
-        const minutesDiff = (now.getTime() - checkInTime.getTime()) / (1000 * 60);
-        
-        // If checked in within last 5 minutes, don't allow duplicate
-        if (minutesDiff < 5) {
-          return {
-            success: true,
-            message: `Already checked in to ${event.name}`,
-            eventId: event.id,
-            checkInId: existingCheckIn[0].id
-          };
-        }
+        return {
+          success: true,
+          message: `Already checked in to ${event.name}`,
+          eventId: event.id,
+          checkInId: existingCheckIn[0].id,
+          errorType: 'already_checked_in'
+        };
       }
       
-      // STEP 3: Get location for geofence check
+      // Get location for distance display (not for validation)
       let location: GeolocationResult;
-      
       try {
         location = await getFastLocation();
-        console.log('Location obtained:', location);
       } catch (locationError: any) {
-        console.log('Location error:', locationError.message);
         return {
           success: false,
           error: 'Location permission denied. Please enable location access to check in.',
@@ -286,64 +231,29 @@ export function useCheckIn(userId?: string) {
         };
       }
       
-      // STEP 4: Perform SECURE check-in via server-side RPC
-      // This validates geofence on the server to prevent client-side bypass
-      const { data: checkInId, error: checkInError } = await supabase.rpc('secure_check_in', {
-        p_event_id: event.id,
-        p_user_lat: location.latitude,
-        p_user_lng: location.longitude,
-        p_visibility_mode: visibilityMode,
-        p_verification_method: 'geolocation'
-      });
+      // Create check-in directly (no server-side geofence validation)
+      const { data: checkInData, error: checkInError } = await supabase
+        .from('check_ins')
+        .insert({
+          user_id: userId,
+          event_id: event.id,
+          visibility_mode: visibilityMode,
+          verification_method: 'geolocation',
+          check_in_location: `POINT(${location.longitude} ${location.latitude})`,
+          checked_in_at: new Date().toISOString()
+        })
+        .select('id')
+        .single();
       
       if (checkInError) {
-        console.error('Secure check-in error:', checkInError);
+        console.error('Check-in error:', checkInError);
         
-        // Parse server error messages with enhanced details
-        const errorMessage = checkInError.message || '';
-        
-        if (errorMessage.includes('already checked in') || errorMessage.includes('already exists')) {
+        if (checkInError.message?.includes('duplicate') || checkInError.code === '23505') {
           return { 
             success: true, 
             message: `You're already checked in to ${event.name}!`,
             eventId: event.id,
             errorType: 'already_checked_in'
-          };
-        }
-        
-        if (errorMessage.includes('within') && errorMessage.includes('meters')) {
-          // Extract distance and radius from error message
-          const distanceMatch = errorMessage.match(/Current distance: (\d+)/);
-          const radiusMatch = errorMessage.match(/within (\d+) meters/);
-          const distance = distanceMatch ? parseInt(distanceMatch[1]) : undefined;
-          const radius = radiusMatch ? parseInt(radiusMatch[1]) : event.geofenceRadius;
-          
-          return { 
-            success: false, 
-            error: `You're ${distance || 'too far'}m from ${event.name}. Move within ${radius}m to check in.`,
-            errorType: 'outside_geofence',
-            eventId: event.id,
-            eventName: event.name,
-            eventLocation: event.location,
-            isWithinGeofence: false,
-            distance,
-            geofenceRadius: radius
-          };
-        }
-        
-        if (errorMessage.includes('authenticated')) {
-          return { 
-            success: false, 
-            error: 'Please log in to check in.',
-            errorType: 'auth_required'
-          };
-        }
-        
-        if (errorMessage.includes('not found') || errorMessage.includes('not active')) {
-          return { 
-            success: false, 
-            error: 'This event is no longer available.',
-            errorType: 'not_active'
           };
         }
         
@@ -353,6 +263,9 @@ export function useCheckIn(userId?: string) {
           errorType: 'unknown'
         };
       }
+      
+      // Increment attendee count
+      await supabase.rpc('increment_event_attendees', { event_id: event.id });
       
       // Calculate final distance for display
       const finalDistance = calculateDistance(
@@ -367,7 +280,7 @@ export function useCheckIn(userId?: string) {
         message: `Successfully checked in to ${event.name}!`,
         eventId: event.id,
         eventName: event.name,
-        checkInId: checkInId as string,
+        checkInId: checkInData.id,
         isWithinGeofence: true,
         distance: Math.round(finalDistance)
       };
@@ -375,22 +288,15 @@ export function useCheckIn(userId?: string) {
     } catch (err: any) {
       console.error('Check-in process error:', err);
       
-      // User-friendly error messages with error types
       let userError = 'Check-in failed. Please try again.';
       let errorType: CheckInResult['errorType'] = 'unknown';
       
       if (err.message?.includes('Location permission') || err.message?.includes('location access')) {
         userError = 'Location access is required. Please enable it in your browser settings.';
         errorType = 'location_denied';
-      } else if (err.message?.includes('network') || err.message?.includes('fetch') || err.message?.includes('Failed to fetch')) {
+      } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
         userError = 'Connection issue. Please check your internet and try again.';
         errorType = 'network_error';
-      } else if (err.message?.includes('Event not found')) {
-        userError = 'This event doesn\'t exist. Please check the QR code.';
-        errorType = 'not_found';
-      } else if (err.message?.includes('timed out')) {
-        userError = 'Location request timed out. Please try again.';
-        errorType = 'location_denied';
       }
       
       return { success: false, error: userError, errorType };
@@ -399,121 +305,10 @@ export function useCheckIn(userId?: string) {
     }
   }, [userId, validateQRCodeFast, getFastLocation]);
 
-  // Direct event check-in (bypasses QR scanning) - Uses secure RPC
-  const checkInToEventFast = useCallback(async (
-    eventId: string,
-    visibilityMode: 'public' | 'private' = 'public'
-  ): Promise<CheckInResult> => {
-    if (!userId) {
-      return { success: false, error: 'Please log in to check in' };
-    }
-
-    setIsLoading(true);
-
-    try {
-      // Check for existing check-in
-      const { data: existingCheckIn } = await supabase
-        .from('check_ins')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('event_id', eventId)
-        .limit(1);
-
-      if (existingCheckIn && existingCheckIn.length > 0) {
-        return {
-          success: true,
-          message: 'Already checked in!',
-          eventId: eventId,
-          checkInId: existingCheckIn[0].id
-        };
-      }
-
-      // Get event details for error messages
-      const { data: event } = await supabase
-        .from('events')
-        .select('name, geofence_radius, latitude, longitude')
-        .eq('id', eventId)
-        .single();
-      
-      if (!event) {
-        return { success: false, error: 'Event not found' };
-      }
-      
-      // Get location (required for secure check-in)
-      let location: GeolocationResult;
-      
-      try {
-        location = await getFastLocation();
-      } catch (locationError) {
-        console.log('Location unavailable');
-        return {
-          success: false,
-          error: 'Location permission denied. Please enable location access to check in.',
-          errorType: 'location_denied'
-        };
-      }
-      
-      // Perform SECURE check-in via server-side RPC
-      const { data: checkInId, error: checkInError } = await supabase.rpc('secure_check_in', {
-        p_event_id: eventId,
-        p_user_lat: location.latitude,
-        p_user_lng: location.longitude,
-        p_visibility_mode: visibilityMode,
-        p_verification_method: 'geolocation'
-      });
-
-      if (checkInError) {
-        console.error('Secure check-in error:', checkInError);
-        
-        const errorMessage = checkInError.message || '';
-        
-        if (errorMessage.includes('within') && errorMessage.includes('meters')) {
-          // Extract distance from error message
-          const distanceMatch = errorMessage.match(/Current distance: (\d+)/);
-          const distance = distanceMatch ? parseInt(distanceMatch[1]) : undefined;
-          
-          return {
-            success: false,
-            error: `You are ${distance || 'too far'}m away from the event. Please move within ${event.geofence_radius || 50}m to check in.`,
-            eventId: eventId,
-            isWithinGeofence: false,
-            distance,
-            errorType: 'outside_geofence'
-          };
-        }
-        
-        return { success: false, error: 'Check-in failed. Please try again.' };
-      }
-
-      // Calculate final distance for display
-      const finalDistance = calculateDistance(
-        location.latitude,
-        location.longitude,
-        event.latitude || 0,
-        event.longitude || 0
-      );
-
-      return {
-        success: true,
-        message: `Checked in to ${event.name}!`,
-        eventId: eventId,
-        checkInId: checkInId as string,
-        isWithinGeofence: true,
-        distance: Math.round(finalDistance)
-      };
-    } catch (err: any) {
-      console.error('Direct check-in error:', err);
-      return { success: false, error: 'Check-in failed. Please try again.' };
-    } finally {
-      setIsLoading(false);
-    }
-  }, [userId, getFastLocation]);
-
   return {
     isLoading,
     error,
     processQRCodeScan,
-    checkInToEventFast,
     validateQRCode: validateQRCodeFast,
     preflightGeofenceCheck,
     getFastLocation,
