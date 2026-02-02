@@ -272,29 +272,17 @@ export function useCheckIn(userId?: string) {
       }
       
       // STEP 3: Get location for geofence check
-      let location: GeolocationResult | undefined;
+      let location: GeolocationResult;
       
       try {
         location = await getFastLocation();
         console.log('Location obtained:', location);
-        
-        // Preview geofence check for UI feedback (actual validation on server)
-        const preview = checkGeofencePreview(event, location.latitude, location.longitude);
-        
-        if (!preview.withinGeofence) {
-          return {
-            success: false,
-            error: `You are ${preview.distance}m away from the event location. Please move within ${event.geofenceRadius || 50}m to check in.`,
-            eventId: event.id,
-            isWithinGeofence: false,
-            distance: preview.distance
-          };
-        }
       } catch (locationError: any) {
         console.log('Location error:', locationError.message);
         return {
           success: false,
-          error: 'Location permission denied. Please enable location access to check in.'
+          error: 'Location permission denied. Please enable location access to check in.',
+          errorType: 'location_denied'
         };
       }
       
@@ -366,7 +354,13 @@ export function useCheckIn(userId?: string) {
         };
       }
       
-      // secure_check_in already increments attendee count
+      // Calculate final distance for display
+      const finalDistance = calculateDistance(
+        location.latitude,
+        location.longitude,
+        event.coordinates.lat,
+        event.coordinates.lng
+      );
       
       return {
         success: true,
@@ -374,7 +368,8 @@ export function useCheckIn(userId?: string) {
         eventId: event.id,
         eventName: event.name,
         checkInId: checkInId as string,
-        isWithinGeofence: true
+        isWithinGeofence: true,
+        distance: Math.round(finalDistance)
       };
       
     } catch (err: any) {
@@ -402,7 +397,7 @@ export function useCheckIn(userId?: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, validateQRCodeFast, getFastLocation, checkGeofencePreview]);
+  }, [userId, validateQRCodeFast, getFastLocation]);
 
   // Direct event check-in (bypasses QR scanning) - Uses secure RPC
   const checkInToEventFast = useCallback(async (
@@ -436,7 +431,7 @@ export function useCheckIn(userId?: string) {
       // Get event details for error messages
       const { data: event } = await supabase
         .from('events')
-        .select('name, geofence_radius')
+        .select('name, geofence_radius, latitude, longitude')
         .eq('id', eventId)
         .single();
       
@@ -453,7 +448,8 @@ export function useCheckIn(userId?: string) {
         console.log('Location unavailable');
         return {
           success: false,
-          error: 'Location permission denied. Please enable location access to check in.'
+          error: 'Location permission denied. Please enable location access to check in.',
+          errorType: 'location_denied'
         };
       }
       
@@ -481,21 +477,29 @@ export function useCheckIn(userId?: string) {
             error: `You are ${distance || 'too far'}m away from the event. Please move within ${event.geofence_radius || 50}m to check in.`,
             eventId: eventId,
             isWithinGeofence: false,
-            distance
+            distance,
+            errorType: 'outside_geofence'
           };
         }
         
         return { success: false, error: 'Check-in failed. Please try again.' };
       }
 
-      // secure_check_in already increments attendee count
+      // Calculate final distance for display
+      const finalDistance = calculateDistance(
+        location.latitude,
+        location.longitude,
+        event.latitude || 0,
+        event.longitude || 0
+      );
 
       return {
         success: true,
         message: `Checked in to ${event.name}!`,
         eventId: eventId,
         checkInId: checkInId as string,
-        isWithinGeofence: true
+        isWithinGeofence: true,
+        distance: Math.round(finalDistance)
       };
     } catch (err: any) {
       console.error('Direct check-in error:', err);
