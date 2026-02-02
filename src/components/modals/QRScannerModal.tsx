@@ -1,247 +1,67 @@
-import { useReducer, useRef, useEffect, useCallback } from 'react';
-import { X, QrCode, Keyboard, Loader2, MapPin, AlertCircle, Check, Navigation, Users, UserX, Camera, RotateCcw } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { X, QrCode, Keyboard, Loader2, MapPin, AlertCircle, Check, ExternalLink, Navigation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCheckIn } from '@/hooks/useCheckIn';
 import { Event } from '@/lib/types';
+import { BrowserMultiFormatReader } from '@zxing/browser';
 import { supabase } from '@/integrations/supabase/client';
-import { cn } from '@/lib/utils';
 
 interface QRScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   userId?: string;
-  user?: any;
   onCheckInSuccess?: (eventId: string) => void;
 }
 
-type ScannerStep = 
-  | 'scan' 
-  | 'code' 
-  | 'verifying' 
-  | 'privacy' 
-  | 'photo' 
-  | 'preview' 
-  | 'completing'
-  | 'success' 
-  | 'error' 
-  | 'outside_geofence';
+type ScannerStep = 'scan' | 'code' | 'verifying' | 'geofence_check' | 'success' | 'error' | 'outside_geofence';
 
-interface ScannerState {
-  step: ScannerStep;
-  manualCode: string;
-  scannedEvent: Event | null;
-  errorMessage: string;
-  successMessage: string;
-  distance: number | null;
-  isPublic: boolean | null;
-  capturedPhoto: string | null;
-}
-
-type ScannerAction =
-  | { type: 'RESET' }
-  | { type: 'SET_STEP'; step: ScannerStep }
-  | { type: 'SET_MANUAL_CODE'; code: string }
-  | { type: 'SET_EVENT'; event: Event | null }
-  | { type: 'SET_ERROR'; message: string }
-  | { type: 'SET_SUCCESS'; message: string; distance?: number | null }
-  | { type: 'SET_VERIFYING'; event?: Event | null }
-  | { type: 'SET_OUTSIDE_GEOFENCE'; message: string; distance?: number | null }
-  | { type: 'SET_PRIVACY'; isPublic: boolean }
-  | { type: 'SET_PHOTO'; photo: string | null };
-
-const DESIGN = {
-  colors: {
-    primary: '#C4B5FD',
-    lavenderLight: '#E9D5FF',
-    accentPink: '#FFB8E6',
-    background: '#1A1A1A',
-    card: '#2D2D2D',
-    textPrimary: '#FFFFFF',
-    textSecondary: '#B8B8B8',
-    brandGreen: '#10B981'
-  },
-  borderRadius: {
-    card: '24px',
-    inner: '20px',
-    button: '12px',
-    round: '50%',
-    small: '8px'
-  },
-  shadows: {
-    card: '0 8px 32px rgba(0, 0, 0, 0.4)',
-    button: '0 4px 16px rgba(0, 0, 0, 0.3)',
-    glowPurple: '0 4px 32px rgba(196, 181, 253, 0.4)'
-  }
-};
-
-const initialState: ScannerState = {
-  step: 'scan',
-  manualCode: '',
-  scannedEvent: null,
-  errorMessage: '',
-  successMessage: '',
-  distance: null,
-  isPublic: null,
-  capturedPhoto: null,
-};
-
-function scannerReducer(state: ScannerState, action: ScannerAction): ScannerState {
-  switch (action.type) {
-    case 'RESET':
-      return initialState;
-    case 'SET_STEP':
-      return { ...state, step: action.step };
-    case 'SET_MANUAL_CODE':
-      return { ...state, manualCode: action.code };
-    case 'SET_EVENT':
-      return { ...state, scannedEvent: action.event };
-    case 'SET_ERROR':
-      return { ...state, step: 'error', errorMessage: action.message };
-    case 'SET_SUCCESS':
-      return {
-        ...state,
-        step: 'success',
-        successMessage: action.message,
-        distance: action.distance ?? state.distance,
-      };
-    case 'SET_VERIFYING':
-      return {
-        ...state,
-        step: 'verifying',
-        errorMessage: '',
-        scannedEvent: action.event ?? state.scannedEvent,
-      };
-    case 'SET_OUTSIDE_GEOFENCE':
-      return {
-        ...state,
-        step: 'outside_geofence',
-        errorMessage: action.message,
-        distance: action.distance ?? state.distance,
-      };
-    case 'SET_PRIVACY':
-      return { ...state, isPublic: action.isPublic };
-    case 'SET_PHOTO':
-      return { ...state, capturedPhoto: action.photo };
-    default:
-      return state;
-  }
-}
-
-export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess }: QRScannerModalProps) {
-  const { checkInToEventFast, isLoading } = useCheckIn(userId);
+export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QRScannerModalProps) {
+  const navigate = useNavigate();
+  const { processQRCodeScan, isLoading, validateQRCode } = useCheckIn(userId);
   
-  const [state, dispatch] = useReducer(scannerReducer, initialState);
+  const [step, setStep] = useState<ScannerStep>('scan');
+  const [manualCode, setManualCode] = useState('');
+  const [scannedEvent, setScannedEvent] = useState<Event | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [distance, setDistance] = useState<number | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>('');
   
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const codeReaderRef = useRef<any>(null);
+  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const controlsRef = useRef<{ stop: () => void } | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const isStartingRef = useRef(false);
 
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
-      dispatch({ type: 'RESET' });
+      setStep('scan');
+      setManualCode('');
+      setScannedEvent(null);
+      setErrorMessage('');
+      setSuccessMessage('');
+      setDistance(null);
+      setDebugInfo('');
     }
   }, [isOpen]);
 
-  // Camera management
-  const startCamera = useCallback(async (facingMode: 'user' | 'environment' = 'environment') => {
+  // Fetch event details by ID
+  const fetchEventDetails = useCallback(async (eventId: string): Promise<Event | null> => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode, width: 640, height: 480 },
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-      }
-    } catch (error) {
-      console.error('Camera error:', error);
-    }
-  }, []);
-
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-  }, []);
-
-  const stopScanning = useCallback(() => {
-    if (controlsRef.current) {
-      controlsRef.current.stop();
-      controlsRef.current = null;
-    }
-    codeReaderRef.current = null;
-    isStartingRef.current = false;
-  }, []);
-
-  // Process QR code - ONLY validates event, does NOT check geofence yet
-  const processQRCode = useCallback(async (code: string) => {
-    dispatch({ type: 'SET_VERIFYING' });
-    
-    try {
-      console.log('Processing QR code:', code);
-      
-      // Extract event ID from QR code/URL
-      let eventId: string | null = null;
-      
-      if (code.includes('/event/')) {
-        const match = code.match(/\/event\/([a-f0-9-]+)/i);
-        if (match) eventId = match[1];
-      } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)) {
-        eventId = code;
-      }
-      
-      if (!eventId) {
-        dispatch({ type: 'SET_ERROR', message: 'Invalid QR code format. Please scan a valid event QR code.' });
-        return;
-      }
-      
-      console.log('Event ID extracted:', eventId);
-      
-      // Fast event lookup
-      const { data: eventData, error: eventError } = await supabase
+      const { data: eventData, error } = await supabase
         .from('events')
         .select('*')
         .eq('id', eventId)
         .single();
-      
-      if (eventError || !eventData) {
-        dispatch({ type: 'SET_ERROR', message: 'Event not found. Please check the QR code.' });
-        return;
-      }
-      
-      if (!eventData.is_active) {
-        dispatch({ type: 'SET_ERROR', message: 'This event is no longer active.' });
-        return;
+
+      if (error || !eventData) {
+        return null;
       }
 
-      // Check event time frame
-      const eventDate = new Date(eventData.date);
-      const eventTime = eventData.time;
-      const now = new Date();
-      
-      // Parse event date and time
-      const [hours, minutes] = eventTime.split(':').map(Number);
-      const eventStart = new Date(eventDate);
-      eventStart.setHours(hours, minutes, 0, 0);
-      
-      // Allow check-in 30 minutes before event starts
-      const checkInAllowed = new Date(eventStart.getTime() - 30 * 60 * 1000);
-      
-      if (now < checkInAllowed) {
-        dispatch({ 
-          type: 'SET_ERROR', 
-          message: `Check-in opens 30 minutes before the event starts at ${eventTime}.` 
-        });
-        return;
-      }
-      
-      const event: Event = {
+      return {
         id: eventData.id,
         name: eventData.name,
         description: eventData.description || '',
@@ -267,38 +87,132 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
         isDemo: eventData.is_demo || false,
         isActive: eventData.is_active ?? true,
       };
+    } catch (error) {
+      console.error('Error fetching event details:', error);
+      return null;
+    }
+  }, []);
+
+  // Process QR code - OPTIMIZED for speed
+  const processQRCode = useCallback(async (code: string) => {
+    setStep('verifying');
+    setErrorMessage('');
+    setDebugInfo(`Processing QR code...`);
+    
+    try {
+      console.log('Processing QR code:', code);
       
-      dispatch({ type: 'SET_EVENT', event });
+      // Extract event ID from QR code/URL
+      let eventId: string | null = null;
+      
+      // Handle different QR code formats
+      if (code.includes('/event/')) {
+        // URL format: .../event/{id}/checkin or .../event/{id}
+        const match = code.match(/\/event\/([a-f0-9-]+)/i);
+        if (match) eventId = match[1];
+      } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)) {
+        // Direct UUID format
+        eventId = code;
+      }
+      
+      if (!eventId) {
+        setErrorMessage('Invalid QR code format. Please scan a valid event QR code.');
+        setStep('error');
+        return;
+      }
+      
+      console.log('Event ID extracted:', eventId);
+      
+      // Fast event lookup
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .select('id, name, latitude, longitude, geofence_radius, is_active, location')
+        .eq('id', eventId)
+        .single();
+      
+      if (eventError || !eventData) {
+        setErrorMessage('Event not found. Please check the QR code.');
+        setStep('error');
+        return;
+      }
+      
+      if (!eventData.is_active) {
+        setErrorMessage('This event is no longer active.');
+        setStep('error');
+        return;
+      }
+      
+      const event: Event = {
+        id: eventData.id,
+        name: eventData.name,
+        location: eventData.location,
+        coordinates: { lat: eventData.latitude, lng: eventData.longitude },
+        geofenceRadius: eventData.geofence_radius || 50,
+        isActive: eventData.is_active,
+      } as Event;
+      
+      setScannedEvent(event);
+      setDebugInfo(`Event found: ${event.name}`);
       
       // Check if user has already checked in
       if (userId) {
         const { data: existingCheckIn } = await supabase
           .from('check_ins')
-          .select('id, privacy_mode, event_photo')
+          .select('id')
           .eq('user_id', userId)
           .eq('event_id', event.id)
           .limit(1);
 
         if (existingCheckIn && existingCheckIn.length > 0) {
-          dispatch({ 
-            type: 'SET_SUCCESS', 
-            message: `Already checked in to ${event.name}!`,
-            distance: 0 
-          });
+          setSuccessMessage(`Already checked in to ${event.name}!`);
+          setStep('success');
           onCheckInSuccess?.(event.id);
           return;
         }
       }
       
-      // Event is valid - proceed to privacy choice
-      // Geofence will be checked when user confirms check-in
-      dispatch({ type: 'SET_STEP', step: 'privacy' });
+      // Perform the actual check-in using secure RPC
+      setStep('geofence_check');
+      setDebugInfo('Verifying location and checking in...');
       
+      const result = await processQRCodeScan(code, 'public');
+      
+      if (result.success) {
+        setSuccessMessage(result.message || `Successfully checked in to ${event.name}!`);
+        setDistance(result.distance || null);
+        setStep('success');
+        onCheckInSuccess?.(result.eventId || event.id);
+      } else {
+        // Check if error is about geofence
+        if (result.error?.includes('away') || result.error?.includes('within') || result.error?.includes('meters')) {
+          setDistance(result.distance || null);
+          setErrorMessage(result.error || 'You are outside the event area');
+          setStep('outside_geofence');
+        } else if (result.error?.includes('already')) {
+          setSuccessMessage(`Already checked in to ${event.name}!`);
+          setStep('success');
+          onCheckInSuccess?.(event.id);
+        } else {
+          setErrorMessage(result.error || 'Check-in failed. Please try again.');
+          setStep('error');
+        }
+      }
     } catch (err: any) {
       console.error('Error processing QR code:', err);
-      dispatch({ type: 'SET_ERROR', message: err?.message || 'Failed to process QR code. Please try again.' });
+      setErrorMessage(err?.message || 'Failed to process QR code. Please try again.');
+      setStep('error');
     }
-  }, [userId, onCheckInSuccess]);
+  }, [processQRCodeScan, userId, onCheckInSuccess]);
+
+  // Stop scanning
+  const stopScanning = useCallback(() => {
+    if (controlsRef.current) {
+      controlsRef.current.stop();
+      controlsRef.current = null;
+    }
+    codeReaderRef.current = null;
+    isStartingRef.current = false;
+  }, []);
 
   // Start QR code scanning
   const startScanning = useCallback(async () => {
@@ -307,11 +221,9 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
     isStartingRef.current = true;
     
     try {
-      if (!codeReaderRef.current) {
-        const { BrowserMultiFormatReader } = await import('@zxing/browser');
-        codeReaderRef.current = new BrowserMultiFormatReader();
-      }
+      codeReaderRef.current = new BrowserMultiFormatReader();
 
+      // Try to get the environment/rear camera
       let preferredDeviceId: string | undefined;
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -319,177 +231,78 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
         const env = videoInputs.find((d) => /back|rear|environment/i.test(d.label));
         preferredDeviceId = env?.deviceId || videoInputs[0]?.deviceId;
       } catch {
-        // ignore
+        // ignore; decoder will pick a default device
       }
       
       controlsRef.current = await codeReaderRef.current.decodeFromVideoDevice(
         preferredDeviceId,
         videoRef.current,
-        async (result: any) => {
+        async (result, error) => {
           if (result) {
             stopScanning();
             const code = result.getText();
-            dispatch({ type: 'SET_MANUAL_CODE', code });
+            setManualCode(code);
             await processQRCode(code);
           }
         }
       );
     } catch (err) {
       console.error('Camera access error:', err);
-      dispatch({
-        type: 'SET_ERROR',
-        message: 'Camera access required. Please enable camera permissions or use manual code entry.',
-      });
-      dispatch({ type: 'SET_STEP', step: 'code' });
+      setErrorMessage('Camera access required. Please enable camera permissions or use manual code entry.');
+      setStep('code');
     } finally {
       isStartingRef.current = false;
     }
   }, [stopScanning, processQRCode]);
 
-  // Manage camera/scanner based on step
+  // Start/stop scanning based on step
   useEffect(() => {
-    if (isOpen) {
-      if (state.step === 'scan') {
-        startScanning();
-      } else if (state.step === 'photo') {
-        stopScanning();
-        startCamera('user');
-      } else {
-        stopScanning();
-        stopCamera();
-      }
+    if (isOpen && step === 'scan') {
+      startScanning();
+    } else {
+      stopScanning();
     }
 
-    return () => {
-      stopScanning();
-      stopCamera();
-    };
-  }, [isOpen, state.step, startScanning, startCamera, stopScanning, stopCamera]);
+    return () => stopScanning();
+  }, [isOpen, step, startScanning, stopScanning]);
 
   // Handle manual code submission
-  const handleCodeSubmit = useCallback(async () => {
-    if (!state.manualCode.trim()) {
-      dispatch({ type: 'SET_ERROR', message: 'Please enter a code or URL' });
+  const handleCodeSubmit = async () => {
+    if (!manualCode.trim()) {
+      setErrorMessage('Please enter a code or URL');
       return;
     }
-    await processQRCode(state.manualCode);
-  }, [state.manualCode, processQRCode]);
+    await processQRCode(manualCode);
+  };
 
-  // Handle privacy choice
-  const handlePrivacyChoice = useCallback(async (isPublic: boolean) => {
-    dispatch({ type: 'SET_PRIVACY', isPublic });
-    
-    if (!state.scannedEvent || !userId) {
-      dispatch({ type: 'SET_ERROR', message: 'Event or user information missing' });
-      return;
-    }
-    
-    if (isPublic) {
-      // Go to photo capture for public mode
-      dispatch({ type: 'SET_STEP', step: 'photo' });
-    } else {
-      // Complete check-in immediately for private mode (no photo)
-      await completeCheckIn(isPublic, null);
-    }
-  }, [state.scannedEvent, userId]);
-
-  // Capture photo
-  const capturePhoto = useCallback(() => {
-    if (videoRef.current && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const video = videoRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        dispatch({ type: 'SET_PHOTO', photo: dataUrl });
-        dispatch({ type: 'SET_STEP', step: 'preview' });
-      }
-    }
-  }, []);
-
-  // Complete check-in - THIS is where geofence checking happens
-  const completeCheckIn = useCallback(async (isPublic?: boolean, photo?: string | null) => {
-    if (!state.scannedEvent || !userId) {
-      dispatch({ type: 'SET_ERROR', message: 'Event or user information missing' });
-      return;
-    }
-    
-    const privacyMode = isPublic ?? state.isPublic ?? false;
-    const eventPhoto = photo ?? state.capturedPhoto;
-    
-    try {
-      // Show completing step
-      dispatch({ type: 'SET_STEP', step: 'completing' });
-      
-      // NOW we check geofence + complete check-in
-      const result = await checkInToEventFast(
-        state.scannedEvent.id,
-        privacyMode ? 'public' : 'private'
-      );
-      
-      if (result.success) {
-        // Update check-in record with photo if provided
-        if (eventPhoto) {
-          await supabase
-            .from('check_ins')
-            .update({ 
-              event_photo: eventPhoto,
-              updated_at: new Date().toISOString()
-            })
-            .eq('event_id', state.scannedEvent.id)
-            .eq('user_id', userId);
-        }
-        
-        // Success!
-        dispatch({
-          type: 'SET_SUCCESS',
-          message: `Successfully checked in to ${state.scannedEvent.name}!`,
-          distance: result.distance || 0
-        });
-        
-        onCheckInSuccess?.(state.scannedEvent.id);
-      } else {
-        // Check if error is about geofence
-        if (result.error?.includes('away') || result.error?.includes('within') || result.error?.includes('meters')) {
-          dispatch({
-            type: 'SET_OUTSIDE_GEOFENCE',
-            message: result.error || 'You are outside the event area',
-            distance: result.distance || null,
-          });
-        } else {
-          dispatch({ 
-            type: 'SET_ERROR', 
-            message: result.error || 'Check-in failed. Please try again.' 
-          });
-        }
-      }
-    } catch (err: any) {
-      console.error('Error completing check-in:', err);
-      dispatch({ 
-        type: 'SET_ERROR', 
-        message: err?.message || 'Failed to complete check-in. Please try again.' 
-      });
-    }
-  }, [state.scannedEvent, state.isPublic, state.capturedPhoto, userId, checkInToEventFast, onCheckInSuccess]);
-
-  const handleClose = useCallback(() => {
+  const handleClose = () => {
     stopScanning();
-    stopCamera();
     onClose();
-  }, [stopScanning, stopCamera, onClose]);
+    
+    if (step === 'success' && scannedEvent) {
+      navigate(`/event/${scannedEvent.id}`);
+    }
+  };
 
-  const handleRetry = useCallback(async () => {
-    if (!state.scannedEvent) {
-      dispatch({ type: 'SET_STEP', step: 'scan' });
+  const handleViewEvent = () => {
+    if (scannedEvent) {
+      navigate(`/event/${scannedEvent.id}`);
+    }
+    onClose();
+  };
+
+  const handleRetry = async () => {
+    if (!manualCode.trim() && !scannedEvent) {
+      setStep('scan');
       return;
     }
     
-    // Retry the check-in with current privacy settings
-    await completeCheckIn();
-  }, [state.scannedEvent, completeCheckIn]);
+    if (scannedEvent && manualCode) {
+      await processQRCode(manualCode);
+    } else {
+      setStep('scan');
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -499,40 +312,22 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex flex-col"
-        style={{ background: DESIGN.colors.background }}
+        className="fixed inset-0 z-50 bg-background flex flex-col"
       >
         {/* Header */}
-        <div 
-          className="flex items-center justify-between p-4 border-b flex-shrink-0"
-          style={{ 
-            borderColor: DESIGN.colors.card,
-            height: '72px'
-          }}
-        >
-          <h2 
-            className="text-xl font-bold"
-            style={{ color: DESIGN.colors.textPrimary }}
-          >
-            {state.step === 'scan' && 'Scan QR Code'}
-            {state.step === 'code' && 'Enter Event Code'}
-            {state.step === 'verifying' && 'Verifying Event...'}
-            {state.step === 'privacy' && 'Privacy Choice'}
-            {state.step === 'photo' && 'Take Photo'}
-            {state.step === 'preview' && 'Preview Card'}
-            {state.step === 'completing' && 'Checking In...'}
-            {state.step === 'success' && 'Check-In Complete!'}
-            {state.step === 'error' && 'Check-In Failed'}
-            {state.step === 'outside_geofence' && 'Outside Event Area'}
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h2 className="text-xl font-bold text-foreground">
+            {step === 'scan' && 'Scan QR Code'}
+            {step === 'code' && 'Enter Event Code'}
+            {step === 'verifying' && 'Verifying...'}
+            {step === 'geofence_check' && 'Checking In...'}
+            {step === 'success' && 'Check-In Complete!'}
+            {step === 'error' && 'Check-In Failed'}
+            {step === 'outside_geofence' && 'Outside Event Area'}
           </h2>
           <button
             onClick={handleClose}
-            className="w-10 h-10 flex items-center justify-center"
-            style={{
-              background: DESIGN.colors.card,
-              borderRadius: DESIGN.borderRadius.round,
-              color: DESIGN.colors.textPrimary
-            }}
+            className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-accent transition-colors"
             disabled={isLoading}
           >
             <X className="w-5 h-5" />
@@ -541,8 +336,7 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
 
         {/* Content */}
         <div className="flex-1 flex flex-col items-center justify-center p-6">
-          {/* QR Scanner Step */}
-          {state.step === 'scan' && (
+          {step === 'scan' && (
             <>
               <div className="relative w-64 h-64 mb-6 rounded-3xl overflow-hidden">
                 <video
@@ -552,36 +346,23 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
                   muted
                   className="w-full h-full object-cover"
                 />
-                <div 
-                  className="absolute inset-0 border-2"
-                  style={{ 
-                    borderColor: DESIGN.colors.primary,
-                    borderRadius: DESIGN.borderRadius.card
-                  }}
-                >
-                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4" style={{ borderColor: DESIGN.colors.primary, borderTopLeftRadius: '16px' }} />
-                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4" style={{ borderColor: DESIGN.colors.primary, borderTopRightRadius: '16px' }} />
-                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4" style={{ borderColor: DESIGN.colors.primary, borderBottomLeftRadius: '16px' }} />
-                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4" style={{ borderColor: DESIGN.colors.primary, borderBottomRightRadius: '16px' }} />
+                <div className="absolute inset-0 border-2 border-primary rounded-3xl">
+                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-2xl" />
+                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-2xl" />
+                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-2xl" />
+                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-2xl" />
                 </div>
-                <div 
-                  className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 text-xs font-bold"
-                  style={{
-                    background: DESIGN.colors.primary,
-                    color: DESIGN.colors.background,
-                    borderRadius: '12px'
-                  }}
-                >
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full">
                   SCANNING...
                 </div>
               </div>
-              <p className="text-center mb-6" style={{ color: DESIGN.colors.textSecondary }}>
+              <p className="text-muted-foreground text-center mb-6">
                 Point your camera at the event's QR code
               </p>
               <Button 
                 variant="outline" 
                 className="h-12"
-                onClick={() => dispatch({ type: 'SET_STEP', step: 'code' })}
+                onClick={() => setStep('code')}
                 disabled={isLoading}
               >
                 <Keyboard className="w-4 h-4 mr-2" />
@@ -590,19 +371,16 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
             </>
           )}
 
-          {/* Manual Code Entry Step */}
-          {state.step === 'code' && (
+          {step === 'code' && (
             <>
-              <QrCode className="w-16 h-16 mb-6" style={{ color: DESIGN.colors.primary }} />
-              <h3 className="text-xl font-bold mb-2" style={{ color: DESIGN.colors.textPrimary }}>
-                Enter Event Code
-              </h3>
-              <p className="text-center mb-6" style={{ color: DESIGN.colors.textSecondary }}>
+              <QrCode className="w-16 h-16 text-primary mb-6" />
+              <h3 className="text-xl font-bold mb-2">Enter Event Code</h3>
+              <p className="text-muted-foreground text-center mb-6">
                 Enter the event code or scan the QR code
               </p>
               <Input
-                value={state.manualCode}
-                onChange={(e) => dispatch({ type: 'SET_MANUAL_CODE', code: e.target.value })}
+                value={manualCode}
+                onChange={(e) => setManualCode(e.target.value)}
                 placeholder="Enter code or event URL..."
                 className="text-center text-lg font-medium h-14 max-w-xs mb-6"
                 onKeyDown={(e) => e.key === 'Enter' && handleCodeSubmit()}
@@ -611,7 +389,7 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
                 <Button 
                   variant="outline" 
                   className="flex-1 h-12" 
-                  onClick={() => dispatch({ type: 'SET_STEP', step: 'scan' })}
+                  onClick={() => setStep('scan')}
                   disabled={isLoading}
                 >
                   Back to Scan
@@ -619,401 +397,101 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
                 <Button 
                   className="flex-1 h-12" 
                   onClick={handleCodeSubmit} 
-                  disabled={!state.manualCode.trim() || isLoading}
-                  style={{ 
-                    background: DESIGN.colors.primary,
-                    color: DESIGN.colors.background,
-                  }}
+                  disabled={!manualCode.trim() || isLoading}
                 >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Continue'}
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Check In'}
                 </Button>
               </div>
             </>
           )}
 
-          {/* Verifying Step */}
-          {state.step === 'verifying' && (
+          {step === 'verifying' && (
             <>
-              <Loader2 className="w-16 h-16 animate-spin mb-6" style={{ color: DESIGN.colors.primary }} />
-              <h3 className="text-xl font-bold mb-2" style={{ color: DESIGN.colors.textPrimary }}>
-                Verifying Event
-              </h3>
-              <p className="text-center mb-4" style={{ color: DESIGN.colors.textSecondary }}>
-                Checking event details...
-              </p>
+              <Loader2 className="w-16 h-16 text-primary animate-spin mb-6" />
+              <h3 className="text-xl font-bold mb-2">Verifying Event</h3>
+              <p className="text-muted-foreground text-center mb-4">Checking event details...</p>
+              {scannedEvent && (
+                <p className="text-sm font-medium text-center">
+                  {scannedEvent.name}
+                </p>
+              )}
             </>
           )}
 
-          {/* Completing Check-In Step */}
-          {state.step === 'completing' && (
+          {step === 'geofence_check' && (
             <>
               <div className="relative">
-                <Navigation className="w-16 h-16 mb-6" style={{ color: DESIGN.colors.primary }} />
-                <Loader2 className="absolute -bottom-2 -right-2 w-8 h-8 animate-spin" style={{ color: DESIGN.colors.primary }} />
+                <Navigation className="w-16 h-16 text-primary mb-6" />
+                <Loader2 className="absolute -bottom-2 -right-2 w-8 h-8 text-primary animate-spin" />
               </div>
-              <h3 className="text-xl font-bold mb-2" style={{ color: DESIGN.colors.textPrimary }}>
-                Completing Check-In
-              </h3>
-              <p className="text-center mb-4" style={{ color: DESIGN.colors.textSecondary }}>
-                Verifying your location and finalizing check-in...
+              <h3 className="text-xl font-bold mb-2">Completing Check-In</h3>
+              <p className="text-muted-foreground text-center mb-4">
+                Verifying your location and checking you in...
               </p>
-              {state.scannedEvent && (
-                <p className="text-sm text-center" style={{ color: DESIGN.colors.textSecondary }}>
-                  Event: <span className="font-medium">{state.scannedEvent.name}</span>
+              {scannedEvent && (
+                <p className="text-sm text-muted-foreground text-center">
+                  Event: <span className="font-medium">{scannedEvent.name}</span>
                 </p>
               )}
             </>
           )}
 
-          {/* Privacy Choice Step */}
-          {state.step === 'privacy' && state.scannedEvent && (
-            <div className="w-full max-w-md">
-              <div className="text-center mb-8">
-                <h3 className="text-xl font-bold mb-2" style={{ color: DESIGN.colors.textPrimary }}>
-                  Joining {state.scannedEvent.name}
-                </h3>
-                <p style={{ color: DESIGN.colors.textSecondary }}>
-                  How do you want to appear at this event?
-                </p>
-              </div>
-
-              <div className="space-y-4 mb-6">
-                <motion.button
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handlePrivacyChoice(true)}
-                  className="w-full p-6 text-left"
-                  style={{
-                    background: DESIGN.colors.card,
-                    borderRadius: DESIGN.borderRadius.card,
-                    border: `2px solid ${DESIGN.colors.card}`
-                  }}
-                  disabled={isLoading}
-                >
-                  <div className="flex items-center gap-4 mb-3">
-                    <div 
-                      className="w-12 h-12 flex items-center justify-center"
-                      style={{
-                        background: `${DESIGN.colors.primary}20`,
-                        borderRadius: DESIGN.borderRadius.small
-                      }}
-                    >
-                      <Users className="w-6 h-6" style={{ color: DESIGN.colors.primary }} />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-lg" style={{ color: DESIGN.colors.textPrimary }}>
-                        Public
-                      </h4>
-                      <p className="text-sm" style={{ color: DESIGN.colors.brandGreen }}>
-                        Best for networking
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
-                    Others can see your profile and photo. Connect with people at the event!
-                  </p>
-                </motion.button>
-
-                <motion.button
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handlePrivacyChoice(false)}
-                  className="w-full p-6 text-left"
-                  style={{
-                    background: DESIGN.colors.card,
-                    borderRadius: DESIGN.borderRadius.card,
-                    border: `2px solid ${DESIGN.colors.card}`
-                  }}
-                  disabled={isLoading}
-                >
-                  <div className="flex items-center gap-4 mb-3">
-                    <div 
-                      className="w-12 h-12 flex items-center justify-center"
-                      style={{
-                        background: `${DESIGN.colors.textSecondary}20`,
-                        borderRadius: DESIGN.borderRadius.small
-                      }}
-                    >
-                      <UserX className="w-6 h-6" style={{ color: DESIGN.colors.textSecondary }} />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-lg" style={{ color: DESIGN.colors.textPrimary }}>
-                        Private
-                      </h4>
-                      <p className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
-                        Browse anonymously
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-sm" style={{ color: DESIGN.colors.textSecondary }}>
-                    You can see others but they won't see you. Perfect for shy attendees.
-                  </p>
-                </motion.button>
-              </div>
-
-              <Button 
-                variant="outline" 
-                onClick={handleClose} 
-                className="w-full h-12"
-                disabled={isLoading}
-              >
-                Cancel
-              </Button>
-            </div>
-          )}
-
-          {/* Photo Capture Step */}
-          {state.step === 'photo' && (
+          {step === 'success' && (
             <>
-              <div className="relative w-64 h-80 mb-6">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                  style={{ 
-                    borderRadius: DESIGN.borderRadius.card,
-                    transform: 'scaleX(-1)' 
-                  }}
-                />
-                <div 
-                  className="absolute inset-0 border-4"
-                  style={{ 
-                    borderColor: `${DESIGN.colors.primary}80`,
-                    borderRadius: DESIGN.borderRadius.card
-                  }}
-                />
-                <div 
-                  className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 text-xs font-bold"
-                  style={{
-                    background: DESIGN.colors.brandGreen,
-                    color: DESIGN.colors.background,
-                    borderRadius: '12px'
-                  }}
-                >
-                  LIVE PHOTO
-                </div>
+              <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mb-6">
+                <Check className="w-10 h-10 text-green-500" />
               </div>
-              <canvas ref={canvasRef} className="hidden" />
-              
-              <p className="text-center mb-6" style={{ color: DESIGN.colors.textSecondary }}>
-                This photo will be shown to other attendees
-              </p>
-
-              <div className="flex gap-4">
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => dispatch({ type: 'SET_STEP', step: 'privacy' })}
-                  className="w-14 h-14 flex items-center justify-center"
-                  style={{
-                    background: DESIGN.colors.card,
-                    color: DESIGN.colors.textPrimary,
-                    borderRadius: DESIGN.borderRadius.round
-                  }}
-                  disabled={isLoading}
-                >
-                  <X className="w-6 h-6" />
-                </motion.button>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={capturePhoto}
-                  className="w-20 h-20 flex items-center justify-center"
-                  style={{
-                    background: DESIGN.colors.primary,
-                    color: DESIGN.colors.background,
-                    borderRadius: DESIGN.borderRadius.round,
-                    boxShadow: DESIGN.shadows.glowPurple
-                  }}
-                  disabled={isLoading}
-                >
-                  <Camera className="w-8 h-8" />
-                </motion.button>
-              </div>
-            </>
-          )}
-
-          {/* Preview Step */}
-          {state.step === 'preview' && user && (
-            <>
-              <h3 
-                className="text-sm font-medium mb-4"
-                style={{ color: DESIGN.colors.textSecondary }}
-              >
-                This is how others will see you
-              </h3>
-
-              <div 
-                className="w-64 aspect-[3/4] mb-6 relative"
-                style={{
-                  background: DESIGN.colors.card,
-                  borderRadius: DESIGN.borderRadius.card,
-                  border: `1px solid ${DESIGN.colors.textSecondary}20`,
-                  boxShadow: DESIGN.shadows.card
-                }}
-              >
-                {state.capturedPhoto && (
-                  <img
-                    src={state.capturedPhoto}
-                    alt="Your photo"
-                    className="w-full h-3/4 object-cover"
-                    style={{ 
-                      borderTopLeftRadius: DESIGN.borderRadius.card,
-                      borderTopRightRadius: DESIGN.borderRadius.card,
-                      transform: 'scaleX(-1)' 
-                    }}
-                  />
-                )}
-                <div 
-                  className="absolute bottom-0 left-0 right-0 p-4"
-                  style={{
-                    background: 'linear-gradient(to top, #1A1A1A, #1A1A1A80, transparent)',
-                    borderBottomLeftRadius: DESIGN.borderRadius.card,
-                    borderBottomRightRadius: DESIGN.borderRadius.card
-                  }}
-                >
-                  <h4 
-                    className="font-bold text-lg mb-1"
-                    style={{ color: DESIGN.colors.textPrimary }}
-                  >
-                    {user.profile?.name || user.name}, {user.profile?.age || user.age}
-                  </h4>
-                  <p 
-                    className="text-sm truncate mb-2"
-                    style={{ color: DESIGN.colors.textSecondary }}
-                  >
-                    {user.profile?.bio || user.bio || 'No bio yet'}
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {(user.profile?.interests || user.interests || []).slice(0, 3).map((interest: string) => (
-                      <span 
-                        key={interest} 
-                        className="px-2 py-0.5 text-xs"
-                        style={{
-                          background: `${DESIGN.colors.primary}20`,
-                          color: DESIGN.colors.primary,
-                          borderRadius: '8px'
-                        }}
-                      >
-                        {interest}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3 w-full max-w-xs">
-                <Button
-                  variant="outline"
-                  className="flex-1 h-12"
-                  onClick={() => dispatch({ type: 'SET_STEP', step: 'photo' })}
-                  disabled={isLoading}
-                >
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Retake
-                </Button>
-                <Button
-                  className="flex-1 h-12"
-                  style={{ 
-                    background: DESIGN.colors.primary,
-                    color: DESIGN.colors.background,
-                    boxShadow: DESIGN.shadows.glowPurple
-                  }}
-                  onClick={() => completeCheckIn()}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4 mr-2" />
-                      Looks Good!
-                    </>
-                  )}
-                </Button>
-              </div>
-            </>
-          )}
-
-          {/* Success Step */}
-          {state.step === 'success' && state.scannedEvent && (
-            <>
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-                className="w-24 h-24 flex items-center justify-center mb-6"
-                style={{
-                  background: `${DESIGN.colors.brandGreen}20`,
-                  borderRadius: DESIGN.borderRadius.round
-                }}
-              >
-                <Check className="w-12 h-12" style={{ color: DESIGN.colors.brandGreen }} />
-              </motion.div>
-              <h3 className="text-3xl font-bold mb-2" style={{ color: DESIGN.colors.textPrimary }}>
-                Welcome!
-              </h3>
-              <p className="mb-2" style={{ color: DESIGN.colors.textSecondary }}>
-                You're checked in to
-              </p>
-              <h4 className="text-2xl font-bold mb-8" style={{ color: DESIGN.colors.primary }}>
-                {state.scannedEvent.name}
-              </h4>
-              {state.distance !== null && state.distance > 0 && (
-                <div className="mb-6 p-3 rounded-lg" style={{ background: `${DESIGN.colors.brandGreen}10`, border: `1px solid ${DESIGN.colors.brandGreen}30` }}>
-                  <p className="text-sm" style={{ color: DESIGN.colors.brandGreen }}>
+              <h3 className="text-xl font-bold mb-2">{successMessage}</h3>
+              <p className="text-muted-foreground text-center mb-6">You're now checked in!</p>
+              {distance !== null && (
+                <div className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                  <p className="text-sm text-green-600 dark:text-green-400">
                     <MapPin className="w-4 h-4 inline mr-1" />
-                    Checked in from {state.distance}m away
+                    Checked in from {distance}m away
                   </p>
                 </div>
               )}
-              <Button
-                className="w-full max-w-xs h-12"
-                style={{ 
-                  background: DESIGN.colors.primary,
-                  color: DESIGN.colors.background,
-                  boxShadow: DESIGN.shadows.glowPurple
-                }}
-                onClick={handleClose}
-              >
-                Start Connecting
-              </Button>
+              <div className="flex gap-3">
+                <Button 
+                  className="h-12 px-6" 
+                  onClick={handleClose}
+                >
+                  Close
+                </Button>
+                {scannedEvent && (
+                  <Button 
+                    variant="outline" 
+                    className="h-12 px-6"
+                    onClick={handleViewEvent}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View Event
+                  </Button>
+                )}
+              </div>
             </>
           )}
 
-          {/* Error Step */}
-          {state.step === 'error' && (
+          {step === 'error' && (
             <>
-              <div 
-                className="w-20 h-20 flex items-center justify-center mb-6"
-                style={{
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  borderRadius: DESIGN.borderRadius.round
-                }}
-              >
+              <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center mb-6">
                 <AlertCircle className="w-10 h-10 text-red-500" />
               </div>
-              <h3 className="text-xl font-bold mb-2" style={{ color: DESIGN.colors.textPrimary }}>
-                Check-In Failed
-              </h3>
-              <p className="text-center mb-6 max-w-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                {state.errorMessage}
-              </p>
+              <h3 className="text-xl font-bold mb-2">Check-In Failed</h3>
+              <p className="text-muted-foreground text-center mb-6 max-w-xs">{errorMessage}</p>
               <div className="flex gap-3">
                 <Button 
                   variant="outline" 
                   className="h-12" 
-                  onClick={() => dispatch({ type: 'SET_STEP', step: 'scan' })}
+                  onClick={handleRetry}
                   disabled={isLoading}
                 >
                   Try Again
                 </Button>
                 <Button 
                   className="h-12" 
-                  onClick={() => dispatch({ type: 'SET_STEP', step: 'code' })}
+                  onClick={() => setStep('code')}
                   disabled={isLoading}
-                  style={{ 
-                    background: DESIGN.colors.primary,
-                    color: DESIGN.colors.background,
-                  }}
                 >
                   Enter Code
                 </Button>
@@ -1021,72 +499,47 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
             </>
           )}
 
-          {/* Outside Geofence Step */}
-          {state.step === 'outside_geofence' && state.scannedEvent && (
+          {step === 'outside_geofence' && (
             <>
-              <div 
-                className="w-20 h-20 flex items-center justify-center mb-6"
-                style={{
-                  background: 'rgba(234, 179, 8, 0.2)',
-                  borderRadius: DESIGN.borderRadius.round
-                }}
-              >
+              <div className="w-20 h-20 rounded-full bg-yellow-500/20 flex items-center justify-center mb-6">
                 <MapPin className="w-10 h-10 text-yellow-500" />
               </div>
-              <h3 className="text-xl font-bold mb-2" style={{ color: DESIGN.colors.textPrimary }}>
-                Outside Event Area
-              </h3>
-              <p className="text-center mb-4 max-w-xs" style={{ color: DESIGN.colors.textSecondary }}>
-                {state.errorMessage}
-              </p>
+              <h3 className="text-xl font-bold mb-2">Outside Event Area</h3>
+              <p className="text-muted-foreground text-center mb-4 max-w-xs">{errorMessage}</p>
               
-              <div className="w-full max-w-xs mb-6">
-                <div 
-                  className="rounded-lg p-4 mb-4"
-                  style={{
-                    background: 'rgba(234, 179, 8, 0.1)',
-                    border: '1px solid rgba(234, 179, 8, 0.3)'
-                  }}
-                >
-                  <h4 className="font-medium text-yellow-600 dark:text-yellow-400 mb-2">
-                    Event Details
-                  </h4>
-                  <p className="text-sm mb-1" style={{ color: DESIGN.colors.textPrimary }}>
-                    <span className="font-medium">Event:</span> {state.scannedEvent.name}
-                  </p>
-                  <p className="text-sm" style={{ color: DESIGN.colors.textPrimary }}>
-                    <span className="font-medium">Location:</span> {state.scannedEvent.location}
-                  </p>
-                </div>
-                
-                {state.distance !== null && (
-                  <div 
-                    className="rounded-lg p-4"
-                    style={{
-                      background: 'rgba(239, 68, 68, 0.1)',
-                      border: '1px solid rgba(239, 68, 68, 0.3)'
-                    }}
-                  >
-                    <p className="text-sm text-red-600 dark:text-red-400">
-                      <MapPin className="w-4 h-4 inline mr-1" />
-                      You are {state.distance}m away from the event
+              {scannedEvent && (
+                <div className="w-full max-w-xs mb-6">
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-4">
+                    <h4 className="font-medium text-yellow-600 dark:text-yellow-400 mb-2">
+                      Event Details
+                    </h4>
+                    <p className="text-sm text-foreground mb-1">
+                      <span className="font-medium">Event:</span> {scannedEvent.name}
                     </p>
-                    <p className="text-xs text-red-500/80 mt-1">
-                      You need to be within {state.scannedEvent.geofenceRadius || 50}m to check in
+                    <p className="text-sm text-foreground">
+                      <span className="font-medium">Location:</span> {scannedEvent.location}
                     </p>
                   </div>
-                )}
-              </div>
+                  
+                  {distance !== null && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                      <p className="text-sm text-red-600 dark:text-red-400">
+                        <MapPin className="w-4 h-4 inline mr-1" />
+                        You are {distance}m away from the event
+                      </p>
+                      <p className="text-xs text-red-500/80 mt-1">
+                        You need to be within {scannedEvent.geofenceRadius || 50}m to check in
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div className="flex flex-col gap-3 w-full max-w-xs">
                 <Button 
                   className="h-12 w-full" 
                   onClick={handleRetry}
                   disabled={isLoading}
-                  style={{ 
-                    background: DESIGN.colors.primary,
-                    color: DESIGN.colors.background,
-                  }}
                 >
                   {isLoading ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -1097,10 +550,17 @@ export function QRScannerModal({ isOpen, onClose, userId, user, onCheckInSuccess
                 <Button 
                   variant="outline" 
                   className="h-12 w-full" 
-                  onClick={() => dispatch({ type: 'SET_STEP', step: 'scan' })}
+                  onClick={() => setStep('scan')}
                   disabled={isLoading}
                 >
                   Scan Different QR Code
+                </Button>
+                <Button 
+                  className="h-12 w-full" 
+                  onClick={handleClose}
+                  disabled={isLoading}
+                >
+                  Close
                 </Button>
               </div>
             </>
