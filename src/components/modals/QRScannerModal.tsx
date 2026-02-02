@@ -32,6 +32,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [selectedVisibility, setSelectedVisibility] = useState<'public' | 'private'>('public');
   const [qrDataCache, setQrDataCache] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState(false); // Prevent re-processing
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -51,6 +52,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       setDebugInfo('');
       setSelectedVisibility('public');
       setQrDataCache('');
+      setIsProcessing(false);
     }
   }, [isOpen]);
 
@@ -101,6 +103,9 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
 
   // Process QR code - validates and shows privacy choice
   const processQRCode = useCallback(async (code: string) => {
+    if (isProcessing) return; // Prevent duplicate processing
+    
+    setIsProcessing(true);
     setStep('verifying');
     setErrorMessage('');
     setDebugInfo(`Processing QR code...`);
@@ -125,6 +130,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       if (!eventId) {
         setErrorMessage('Invalid QR code format. Please scan a valid event QR code.');
         setStep('error');
+        setIsProcessing(false);
         return;
       }
       
@@ -136,6 +142,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       if (!validation.valid || !validation.event) {
         setErrorMessage(validation.error || 'Event not found. Please check the QR code.');
         setStep('error');
+        setIsProcessing(false);
         return;
       }
       
@@ -156,6 +163,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
         if (existingCheckIn && existingCheckIn.length > 0) {
           setSuccessMessage(`You're already checked in to ${event.name}!`);
           setStep('success');
+          setIsProcessing(false);
           onCheckInSuccess?.(event.id);
           return;
         }
@@ -174,6 +182,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
           setErrorMessage(geofenceResult.error);
         }
         setStep('error');
+        setIsProcessing(false);
         return;
       }
       
@@ -183,36 +192,44 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       if (!geofenceResult.success) {
         setErrorMessage(`You're ${geofenceResult.distance}m from ${event.name}. Move within ${geofenceResult.geofenceRadius}m to check in.`);
         setStep('outside_geofence');
+        setIsProcessing(false);
         return;
       }
       
-      // Show privacy choice step
+      // Show privacy choice step - geofence check passed
       setStep('privacy_choice');
+      setIsProcessing(false);
       
     } catch (err: any) {
       console.error('Error processing QR code:', err);
       setErrorMessage(err?.message || 'Failed to process QR code. Please try again.');
       setStep('error');
+      setIsProcessing(false);
     }
-  }, [validateQRCode, preflightGeofenceCheck, userId, onCheckInSuccess]);
+  }, [validateQRCode, preflightGeofenceCheck, userId, onCheckInSuccess, isProcessing]);
 
   // Complete check-in with selected visibility
   const completeCheckIn = useCallback(async (visibility: 'public' | 'private') => {
-    if (!qrDataCache || !scannedEvent) return;
+    if (!qrDataCache || !scannedEvent || isProcessing) return;
     
+    setIsProcessing(true);
     setSelectedVisibility(visibility);
     setStep('checking_in');
     
     try {
+      // processQRCodeScan will do its own geofence validation on the server
+      // We just need to handle the result
       const result = await processQRCodeScan(qrDataCache, visibility);
       
+      // Update final state based on result
       if (result.success) {
         setSuccessMessage(result.message || `Successfully checked in to ${scannedEvent.name}!`);
         setDistance(result.distance || distance);
         setStep('success');
+        setIsProcessing(false);
         onCheckInSuccess?.(result.eventId || scannedEvent.id);
       } else {
-        // Check if error is about geofence
+        // Handle different error types
         if (result.errorType === 'outside_geofence') {
           setDistance(result.distance || null);
           setGeofenceRadius(result.geofenceRadius || 50);
@@ -226,13 +243,15 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
           setErrorMessage(result.error || 'Check-in failed. Please try again.');
           setStep('error');
         }
+        setIsProcessing(false);
       }
     } catch (err: any) {
       console.error('Error completing check-in:', err);
       setErrorMessage(err?.message || 'Check-in failed. Please try again.');
       setStep('error');
+      setIsProcessing(false);
     }
-  }, [qrDataCache, scannedEvent, processQRCodeScan, distance, onCheckInSuccess]);
+  }, [qrDataCache, scannedEvent, processQRCodeScan, distance, onCheckInSuccess, isProcessing]);
 
   // Stop scanning
   const stopScanning = useCallback(() => {
@@ -268,7 +287,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
         preferredDeviceId,
         videoRef.current,
         async (result, error) => {
-          if (result) {
+          if (result && !isProcessing) {
             stopScanning();
             const code = result.getText();
             setManualCode(code);
@@ -283,7 +302,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
     } finally {
       isStartingRef.current = false;
     }
-  }, [stopScanning, processQRCode]);
+  }, [stopScanning, processQRCode, isProcessing]);
 
   // Start/stop scanning based on step
   useEffect(() => {
@@ -322,6 +341,8 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
   };
 
   const handleRetry = async () => {
+    setIsProcessing(false); // Reset processing flag
+    
     if (!manualCode.trim() && !scannedEvent) {
       setStep('scan');
       return;
@@ -369,7 +390,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
           <button
             onClick={handleClose}
             className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-accent transition-colors"
-            disabled={isLoading}
+            disabled={isLoading || isProcessing}
           >
             <X className="w-5 h-5" />
           </button>
@@ -404,7 +425,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 variant="outline" 
                 className="h-12"
                 onClick={() => setStep('code')}
-                disabled={isLoading}
+                disabled={isLoading || isProcessing}
               >
                 <Keyboard className="w-4 h-4 mr-2" />
                 Enter Code Manually
@@ -431,16 +452,16 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                   variant="outline" 
                   className="flex-1 h-12" 
                   onClick={() => setStep('scan')}
-                  disabled={isLoading}
+                  disabled={isLoading || isProcessing}
                 >
                   Back to Scan
                 </Button>
                 <Button 
                   className="flex-1 h-12" 
                   onClick={handleCodeSubmit} 
-                  disabled={!manualCode.trim() || isLoading}
+                  disabled={!manualCode.trim() || isLoading || isProcessing}
                 >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Check In'}
+                  {isLoading || isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Check In'}
                 </Button>
               </div>
             </>
@@ -500,8 +521,8 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 <motion.button
                   whileTap={{ scale: 0.98 }}
                   onClick={() => completeCheckIn('public')}
-                  disabled={isLoading}
-                  className="w-full p-4 rounded-xl bg-card border-2 border-primary/50 hover:border-primary transition-colors text-left"
+                  disabled={isLoading || isProcessing}
+                  className="w-full p-4 rounded-xl bg-card border-2 border-primary/50 hover:border-primary transition-colors text-left disabled:opacity-50"
                 >
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
@@ -520,8 +541,8 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 <motion.button
                   whileTap={{ scale: 0.98 }}
                   onClick={() => completeCheckIn('private')}
-                  disabled={isLoading}
-                  className="w-full p-4 rounded-xl bg-card border border-border hover:border-muted-foreground transition-colors text-left"
+                  disabled={isLoading || isProcessing}
+                  className="w-full p-4 rounded-xl bg-card border border-border hover:border-muted-foreground transition-colors text-left disabled:opacity-50"
                 >
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
@@ -541,8 +562,11 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
               <Button 
                 variant="outline" 
                 className="h-10" 
-                onClick={() => setStep('scan')}
-                disabled={isLoading}
+                onClick={() => {
+                  setIsProcessing(false);
+                  setStep('scan');
+                }}
+                disabled={isLoading || isProcessing}
               >
                 Cancel
               </Button>
@@ -617,15 +641,18 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                   variant="outline" 
                   className="h-12" 
                   onClick={handleRetry}
-                  disabled={isLoading}
+                  disabled={isLoading || isProcessing}
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Try Again
                 </Button>
                 <Button 
                   className="h-12" 
-                  onClick={() => setStep('code')}
-                  disabled={isLoading}
+                  onClick={() => {
+                    setIsProcessing(false);
+                    setStep('code');
+                  }}
+                  disabled={isLoading || isProcessing}
                 >
                   Enter Code
                 </Button>
@@ -683,9 +710,9 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                   variant="outline"
                   className="h-12 w-full" 
                   onClick={handleRetry}
-                  disabled={isLoading}
+                  disabled={isLoading || isProcessing}
                 >
-                  {isLoading ? (
+                  {isLoading || isProcessing ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
                     <RefreshCw className="w-4 h-4 mr-2" />
@@ -696,7 +723,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                   variant="ghost"
                   className="h-12 w-full" 
                   onClick={handleClose}
-                  disabled={isLoading}
+                  disabled={isLoading || isProcessing}
                 >
                   Cancel
                 </Button>
