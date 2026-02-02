@@ -6,17 +6,27 @@ import { Event } from '@/lib/types';
 export interface CheckInResult {
   success: boolean;
   error?: string;
+  errorType?: 'event_ended' | 'event_not_started' | 'outside_geofence' | 'location_denied' | 'already_checked_in' | 'network_error' | 'not_found' | 'not_active' | 'auth_required' | 'unknown';
   message?: string;
   eventId?: string;
   checkInId?: string;
   isWithinGeofence?: boolean;
   distance?: number;
+  geofenceRadius?: number;
+  eventName?: string;
+  eventLocation?: string;
 }
 
 export interface GeolocationResult {
   latitude: number;
   longitude: number;
   accuracy: number;
+}
+
+export interface GeofencePreviewResult {
+  withinGeofence: boolean;
+  distance: number;
+  geofenceRadius: number;
 }
 
 export function useCheckIn(userId?: string) {
@@ -46,57 +56,119 @@ export function useCheckIn(userId?: string) {
                   accuracy: position.coords.accuracy
                 });
               },
-              (err) => reject(new Error('Location permission denied')),
+              (err) => {
+                if (err.code === 1) {
+                  reject(new Error('Location permission denied. Please enable location access in your browser settings.'));
+                } else if (err.code === 2) {
+                  reject(new Error('Unable to determine your location. Please check your GPS settings.'));
+                } else if (err.code === 3) {
+                  reject(new Error('Location request timed out. Please try again.'));
+                } else {
+                  reject(new Error('Location unavailable. Please try again.'));
+                }
+              },
               { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
           },
           { enableHighAccuracy: false, timeout: 3000, maximumAge: 60000 }
         );
       } else {
-        reject(new Error('Geolocation not supported'));
+        reject(new Error('Geolocation not supported by your browser.'));
       }
     });
   }, []);
 
+  // Pre-flight geofence check - get distance before attempting check-in
+  const preflightGeofenceCheck = useCallback(async (
+    eventId: string
+  ): Promise<{ success: boolean; distance?: number; geofenceRadius?: number; eventName?: string; eventLocation?: string; error?: string }> => {
+    try {
+      // Get event details
+      const { data: eventData, error: fetchError } = await supabase
+        .from('events')
+        .select('id, name, latitude, longitude, geofence_radius, location')
+        .eq('id', eventId)
+        .single();
+      
+      if (fetchError || !eventData) {
+        return { success: false, error: 'Event not found' };
+      }
+
+      // Get user location
+      const location = await getFastLocation();
+      
+      // Calculate distance
+      const distance = calculateDistance(
+        location.latitude,
+        location.longitude,
+        eventData.latitude || 0,
+        eventData.longitude || 0
+      );
+
+      const geofenceRadius = eventData.geofence_radius || 50;
+      
+      return {
+        success: distance <= geofenceRadius,
+        distance: Math.round(distance),
+        geofenceRadius,
+        eventName: eventData.name,
+        eventLocation: eventData.location
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }, [getFastLocation]);
+
   // Enhanced QR code validation that handles all formats
   const validateQRCodeFast = useCallback(async (
     qrData: string
-  ): Promise<{ valid: boolean; eventId?: string; event?: Event; error?: string }> => {
+  ): Promise<{ valid: boolean; eventId?: string; event?: Event; error?: string; errorType?: CheckInResult['errorType'] }> => {
     try {
       // First, try to parse as URL
       const parsed = parseCheckInURL(qrData);
       
       if (!parsed || !parsed.eventId) {
-        return { valid: false, error: 'Invalid QR code format. Please scan a valid event QR code.' };
+        return { valid: false, error: 'Invalid QR code format. Please scan a valid event QR code.', errorType: 'unknown' };
       }
       
       const eventId = parsed.eventId;
       
       // Validate event ID format
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId)) {
-        return { valid: false, error: 'Invalid event ID format' };
+        return { valid: false, error: 'Invalid event ID format', errorType: 'unknown' };
       }
       
-      // FAST database fetch - get essential fields
+      // FAST database fetch - get essential fields including ended_at
       const { data: eventData, error: fetchError } = await supabase
         .from('events')
-        .select('id, name, latitude, longitude, geofence_radius, is_active, date, time, location')
+        .select('id, name, latitude, longitude, geofence_radius, is_active, date, time, end_time, ended_at, location')
         .eq('id', eventId)
         .single();
       
       if (fetchError || !eventData) {
-        return { valid: false, error: 'Event not found or invalid' };
+        return { valid: false, error: 'This event doesn\'t exist. Please check the QR code.', errorType: 'not_found' };
       }
       
       if (!eventData.is_active) {
-        return { valid: false, error: 'This event is no longer active' };
+        return { valid: false, error: 'This event is no longer active.', errorType: 'not_active' };
+      }
+
+      // Check if event has ended (using ended_at timestamp)
+      if (eventData.ended_at) {
+        return { valid: false, error: 'This event has ended. Check-in is no longer available.', errorType: 'event_ended' };
       }
       
-      // Check if event date is in the past
+      // Check event date - allow check-in on the event day and future
       if (eventData.date) {
         const eventDate = new Date(eventData.date);
-        if (eventDate < new Date()) {
-          return { valid: false, error: 'This event has already ended' };
+        const today = new Date();
+        
+        // Reset both to start of day for comparison
+        eventDate.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0);
+        
+        if (eventDate < today) {
+          return { valid: false, error: 'This event has already passed.', errorType: 'event_ended' };
         }
       }
       
@@ -117,7 +189,7 @@ export function useCheckIn(userId?: string) {
       };
     } catch (err: any) {
       console.error('QR validation error:', err);
-      return { valid: false, error: 'Invalid QR code. Please try again.' };
+      return { valid: false, error: 'Unable to validate QR code. Please check your connection and try again.', errorType: 'network_error' };
     }
   }, []);
 
@@ -239,43 +311,58 @@ export function useCheckIn(userId?: string) {
       if (checkInError) {
         console.error('Secure check-in error:', checkInError);
         
-        // Parse server error messages
+        // Parse server error messages with enhanced details
         const errorMessage = checkInError.message || '';
         
         if (errorMessage.includes('already checked in') || errorMessage.includes('already exists')) {
           return { 
             success: true, 
-            message: 'You have already checked in to this event',
-            eventId: event.id
+            message: `You're already checked in to ${event.name}!`,
+            eventId: event.id,
+            errorType: 'already_checked_in'
           };
         }
         
         if (errorMessage.includes('within') && errorMessage.includes('meters')) {
+          // Extract distance and radius from error message
+          const distanceMatch = errorMessage.match(/Current distance: (\d+)/);
+          const radiusMatch = errorMessage.match(/within (\d+) meters/);
+          const distance = distanceMatch ? parseInt(distanceMatch[1]) : undefined;
+          const radius = radiusMatch ? parseInt(radiusMatch[1]) : event.geofenceRadius;
+          
           return { 
             success: false, 
-            error: errorMessage,
+            error: `You're ${distance || 'too far'}m from ${event.name}. Move within ${radius}m to check in.`,
+            errorType: 'outside_geofence',
             eventId: event.id,
-            isWithinGeofence: false
+            eventName: event.name,
+            eventLocation: event.location,
+            isWithinGeofence: false,
+            distance,
+            geofenceRadius: radius
           };
         }
         
         if (errorMessage.includes('authenticated')) {
           return { 
             success: false, 
-            error: 'Please log in to check in'
+            error: 'Please log in to check in.',
+            errorType: 'auth_required'
           };
         }
         
         if (errorMessage.includes('not found') || errorMessage.includes('not active')) {
           return { 
             success: false, 
-            error: 'Event not found or is no longer active'
+            error: 'This event is no longer available.',
+            errorType: 'not_active'
           };
         }
         
         return { 
           success: false, 
-          error: 'Check-in failed. Please try again.' 
+          error: 'Check-in failed. Please try again.',
+          errorType: 'unknown'
         };
       }
       
@@ -285,6 +372,7 @@ export function useCheckIn(userId?: string) {
         success: true,
         message: `Successfully checked in to ${event.name}!`,
         eventId: event.id,
+        eventName: event.name,
         checkInId: checkInId as string,
         isWithinGeofence: true
       };
@@ -292,18 +380,25 @@ export function useCheckIn(userId?: string) {
     } catch (err: any) {
       console.error('Check-in process error:', err);
       
-      // User-friendly error messages
+      // User-friendly error messages with error types
       let userError = 'Check-in failed. Please try again.';
+      let errorType: CheckInResult['errorType'] = 'unknown';
       
-      if (err.message?.includes('Location permission')) {
-        userError = 'Location permission denied. Please enable location access to check in.';
-      } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
-        userError = 'Network error. Please check your internet connection.';
+      if (err.message?.includes('Location permission') || err.message?.includes('location access')) {
+        userError = 'Location access is required. Please enable it in your browser settings.';
+        errorType = 'location_denied';
+      } else if (err.message?.includes('network') || err.message?.includes('fetch') || err.message?.includes('Failed to fetch')) {
+        userError = 'Connection issue. Please check your internet and try again.';
+        errorType = 'network_error';
       } else if (err.message?.includes('Event not found')) {
-        userError = 'Event not found. Please check the QR code.';
+        userError = 'This event doesn\'t exist. Please check the QR code.';
+        errorType = 'not_found';
+      } else if (err.message?.includes('timed out')) {
+        userError = 'Location request timed out. Please try again.';
+        errorType = 'location_denied';
       }
       
-      return { success: false, error: userError };
+      return { success: false, error: userError, errorType };
     } finally {
       setIsLoading(false);
     }
@@ -416,6 +511,8 @@ export function useCheckIn(userId?: string) {
     processQRCodeScan,
     checkInToEventFast,
     validateQRCode: validateQRCodeFast,
+    preflightGeofenceCheck,
+    getFastLocation,
     hasCheckedIn: useCallback(async (eventId: string): Promise<boolean> => {
       if (!userId) return false;
       const { data } = await supabase
