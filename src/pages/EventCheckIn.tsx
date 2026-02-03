@@ -1,32 +1,33 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, MapPin, Calendar, Clock, CheckCircle, AlertCircle, LogIn, ArrowLeft, Navigation } from 'lucide-react';
+import { Loader2, MapPin, Calendar, Clock, CheckCircle, AlertCircle, LogIn, ArrowLeft, Navigation, Users, UserX } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Event } from '@/lib/types';
-import { useCheckIn } from '@/hooks/useCheckIn';
-import { validateGeofenceForCheckIn } from '@/lib/qr-utils';
+import { useCheckIn, GeolocationResult } from '@/hooks/useCheckIn';
+
+type CheckInStep = 'idle' | 'checking_location' | 'choose_visibility' | 'checking_in' | 'success' | 'already_checked_in';
 
 export default function EventCheckIn() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading: authLoading } = useApp();
-  const { processQRCodeScan, checkInToEventFast, isLoading: checkInLoading } = useCheckIn(user?.id);
-  
-  const [event, setEvent] = useState<Event | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false);
-  const [checkingGeofence, setCheckingGeofence] = useState(false);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const { preflightGeofenceCheck, processCheckIn, isLoading: checkInLoading } = useCheckIn(user?.id);
+
+  const [event, setEvent]                   = useState<Event | null>(null);
+  const [loading, setLoading]               = useState(true);
+  const [error, setError]                   = useState<string | null>(null);
+  const [step, setStep]                     = useState<CheckInStep>('idle');
+  const [distance, setDistance]             = useState<number | null>(null);
+
+  // Holds the single GPS result from preflight — reused for the insert
+  const [cachedLocation, setCachedLocation] = useState<GeolocationResult | null>(null);
 
   const token = searchParams.get('token');
-  const checkGeofence = searchParams.get('checkGeofence') === 'true';
 
+  // ── fetch event on mount ────────────────────────────────────────────────
   useEffect(() => {
     const fetchEvent = async () => {
       if (!id) {
@@ -48,7 +49,6 @@ export default function EventCheckIn() {
           return;
         }
 
-        // Map to Event type
         const eventData: Event = {
           id: data.id,
           name: data.name,
@@ -78,17 +78,17 @@ export default function EventCheckIn() {
 
         setEvent(eventData);
 
-        // Check if user has already checked in
+        // Already checked in?
         if (user) {
-          const { data: checkInData } = await supabase
+          const { data: existing } = await supabase
             .from('check_ins')
             .select('id')
             .eq('user_id', user.id)
             .eq('event_id', id)
             .limit(1);
 
-          if (checkInData && checkInData.length > 0) {
-            setAlreadyCheckedIn(true);
+          if (existing && existing.length > 0) {
+            setStep('already_checked_in');
           }
         }
       } catch (err) {
@@ -102,100 +102,58 @@ export default function EventCheckIn() {
     fetchEvent();
   }, [id, user]);
 
-  const checkUserLocation = async (): Promise<boolean> => {
-    if (!event) return false;
-    
-    setCheckingGeofence(true);
-    setLocationError(null);
-    
-    try {
-      // Get user's current location
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        });
-      });
-      
-      const userLat = position.coords.latitude;
-      const userLng = position.coords.longitude;
-      
-      setUserLocation({ lat: userLat, lng: userLng });
-      
-      // Validate geofence
-      const geofenceCheck = await validateGeofenceForCheckIn(
-        event.id,
-        userLat,
-        userLng
-      );
-      
-      if (!geofenceCheck.valid) {
-        setLocationError(geofenceCheck.error || 'You are not within the event geofence');
-        return false;
-      }
-      
-      return true;
-    } catch (err: any) {
-      if (err.code === 1) {
-        setLocationError('Location permission denied. Please enable location access.');
-      } else if (err.code === 2) {
-        setLocationError('Unable to get your location. Please try again.');
-      } else if (err.code === 3) {
-        setLocationError('Location request timed out. Please try again.');
-      } else {
-        setLocationError('Failed to check location. Please try again.');
-      }
-      return false;
-    } finally {
-      setCheckingGeofence(false);
-    }
-  };
-
-  const handleCheckIn = async () => {
+  // ── user taps "Check In Now" → runs geofence, caches location ──────────
+  const handleCheckIn = useCallback(async () => {
     if (!event || !user) return;
 
-    setLocationError(null);
+    setError(null);
+    setStep('checking_location');
+
+    const result = await preflightGeofenceCheck(event.id);
+
+    // Location permission / GPS error
+    if (result.error) {
+      setError(
+        result.error.includes('Location permission') || result.error.includes('location access')
+          ? 'Location permission denied. Please enable location access in your browser settings.'
+          : result.error
+      );
+      setStep('idle');
+      return;
+    }
+
+    setDistance(result.distance ?? null);
+
+    // Outside geofence
+    if (!result.success) {
+      setError(`You're ${result.distance}m from the venue. Move within ${result.geofenceRadius}m to check in.`);
+      setStep('idle');
+      return;
+    }
+
+    // Geofence passed — cache location and ask for visibility
+    setCachedLocation(result.location || null);
+    setStep('choose_visibility');
+  }, [event, user, preflightGeofenceCheck]);
+
+  // ── user picks public / private → insert check-in ──────────────────────
+  const handleVisibilityChoice = useCallback(async (visibility: 'public' | 'private') => {
+    if (!event || !cachedLocation) return;
+
+    setStep('checking_in');
     setError(null);
 
-    // If geofence check is required, validate location first
-    if (checkGeofence) {
-      const isWithinGeofence = await checkUserLocation();
-      if (!isWithinGeofence) {
-        return; // Stop if not within geofence
-      }
-    }
+    const result = await processCheckIn(event, cachedLocation, visibility);
 
-    try {
-      // Use the checkInToEventFast method from useCheckIn hook
-      const result = await checkInToEventFast(event.id, 'public');
-      
-      if (result.success) {
-        setSuccess(true);
-        setAlreadyCheckedIn(true);
-      } else {
-        // Check if error is specifically about geofence
-        if (result.error?.includes('inside the event\'s geofence')) {
-          setLocationError(result.error);
-        } else if (result.error?.includes('already checked in')) {
-          setAlreadyCheckedIn(true);
-        } else {
-          setError(result.error || 'Failed to check in');
-        }
-      }
-    } catch (err: any) {
-      if (err.code === 1) {
-        setLocationError('Location permission denied. Please enable location access.');
-      } else if (err.code === 2) {
-        setLocationError('Unable to get your location. Please try again.');
-      } else if (err.code === 3) {
-        setLocationError('Location request timed out. Please try again.');
-      } else {
-        setError('Check-in failed. Please try again.');
-      }
+    if (result.success || result.errorType === 'already_checked_in') {
+      setStep('success');
+    } else {
+      setError(result.error || 'Check-in failed. Please try again.');
+      setStep('idle');
     }
-  };
+  }, [event, cachedLocation, processCheckIn]);
 
+  // ── loading ─────────────────────────────────────────────────────────────
   if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -204,6 +162,7 @@ export default function EventCheckIn() {
     );
   }
 
+  // ── hard error / event not found ────────────────────────────────────────
   if (error && !event) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -218,7 +177,7 @@ export default function EventCheckIn() {
 
   if (!event) return null;
 
-  // Format date
+  // ── format date for display ─────────────────────────────────────────────
   let formattedDate = event.date;
   try {
     formattedDate = new Date(event.date).toLocaleDateString('en-US', {
@@ -229,11 +188,10 @@ export default function EventCheckIn() {
     });
   } catch {}
 
-  // If not authenticated, show public event page with login prompt
+  // ── not logged in → show event info + login CTA ────────────────────────
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-background">
-        {/* Event Header */}
         <div className="relative h-48">
           <img
             src={event.coverImage || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800'}
@@ -245,17 +203,12 @@ export default function EventCheckIn() {
 
         <div className="px-4 -mt-12 relative z-10">
           <div className="bg-card rounded-2xl p-6 border border-border">
-            <Button
-              variant="ghost"
-              className="mb-4 -ml-2"
-              onClick={() => navigate(-1)}
-            >
+            <Button variant="ghost" className="mb-4 -ml-2" onClick={() => navigate(-1)}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
-            
+
             <h1 className="text-2xl font-bold mb-2">{event.name}</h1>
-            
             <div className="space-y-3 mb-6">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="w-4 h-4" />
@@ -270,12 +223,10 @@ export default function EventCheckIn() {
                 <span>{event.location}</span>
               </div>
             </div>
-
             <p className="text-muted-foreground mb-6">{event.description}</p>
 
-            {/* Login/Signup CTA */}
             <div className="bg-primary/10 rounded-xl p-4 mb-4">
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-3">
                 <LogIn className="w-6 h-6 text-primary" />
                 <div>
                   <h3 className="font-semibold">Sign in to check in</h3>
@@ -293,11 +244,7 @@ export default function EventCheckIn() {
               >
                 Sign In
               </Button>
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => navigate(`/event/${event.id}`)}
-              >
+              <Button variant="outline" className="flex-1" onClick={() => navigate(`/event/${event.id}`)}>
                 View Event
               </Button>
             </div>
@@ -307,8 +254,8 @@ export default function EventCheckIn() {
     );
   }
 
-  // Success state or already checked in
-  if (success || alreadyCheckedIn) {
+  // ── success / already checked in ────────────────────────────────────────
+  if (step === 'success' || step === 'already_checked_in') {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center max-w-md">
@@ -316,33 +263,93 @@ export default function EventCheckIn() {
             <CheckCircle className="w-10 h-10 text-green-500" />
           </div>
           <h1 className="text-2xl font-bold mb-2">
-            {alreadyCheckedIn && !success ? 'Already Checked In!' : 'You\'re Checked In!'}
+            {step === 'already_checked_in' ? 'Already Checked In!' : "You're Checked In!"}
           </h1>
           <p className="text-muted-foreground mb-6">
-            {alreadyCheckedIn && !success 
-              ? `You're already checked in to ${event.name}` 
+            {step === 'already_checked_in'
+              ? `You're already checked in to ${event.name}`
               : `Welcome to ${event.name}`}
           </p>
-          <div className="flex flex-col gap-3 justify-center">
-            <Button onClick={() => navigate(`/event/${event.id}`)} className="w-full">
-              View Event
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/connect')}>
-              Meet People
-            </Button>
-            <Button variant="ghost" onClick={() => navigate('/events')}>
-              Browse More Events
-            </Button>
+          {distance !== null && (
+            <p className="text-sm text-green-600 dark:text-green-400 mb-4">
+              <MapPin className="w-4 h-4 inline mr-1" />
+              Checked in from {distance}m away
+            </p>
+          )}
+          <div className="flex flex-col gap-3">
+            <Button onClick={() => navigate(`/event/${event.id}`)} className="w-full">View Event</Button>
+            <Button variant="outline" onClick={() => navigate('/connect')}>Meet People</Button>
+            <Button variant="ghost" onClick={() => navigate('/events')}>Browse More Events</Button>
           </div>
         </div>
       </div>
     );
   }
 
-  // Authenticated check-in flow
+  // ── visibility choice screen ────────────────────────────────────────────
+  if (step === 'choose_visibility') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/20 flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-primary" />
+            </div>
+            <h1 className="text-2xl font-bold mb-1">You're at {event.name}!</h1>
+            {distance !== null && (
+              <p className="text-sm text-green-600 dark:text-green-400">
+                <MapPin className="w-4 h-4 inline mr-1" />
+                {distance}m from venue • Within range
+              </p>
+            )}
+            <p className="text-muted-foreground mt-2">How would you like to appear at this event?</p>
+          </div>
+
+          <div className="space-y-3 mb-6">
+            {/* Public */}
+            <button
+              onClick={() => handleVisibilityChoice('public')}
+              className="w-full p-4 rounded-xl bg-card border-2 border-primary/50 hover:border-primary transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold">Public</p>
+                  <p className="text-xs text-green-600 dark:text-green-400">Best for networking</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">Others can see your profile and connect with you</p>
+            </button>
+
+            {/* Private */}
+            <button
+              onClick={() => handleVisibilityChoice('private')}
+              className="w-full p-4 rounded-xl bg-card border border-border hover:border-muted-foreground transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                  <UserX className="w-5 h-5 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-semibold">Private</p>
+                  <p className="text-xs text-muted-foreground">Browse anonymously</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">You can see others but they won't see you</p>
+            </button>
+          </div>
+
+          <Button variant="outline" className="w-full" onClick={() => setStep('idle')}>Cancel</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── main check-in page (idle / checking_location / checking_in) ─────────
   return (
     <div className="min-h-screen bg-background">
-      {/* Event Header */}
       <div className="relative h-48">
         <img
           src={event.coverImage || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800'}
@@ -354,17 +361,12 @@ export default function EventCheckIn() {
 
       <div className="px-4 -mt-12 relative z-10">
         <div className="bg-card rounded-2xl p-6 border border-border">
-          <Button
-            variant="ghost"
-            className="mb-4 -ml-2"
-            onClick={() => navigate(-1)}
-          >
+          <Button variant="ghost" className="mb-4 -ml-2" onClick={() => navigate(-1)}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
-          
+
           <h1 className="text-2xl font-bold mb-2">{event.name}</h1>
-          
           <div className="space-y-3 mb-6">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Calendar className="w-4 h-4" />
@@ -380,7 +382,7 @@ export default function EventCheckIn() {
             </div>
           </div>
 
-          {/* Geofence Information */}
+          {/* Geofence info banner */}
           <div className="bg-primary/10 rounded-xl p-4 mb-4">
             <div className="flex items-center gap-3">
               <Navigation className="w-5 h-5 text-primary" />
@@ -393,21 +395,8 @@ export default function EventCheckIn() {
             </div>
           </div>
 
-          {/* Location Error */}
-          {locationError && (
-            <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 mb-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-destructive">Location Check Failed</p>
-                  <p className="text-sm text-muted-foreground mt-1">{locationError}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* General Error */}
-          {error && !locationError && (
+          {/* Error banner */}
+          {error && (
             <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 mb-4">
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
@@ -419,18 +408,18 @@ export default function EventCheckIn() {
             </div>
           )}
 
-          {/* Check-in Button */}
+          {/* Check-in button */}
           <Button
             className="w-full h-14 text-lg font-semibold"
             onClick={handleCheckIn}
-            disabled={checkInLoading || checkingGeofence}
+            disabled={step === 'checking_location' || step === 'checking_in'}
           >
-            {checkingGeofence ? (
+            {step === 'checking_location' ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Checking Location...
               </>
-            ) : checkInLoading ? (
+            ) : step === 'checking_in' ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Checking In...
@@ -441,9 +430,7 @@ export default function EventCheckIn() {
           </Button>
 
           <p className="text-center text-sm text-muted-foreground mt-4">
-            {checkGeofence 
-              ? 'Your location will be verified before check-in' 
-              : 'Location verification may be required for this event'}
+            Your location will be verified before check-in
           </p>
         </div>
       </div>
