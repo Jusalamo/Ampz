@@ -50,73 +50,100 @@ import QRCode from 'qrcode';
 // Type alias to avoid conflict with DOM Event
 type AppEvent = EventType;
 
-// REAL-TIME STATUS CHECKER HOOK
+// Enhanced REAL-TIME STATUS CHECKER HOOK with duration support
 function useEventStatus(event: AppEvent) {
   const [status, setStatus] = useState<'live' | 'upcoming' | 'past'>('upcoming');
   const [timeUntil, setTimeUntil] = useState<string>('');
+  const [eventStart, setEventStart] = useState<Date | null>(null);
+  const [eventEnd, setEventEnd] = useState<Date | null>(null);
   
   useEffect(() => {
-    const calculateStatus = () => {
+    const calculateEventTimes = () => {
       if (!event?.date) return;
       
-      const now = new Date();
+      // Parse event date and time
       const eventDate = new Date(event.date);
+      let startTime = eventDate;
       
-      // Check if event has time component
-      let eventDateTime = eventDate;
+      // If event has time, set the exact start time
       if (event.time) {
         const [hours, minutes] = event.time.split(':').map(Number);
-        eventDateTime = new Date(eventDate);
-        eventDateTime.setHours(hours || 0, minutes || 0, 0, 0);
+        startTime = new Date(eventDate);
+        startTime.setHours(hours || 0, minutes || 0, 0, 0);
       }
       
-      const isToday = eventDate.toDateString() === now.toDateString();
-      const isPast = eventDateTime < now;
+      setEventStart(startTime);
       
-      if (isToday && !isPast) {
+      // Calculate event end time (default 4 hours duration, or use actual duration if available)
+      let endTime = new Date(startTime);
+      const durationHours = event.duration || 4; // Default 4 hours if not specified
+      endTime.setHours(endTime.getHours() + durationHours);
+      
+      setEventEnd(endTime);
+    };
+    
+    calculateEventTimes();
+  }, [event]);
+  
+  useEffect(() => {
+    if (!eventStart || !eventEnd) return;
+    
+    const calculateStatus = () => {
+      const now = new Date();
+      
+      // Determine if event is live, upcoming, or past
+      if (now >= eventStart && now <= eventEnd) {
         setStatus('live');
         
-        // Calculate time until event ends (assuming 4-hour event)
-        const eventEnd = new Date(eventDateTime);
-        eventEnd.setHours(eventEnd.getHours() + 4);
+        // Calculate time until event ends
         const timeDiff = eventEnd.getTime() - now.getTime();
         
         if (timeDiff > 0) {
           const hoursLeft = Math.floor(timeDiff / (1000 * 60 * 60));
           const minutesLeft = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
-          setTimeUntil(`${hoursLeft}h ${minutesLeft}m left`);
+          
+          if (hoursLeft > 0) {
+            setTimeUntil(`${hoursLeft}h ${minutesLeft}m left`);
+          } else {
+            setTimeUntil(`${minutesLeft}m left`);
+          }
         } else {
           setTimeUntil('Ending soon');
         }
-      } else if (isPast) {
-        setStatus('past');
-        setTimeUntil('');
-      } else {
+      } else if (now < eventStart) {
         setStatus('upcoming');
         
         // Calculate time until event starts
-        const timeDiff = eventDateTime.getTime() - now.getTime();
+        const timeDiff = eventStart.getTime() - now.getTime();
         const daysLeft = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
         
         if (daysLeft > 0) {
           setTimeUntil(`In ${daysLeft} day${daysLeft > 1 ? 's' : ''}`);
         } else {
           const hoursLeft = Math.floor(timeDiff / (1000 * 60 * 60));
-          setTimeUntil(`In ${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''}`);
+          if (hoursLeft > 0) {
+            setTimeUntil(`In ${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''}`);
+          } else {
+            const minutesLeft = Math.floor(timeDiff / (1000 * 60));
+            setTimeUntil(`In ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}`);
+          }
         }
+      } else {
+        setStatus('past');
+        setTimeUntil('');
       }
     };
     
     // Calculate immediately
     calculateStatus();
     
-    // Update every minute for real-time accuracy
-    const interval = setInterval(calculateStatus, 60000);
+    // Update every 30 seconds for real-time accuracy (more frequent for live events)
+    const interval = setInterval(calculateStatus, 30000);
     
     return () => clearInterval(interval);
-  }, [event]);
+  }, [eventStart, eventEnd]);
   
-  return { status, timeUntil };
+  return { status, timeUntil, eventStart, eventEnd };
 }
 
 // Add real-time subscription for event updates
@@ -167,6 +194,8 @@ function useEventUpdates(events: AppEvent[], updateEvent: (event: AppEvent) => v
           isDemo: payload.new.is_demo || false,
           isActive: payload.new.is_active ?? true,
           qrCodeUrl: payload.new.qr_code_url,
+          duration: payload.new.duration || 4, // Add duration field
+          endTime: payload.new.end_time, // Add end time field
         };
         
         updateEvent(updatedEvent);
@@ -908,7 +937,7 @@ function NotificationModal({ isOpen, onClose, events, selectedEventId }: Notific
   );
 }
 
-// Event Card Component with Real-time Status
+// Event Card Component with Real-time Status and Duration Support
 interface EventCardProps {
   event: AppEvent;
   onEdit: (event: AppEvent) => void;
@@ -918,7 +947,26 @@ interface EventCardProps {
 }
 
 function EventCard({ event, onEdit, onDelete, onViewQR, isSelected }: EventCardProps) {
-  const { status, timeUntil } = useEventStatus(event);
+  const { status, timeUntil, eventStart, eventEnd } = useEventStatus(event);
+  
+  const formatEventTime = () => {
+    if (!eventStart) return '';
+    
+    const startStr = eventStart.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    
+    if (eventEnd) {
+      const endStr = eventEnd.toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      return `${startStr} - ${endStr}`;
+    }
+    
+    return startStr;
+  };
   
   return (
     <div className={`
@@ -952,15 +1000,13 @@ function EventCard({ event, onEdit, onDelete, onViewQR, isSelected }: EventCardP
         </div>
       </div>
 
-      {/* Event Details */}
+      {/* Event Details with Duration */}
       <p className="text-sm text-gray-400 mb-3">
-        {new Date(event.date).toLocaleDateString('en-US', {
+        {eventStart ? eventStart.toLocaleDateString('en-US', {
           weekday: 'short',
           month: 'short',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit'
-        })} • {event.attendees} attendees
+          day: 'numeric'
+        }) : ''} • {formatEventTime()} • {event.attendees} attendees
       </p>
 
       {/* Geofence Info - Shows updated radius */}
@@ -1066,7 +1112,7 @@ export default function EventManager() {
   // Use real-time updates hook
   useEventUpdates(userEvents, updateEvent);
 
-  // Filter events based on search and status
+  // Filter events based on search and status WITH DURATION SUPPORT
   const filteredEvents = userEvents.filter(event => {
     // Search filter
     const matchesSearch = !searchQuery || 
@@ -1074,24 +1120,29 @@ export default function EventManager() {
       event.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
       event.category.toLowerCase().includes(searchQuery.toLowerCase());
     
-    // Get current status for filtering
+    // Calculate event times for status filtering
     const now = new Date();
     const eventDate = new Date(event.date);
-    let eventDateTime = eventDate;
+    let eventStart = eventDate;
     
     if (event.time) {
       const [hours, minutes] = event.time.split(':').map(Number);
-      eventDateTime = new Date(eventDate);
-      eventDateTime.setHours(hours || 0, minutes || 0, 0, 0);
+      eventStart = new Date(eventDate);
+      eventStart.setHours(hours || 0, minutes || 0, 0, 0);
     }
     
-    const isToday = eventDate.toDateString() === now.toDateString();
-    const isPast = eventDateTime < now;
+    const durationHours = event.duration || 4; // Default 4 hours
+    const eventEnd = new Date(eventStart);
+    eventEnd.setHours(eventEnd.getHours() + durationHours);
     
     let matchesStatus = true;
-    if (filterStatus === 'live') matchesStatus = isToday && !isPast;
-    else if (filterStatus === 'upcoming') matchesStatus = !isPast && !isToday;
-    else if (filterStatus === 'past') matchesStatus = isPast;
+    if (filterStatus === 'live') {
+      matchesStatus = now >= eventStart && now <= eventEnd;
+    } else if (filterStatus === 'upcoming') {
+      matchesStatus = now < eventStart;
+    } else if (filterStatus === 'past') {
+      matchesStatus = now > eventEnd;
+    }
     
     return matchesSearch && matchesStatus;
   });
@@ -1166,7 +1217,8 @@ export default function EventManager() {
           latitude: updatedEvent.coordinates?.lat,
           longitude: updatedEvent.coordinates?.lng,
           geofence_radius: updatedEvent.geofenceRadius,
-          description: updatedEvent.description
+          description: updatedEvent.description,
+          duration: updatedEvent.duration || 4 // Save duration
         })
         .eq('id', updatedEvent.id);
       
