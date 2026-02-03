@@ -16,7 +16,7 @@ interface QRScannerModalProps {
   onCheckInSuccess?: (eventId: string) => void;
 }
 
-type ScannerStep = 'scan' | 'code' | 'verifying' | 'geofence_check' | 'privacy_choice' | 'checking_in' | 'success' | 'error' | 'outside_geofence';
+type ScannerStep = 'scan' | 'code' | 'verifying' | 'privacy_choice' | 'checking_in' | 'success' | 'error' | 'outside_geofence';
 
 export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QRScannerModalProps) {
   const navigate = useNavigate();
@@ -29,9 +29,9 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
   const [successMessage, setSuccessMessage] = useState('');
   const [distance, setDistance] = useState<number | null>(null);
   const [geofenceRadius, setGeofenceRadius] = useState<number>(50);
-  const [debugInfo, setDebugInfo] = useState<string>('');
   const [selectedVisibility, setSelectedVisibility] = useState<'public' | 'private'>('public');
   const [qrDataCache, setQrDataCache] = useState<string>('');
+  const [geofenceChecked, setGeofenceChecked] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -48,9 +48,9 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       setSuccessMessage('');
       setDistance(null);
       setGeofenceRadius(50);
-      setDebugInfo('');
       setSelectedVisibility('public');
       setQrDataCache('');
+      setGeofenceChecked(false);
     }
   }, [isOpen]);
 
@@ -103,22 +103,16 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
   const processQRCode = useCallback(async (code: string) => {
     setStep('verifying');
     setErrorMessage('');
-    setDebugInfo(`Processing QR code...`);
     setQrDataCache(code);
     
     try {
-      console.log('Processing QR code:', code);
-      
       // Extract event ID from QR code/URL
       let eventId: string | null = null;
       
-      // Handle different QR code formats
       if (code.includes('/event/')) {
-        // URL format: .../event/{id}/checkin or .../event/{id}
         const match = code.match(/\/event\/([a-f0-9-]+)/i);
         if (match) eventId = match[1];
       } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)) {
-        // Direct UUID format
         eventId = code;
       }
       
@@ -127,8 +121,6 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
         setStep('error');
         return;
       }
-      
-      console.log('Event ID extracted:', eventId);
       
       // Validate QR code and event
       const validation = await validateQRCode(code);
@@ -142,7 +134,6 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       const event = validation.event;
       setScannedEvent(event);
       setGeofenceRadius(event.geofenceRadius || 50);
-      setDebugInfo(`Event found: ${event.name}`);
       
       // Check if user has already checked in
       if (userId) {
@@ -161,10 +152,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
         }
       }
       
-      // Pre-flight geofence check
-      setStep('geofence_check');
-      setDebugInfo('Checking your location...');
-      
+      // Pre-flight geofence check (ONE TIME ONLY)
       const geofenceResult = await preflightGeofenceCheck(eventId);
       
       if (geofenceResult.error) {
@@ -181,12 +169,13 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       setGeofenceRadius(geofenceResult.geofenceRadius || 50);
       
       if (!geofenceResult.success) {
-        setErrorMessage(`You're ${geofenceResult.distance}m from ${event.name}. Move within ${geofenceResult.geofenceRadius}m to check in.`);
+        setErrorMessage(`You're ${Math.round(geofenceResult.distance || 0)}m from the venue. Move within ${geofenceResult.geofenceRadius}m to check in.`);
         setStep('outside_geofence');
         return;
       }
       
-      // Show privacy choice step
+      // Geofence passed - mark as checked and go directly to privacy choice
+      setGeofenceChecked(true);
       setStep('privacy_choice');
       
     } catch (err: any) {
@@ -196,9 +185,9 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
     }
   }, [validateQRCode, preflightGeofenceCheck, userId, onCheckInSuccess]);
 
-  // Complete check-in with selected visibility
+  // Complete check-in with selected visibility - NO re-checking geofence
   const completeCheckIn = useCallback(async (visibility: 'public' | 'private') => {
-    if (!qrDataCache || !scannedEvent) return;
+    if (!qrDataCache || !scannedEvent || !geofenceChecked) return;
     
     setSelectedVisibility(visibility);
     setStep('checking_in');
@@ -207,32 +196,32 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       const result = await processQRCodeScan(qrDataCache, visibility);
       
       if (result.success) {
-        setSuccessMessage(result.message || `Successfully checked in to ${scannedEvent.name}!`);
+        setSuccessMessage(result.message || `Welcome to ${scannedEvent.name}!`);
         setDistance(result.distance || distance);
         setStep('success');
         onCheckInSuccess?.(result.eventId || scannedEvent.id);
-      } else {
-        // Check if error is about geofence
-        if (result.errorType === 'outside_geofence') {
-          setDistance(result.distance || null);
-          setGeofenceRadius(result.geofenceRadius || 50);
-          setErrorMessage(result.error || 'You are outside the event area');
-          setStep('outside_geofence');
-        } else if (result.errorType === 'already_checked_in') {
-          setSuccessMessage(`You're already checked in to ${scannedEvent.name}!`);
-          setStep('success');
-          onCheckInSuccess?.(scannedEvent.id);
-        } else {
-          setErrorMessage(result.error || 'Check-in failed. Please try again.');
-          setStep('error');
+        
+        // If public mode, navigate to connect page after brief delay
+        if (visibility === 'public') {
+          setTimeout(() => {
+            onClose();
+            navigate('/connect');
+          }, 1500);
         }
+      } else if (result.errorType === 'already_checked_in') {
+        setSuccessMessage(`You're already checked in to ${scannedEvent.name}!`);
+        setStep('success');
+        onCheckInSuccess?.(scannedEvent.id);
+      } else {
+        setErrorMessage(result.error || 'Check-in failed. Please try again.');
+        setStep('error');
       }
     } catch (err: any) {
       console.error('Error completing check-in:', err);
       setErrorMessage(err?.message || 'Check-in failed. Please try again.');
       setStep('error');
     }
-  }, [qrDataCache, scannedEvent, processQRCodeScan, distance, onCheckInSuccess]);
+  }, [qrDataCache, scannedEvent, processQRCodeScan, distance, onCheckInSuccess, geofenceChecked, navigate, onClose]);
 
   // Stop scanning
   const stopScanning = useCallback(() => {
@@ -359,7 +348,6 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
             {step === 'scan' && 'Scan QR Code'}
             {step === 'code' && 'Enter Event Code'}
             {step === 'verifying' && 'Verifying...'}
-            {step === 'geofence_check' && 'Checking Location...'}
             {step === 'privacy_choice' && 'Choose Visibility'}
             {step === 'checking_in' && 'Checking In...'}
             {step === 'success' && 'Check-In Complete!'}
@@ -459,26 +447,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
             </>
           )}
 
-          {step === 'geofence_check' && (
-            <>
-              <div className="relative">
-                <Navigation className="w-16 h-16 text-primary mb-6" />
-                <Loader2 className="absolute -bottom-2 -right-2 w-8 h-8 text-primary animate-spin" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">Checking Your Location</h3>
-              <p className="text-muted-foreground text-center mb-4">
-                Verifying you're at the event venue...
-              </p>
-              {scannedEvent && (
-                <div className="bg-card border border-border rounded-xl p-4 max-w-xs">
-                  <p className="text-sm text-muted-foreground mb-1">Event</p>
-                  <p className="font-medium">{scannedEvent.name}</p>
-                  <p className="text-sm text-muted-foreground mt-2 mb-1">Location</p>
-                  <p className="text-sm">{scannedEvent.location}</p>
-                </div>
-              )}
-            </>
-          )}
+{/* Removed geofence_check step - now handled inline during verifying */}
 
           {step === 'privacy_choice' && scannedEvent && (
             <>

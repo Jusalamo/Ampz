@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppProvider, useApp } from "./contexts/AppContext";
+import { MapProvider } from "./contexts/MapContext";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Home from "./pages/Home";
@@ -86,11 +87,13 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AppProvider>
-        <Toaster />
-        <Sonner />
-        <HashRouter>
-          <AppRoutes />
-        </HashRouter>
+        <MapProvider>
+          <Toaster />
+          <Sonner />
+          <HashRouter>
+            <AppRoutes />
+          </HashRouter>
+        </MapProvider>
       </AppProvider>
     </TooltipProvider>
   </QueryClientProvider>

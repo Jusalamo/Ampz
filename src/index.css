@@ -433,6 +433,37 @@
   .pb-nav {
     padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
   }
+
+  /* Modal safe areas - prevent clipping */
+  .modal-safe-top {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+
+  .modal-safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .modal-container {
+    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-content-scroll {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal-footer-fixed {
+    position: sticky;
+    bottom: 0;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    background: inherit;
+    border-top: 1px solid hsl(var(--border));
+  }
 }
 
 /* =========================================================
