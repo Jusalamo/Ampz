@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, QrCode, Keyboard, Loader2, MapPin, AlertCircle, Check, ExternalLink, Navigation, Users, UserX, RefreshCw, Camera, Sparkles } from 'lucide-react';
+import { X, QrCode, Keyboard, Loader2, MapPin, AlertCircle, Check, ExternalLink, Navigation, Users, UserX, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
@@ -16,7 +16,7 @@ interface QRScannerModalProps {
   onCheckInSuccess?: (eventId: string) => void;
 }
 
-type ScannerStep = 'scan' | 'code' | 'verifying' | 'geofence_check' | 'privacy_choice' | 'checking_in' | 'success_public' | 'success_private' | 'error' | 'outside_geofence';
+type ScannerStep = 'scan' | 'code' | 'verifying' | 'geofence_check' | 'privacy_choice' | 'checking_in' | 'success' | 'error' | 'outside_geofence';
 
 export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QRScannerModalProps) {
   const navigate = useNavigate();
@@ -32,7 +32,6 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [selectedVisibility, setSelectedVisibility] = useState<'public' | 'private'>('public');
   const [qrDataCache, setQrDataCache] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -52,15 +51,56 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       setDebugInfo('');
       setSelectedVisibility('public');
       setQrDataCache('');
-      setIsProcessing(false);
     }
   }, [isOpen]);
 
+  // Fetch event details by ID
+  const fetchEventDetails = useCallback(async (eventId: string): Promise<Event | null> => {
+    try {
+      const { data: eventData, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .single();
+
+      if (error || !eventData) {
+        return null;
+      }
+
+      return {
+        id: eventData.id,
+        name: eventData.name,
+        description: eventData.description || '',
+        category: eventData.category,
+        location: eventData.location,
+        address: eventData.address,
+        coordinates: { lat: eventData.latitude, lng: eventData.longitude },
+        date: eventData.date,
+        time: eventData.time,
+        price: eventData.price || 0,
+        currency: eventData.currency || 'NAD',
+        maxAttendees: eventData.max_attendees || 500,
+        attendees: eventData.attendees_count || 0,
+        organizerId: eventData.organizer_id,
+        qrCode: eventData.qr_code,
+        geofenceRadius: eventData.geofence_radius || 50,
+        customTheme: eventData.custom_theme || '#8B5CF6',
+        coverImage: eventData.cover_image || '',
+        images: eventData.images || [],
+        videos: eventData.videos || [],
+        tags: eventData.tags || [],
+        isFeatured: eventData.is_featured || false,
+        isDemo: eventData.is_demo || false,
+        isActive: eventData.is_active ?? true,
+      };
+    } catch (error) {
+      console.error('Error fetching event details:', error);
+      return null;
+    }
+  }, []);
+
   // Process QR code - validates and shows privacy choice
   const processQRCode = useCallback(async (code: string) => {
-    if (isProcessing) return;
-    
-    setIsProcessing(true);
     setStep('verifying');
     setErrorMessage('');
     setDebugInfo(`Processing QR code...`);
@@ -72,17 +112,19 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       // Extract event ID from QR code/URL
       let eventId: string | null = null;
       
+      // Handle different QR code formats
       if (code.includes('/event/')) {
+        // URL format: .../event/{id}/checkin or .../event/{id}
         const match = code.match(/\/event\/([a-f0-9-]+)/i);
         if (match) eventId = match[1];
       } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)) {
+        // Direct UUID format
         eventId = code;
       }
       
       if (!eventId) {
         setErrorMessage('Invalid QR code format. Please scan a valid event QR code.');
         setStep('error');
-        setIsProcessing(false);
         return;
       }
       
@@ -94,7 +136,6 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       if (!validation.valid || !validation.event) {
         setErrorMessage(validation.error || 'Event not found. Please check the QR code.');
         setStep('error');
-        setIsProcessing(false);
         return;
       }
       
@@ -107,23 +148,14 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       if (userId) {
         const { data: existingCheckIn } = await supabase
           .from('check_ins')
-          .select('id, visibility_mode')
+          .select('id')
           .eq('user_id', userId)
           .eq('event_id', event.id)
           .limit(1);
 
         if (existingCheckIn && existingCheckIn.length > 0) {
-          const visibility = existingCheckIn[0].visibility_mode;
           setSuccessMessage(`You're already checked in to ${event.name}!`);
-          setSelectedVisibility(visibility as 'public' | 'private');
-          
-          // Route based on existing visibility
-          if (visibility === 'public') {
-            setStep('success_public');
-          } else {
-            setStep('success_private');
-          }
-          setIsProcessing(false);
+          setStep('success');
           onCheckInSuccess?.(event.id);
           return;
         }
@@ -142,7 +174,6 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
           setErrorMessage(geofenceResult.error);
         }
         setStep('error');
-        setIsProcessing(false);
         return;
       }
       
@@ -152,69 +183,56 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       if (!geofenceResult.success) {
         setErrorMessage(`You're ${geofenceResult.distance}m from ${event.name}. Move within ${geofenceResult.geofenceRadius}m to check in.`);
         setStep('outside_geofence');
-        setIsProcessing(false);
         return;
       }
       
-      // Geofence check passed - show privacy choice
+      // Show privacy choice step
       setStep('privacy_choice');
-      setIsProcessing(false);
       
     } catch (err: any) {
       console.error('Error processing QR code:', err);
       setErrorMessage(err?.message || 'Failed to process QR code. Please try again.');
       setStep('error');
-      setIsProcessing(false);
     }
-  }, [validateQRCode, preflightGeofenceCheck, userId, onCheckInSuccess, isProcessing]);
+  }, [validateQRCode, preflightGeofenceCheck, userId, onCheckInSuccess]);
 
   // Complete check-in with selected visibility
   const completeCheckIn = useCallback(async (visibility: 'public' | 'private') => {
-    if (!qrDataCache || !scannedEvent || isProcessing) return;
+    if (!qrDataCache || !scannedEvent) return;
     
-    setIsProcessing(true);
     setSelectedVisibility(visibility);
     setStep('checking_in');
     
     try {
-      // Since preflight already passed, just create the check-in record
       const result = await processQRCodeScan(qrDataCache, visibility);
       
       if (result.success) {
         setSuccessMessage(result.message || `Successfully checked in to ${scannedEvent.name}!`);
         setDistance(result.distance || distance);
-        setIsProcessing(false);
+        setStep('success');
         onCheckInSuccess?.(result.eventId || scannedEvent.id);
-        
-        // Route based on visibility choice
-        if (visibility === 'public') {
-          setStep('success_public');
-        } else {
-          setStep('success_private');
-        }
       } else {
-        // Handle errors
-        if (result.errorType === 'already_checked_in') {
+        // Check if error is about geofence
+        if (result.errorType === 'outside_geofence') {
+          setDistance(result.distance || null);
+          setGeofenceRadius(result.geofenceRadius || 50);
+          setErrorMessage(result.error || 'You are outside the event area');
+          setStep('outside_geofence');
+        } else if (result.errorType === 'already_checked_in') {
           setSuccessMessage(`You're already checked in to ${scannedEvent.name}!`);
-          if (visibility === 'public') {
-            setStep('success_public');
-          } else {
-            setStep('success_private');
-          }
+          setStep('success');
           onCheckInSuccess?.(scannedEvent.id);
         } else {
           setErrorMessage(result.error || 'Check-in failed. Please try again.');
           setStep('error');
         }
-        setIsProcessing(false);
       }
     } catch (err: any) {
       console.error('Error completing check-in:', err);
       setErrorMessage(err?.message || 'Check-in failed. Please try again.');
       setStep('error');
-      setIsProcessing(false);
     }
-  }, [qrDataCache, scannedEvent, processQRCodeScan, distance, onCheckInSuccess, isProcessing]);
+  }, [qrDataCache, scannedEvent, processQRCodeScan, distance, onCheckInSuccess]);
 
   // Stop scanning
   const stopScanning = useCallback(() => {
@@ -235,6 +253,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
     try {
       codeReaderRef.current = new BrowserMultiFormatReader();
 
+      // Try to get the environment/rear camera
       let preferredDeviceId: string | undefined;
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -242,14 +261,14 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
         const env = videoInputs.find((d) => /back|rear|environment/i.test(d.label));
         preferredDeviceId = env?.deviceId || videoInputs[0]?.deviceId;
       } catch {
-        // ignore
+        // ignore; decoder will pick a default device
       }
       
       controlsRef.current = await codeReaderRef.current.decodeFromVideoDevice(
         preferredDeviceId,
         videoRef.current,
         async (result, error) => {
-          if (result && !isProcessing) {
+          if (result) {
             stopScanning();
             const code = result.getText();
             setManualCode(code);
@@ -264,17 +283,20 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
     } finally {
       isStartingRef.current = false;
     }
-  }, [stopScanning, processQRCode, isProcessing]);
+  }, [stopScanning, processQRCode]);
 
+  // Start/stop scanning based on step
   useEffect(() => {
     if (isOpen && step === 'scan') {
       startScanning();
     } else {
       stopScanning();
     }
+
     return () => stopScanning();
   }, [isOpen, step, startScanning, stopScanning]);
 
+  // Handle manual code submission
   const handleCodeSubmit = async () => {
     if (!manualCode.trim()) {
       setErrorMessage('Please enter a code or URL');
@@ -286,32 +308,20 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
   const handleClose = () => {
     stopScanning();
     onClose();
-  };
-
-  const handleTakeLivePhoto = () => {
-    if (scannedEvent) {
-      // Navigate to live photo capture screen (you'll need to create this route)
-      navigate(`/event/${scannedEvent.id}/live-photo`);
+    
+    if (step === 'success' && scannedEvent) {
+      navigate(`/event/${scannedEvent.id}`);
     }
-    onClose();
   };
 
-  const handleGoToConnections = () => {
+  const handleViewEvent = () => {
     if (scannedEvent) {
-      // Navigate to connections/swipe screen
-      navigate(`/event/${scannedEvent.id}/connections`);
+      navigate(`/event/${scannedEvent.id}`);
     }
-    onClose();
-  };
-
-  const handleReturnHome = () => {
-    navigate('/');
     onClose();
   };
 
   const handleRetry = async () => {
-    setIsProcessing(false);
-    
     if (!manualCode.trim() && !scannedEvent) {
       setStep('scan');
       return;
@@ -352,15 +362,14 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
             {step === 'geofence_check' && 'Checking Location...'}
             {step === 'privacy_choice' && 'Choose Visibility'}
             {step === 'checking_in' && 'Checking In...'}
-            {step === 'success_public' && 'Check-In Complete!'}
-            {step === 'success_private' && 'Welcome!'}
+            {step === 'success' && 'Check-In Complete!'}
             {step === 'error' && 'Check-In Failed'}
             {step === 'outside_geofence' && 'Too Far Away'}
           </h2>
           <button
             onClick={handleClose}
             className="w-10 h-10 rounded-full bg-card flex items-center justify-center hover:bg-accent transition-colors"
-            disabled={isLoading || isProcessing}
+            disabled={isLoading}
           >
             <X className="w-5 h-5" />
           </button>
@@ -395,7 +404,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 variant="outline" 
                 className="h-12"
                 onClick={() => setStep('code')}
-                disabled={isLoading || isProcessing}
+                disabled={isLoading}
               >
                 <Keyboard className="w-4 h-4 mr-2" />
                 Enter Code Manually
@@ -422,16 +431,16 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                   variant="outline" 
                   className="flex-1 h-12" 
                   onClick={() => setStep('scan')}
-                  disabled={isLoading || isProcessing}
+                  disabled={isLoading}
                 >
                   Back to Scan
                 </Button>
                 <Button 
                   className="flex-1 h-12" 
                   onClick={handleCodeSubmit} 
-                  disabled={!manualCode.trim() || isLoading || isProcessing}
+                  disabled={!manualCode.trim() || isLoading}
                 >
-                  {isLoading || isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Check In'}
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Check In'}
                 </Button>
               </div>
             </>
@@ -484,47 +493,47 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 </p>
               )}
               <p className="text-muted-foreground text-center mb-6">
-                How would you like to experience this event?
+                How would you like to appear at this event?
               </p>
               
               <div className="space-y-3 w-full max-w-xs mb-6">
                 <motion.button
                   whileTap={{ scale: 0.98 }}
                   onClick={() => completeCheckIn('public')}
-                  disabled={isLoading || isProcessing}
-                  className="w-full p-4 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border-2 border-primary/50 hover:border-primary transition-colors text-left disabled:opacity-50"
+                  disabled={isLoading}
+                  className="w-full p-4 rounded-xl bg-card border-2 border-primary/50 hover:border-primary transition-colors text-left"
                 >
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-lg bg-primary/30 flex items-center justify-center">
-                      <Camera className="w-5 h-5 text-primary" />
+                    <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                      <Users className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <p className="font-semibold">Public - Connect & Network</p>
-                      <p className="text-xs text-green-600 dark:text-green-400">Take live photo & meet people</p>
+                      <p className="font-semibold">Public</p>
+                      <p className="text-xs text-green-600 dark:text-green-400">Best for networking</p>
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Share your vibe with a live photo and swipe to connect with other attendees
+                    Others can see your profile and connect with you
                   </p>
                 </motion.button>
 
                 <motion.button
                   whileTap={{ scale: 0.98 }}
                   onClick={() => completeCheckIn('private')}
-                  disabled={isLoading || isProcessing}
-                  className="w-full p-4 rounded-xl bg-card border border-border hover:border-muted-foreground transition-colors text-left disabled:opacity-50"
+                  disabled={isLoading}
+                  className="w-full p-4 rounded-xl bg-card border border-border hover:border-muted-foreground transition-colors text-left"
                 >
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
                       <UserX className="w-5 h-5 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="font-semibold">Private - Just Check In</p>
-                      <p className="text-xs text-muted-foreground">Quick attendance only</p>
+                      <p className="font-semibold">Private</p>
+                      <p className="text-xs text-muted-foreground">Browse anonymously</p>
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Confirm your attendance without networking features
+                    You can see others but they won't see you
                   </p>
                 </motion.button>
               </div>
@@ -532,11 +541,8 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
               <Button 
                 variant="outline" 
                 className="h-10" 
-                onClick={() => {
-                  setIsProcessing(false);
-                  setStep('scan');
-                }}
-                disabled={isLoading || isProcessing}
+                onClick={() => setStep('scan')}
+                disabled={isLoading}
               >
                 Cancel
               </Button>
@@ -558,48 +564,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
             </>
           )}
 
-          {step === 'success_public' && (
-            <>
-              <motion.div 
-                initial={{ scale: 0.5, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", duration: 0.5 }}
-                className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center mb-6"
-              >
-                <Sparkles className="w-10 h-10 text-primary" />
-              </motion.div>
-              <h3 className="text-xl font-bold mb-2">Time to Connect!</h3>
-              <p className="text-muted-foreground text-center mb-6">
-                You're checked in to {scannedEvent?.name || 'the event'}
-              </p>
-              {distance !== null && (
-                <div className="mb-6 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                  <p className="text-sm text-green-600 dark:text-green-400">
-                    <MapPin className="w-4 h-4 inline mr-1" />
-                    Checked in from {distance}m away
-                  </p>
-                </div>
-              )}
-              <div className="w-full max-w-xs space-y-3">
-                <Button 
-                  className="h-12 w-full bg-gradient-to-r from-primary to-primary/80" 
-                  onClick={handleTakeLivePhoto}
-                >
-                  <Camera className="w-4 h-4 mr-2" />
-                  Take Live Photo & Connect
-                </Button>
-                <Button 
-                  variant="outline"
-                  className="h-12 w-full" 
-                  onClick={handleReturnHome}
-                >
-                  Skip to Home
-                </Button>
-              </div>
-            </>
-          )}
-
-          {step === 'success_private' && (
+          {step === 'success' && (
             <>
               <motion.div 
                 initial={{ scale: 0.5, opacity: 0 }}
@@ -609,24 +574,34 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
               >
                 <Check className="w-10 h-10 text-green-500" />
               </motion.div>
-              <h3 className="text-xl font-bold mb-2">Welcome to {scannedEvent?.name || 'the Event'}!</h3>
-              <p className="text-muted-foreground text-center mb-6">
-                You've successfully checked in. Enjoy the event!
-              </p>
+              <h3 className="text-xl font-bold mb-2">{successMessage}</h3>
+              <p className="text-muted-foreground text-center mb-6">You're now checked in!</p>
               {distance !== null && (
-                <div className="mb-6 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                <div className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
                   <p className="text-sm text-green-600 dark:text-green-400">
                     <MapPin className="w-4 h-4 inline mr-1" />
                     Checked in from {distance}m away
                   </p>
                 </div>
               )}
-              <Button 
-                className="h-12 px-8" 
-                onClick={handleReturnHome}
-              >
-                Return to Home
-              </Button>
+              <div className="flex gap-3">
+                <Button 
+                  className="h-12 px-6" 
+                  onClick={handleClose}
+                >
+                  Close
+                </Button>
+                {scannedEvent && (
+                  <Button 
+                    variant="outline" 
+                    className="h-12 px-6"
+                    onClick={handleViewEvent}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View Event
+                  </Button>
+                )}
+              </div>
             </>
           )}
 
@@ -642,18 +617,15 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                   variant="outline" 
                   className="h-12" 
                   onClick={handleRetry}
-                  disabled={isLoading || isProcessing}
+                  disabled={isLoading}
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Try Again
                 </Button>
                 <Button 
                   className="h-12" 
-                  onClick={() => {
-                    setIsProcessing(false);
-                    setStep('code');
-                  }}
-                  disabled={isLoading || isProcessing}
+                  onClick={() => setStep('code')}
+                  disabled={isLoading}
                 >
                   Enter Code
                 </Button>
@@ -711,9 +683,9 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                   variant="outline"
                   className="h-12 w-full" 
                   onClick={handleRetry}
-                  disabled={isLoading || isProcessing}
+                  disabled={isLoading}
                 >
-                  {isLoading || isProcessing ? (
+                  {isLoading ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
                     <RefreshCw className="w-4 h-4 mr-2" />
@@ -724,7 +696,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                   variant="ghost"
                   className="h-12 w-full" 
                   onClick={handleClose}
-                  disabled={isLoading || isProcessing}
+                  disabled={isLoading}
                 >
                   Cancel
                 </Button>
