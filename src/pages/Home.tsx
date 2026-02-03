@@ -10,6 +10,7 @@ import { SubscriptionModal } from '@/components/modals/SubscriptionModal';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -22,8 +23,41 @@ export default function Home() {
   const [showTickets, setShowTickets] = useState(false);
   const [showEventWizard, setShowEventWizard] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
+  const [metrics, setMetrics] = useState({ events: 0, matches: 0, likesLeft: 0 as number | string });
   const featuredRef = useRef<HTMLDivElement>(null);
   const myEventsCarouselRef = useRef<HTMLDivElement>(null);
+
+  // Fetch real metrics from database
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const fetchMetrics = async () => {
+      try {
+        const { count: eventsCount } = await supabase
+          .from('check_ins')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+        
+        const { count: matchesCount } = await supabase
+          .from('matches')
+          .select('*', { count: 'exact', head: true })
+          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+          .eq('status', 'active');
+        
+        setMetrics({
+          events: eventsCount || 0,
+          matches: matchesCount || 0,
+          likesLeft: user.subscription?.tier === 'free' 
+            ? (user.likesRemaining ?? 10) 
+            : '∞'
+        });
+      } catch (err) {
+        console.error('Error fetching metrics:', err);
+      }
+    };
+    
+    fetchMetrics();
+  }, [user?.id, user?.subscription?.tier, user?.likesRemaining]);
 
   // Get all user events (created + bookmarked)
   const createdEvents = events?.filter(e => e.organizerId === user?.id) || [];
@@ -130,23 +164,23 @@ export default function Home() {
     },
   ];
 
-  // Compact stats grid
+  // Compact stats grid - using real metrics
   const stats = [
     { 
       icon: Calendar, 
-      value: myEvents.length, 
-      label: 'My Events',
+      value: metrics.events, 
+      label: 'Events',
       colorClass: 'text-brand-blue'
     },
     { 
       icon: Users, 
-      value: user?.subscription?.tier === 'free' ? 2 : 12, 
+      value: metrics.matches, 
       label: 'Matches',
       colorClass: 'text-brand-green'
     },
     { 
       icon: Heart, 
-      value: user?.subscription?.tier === 'free' ? (user?.likesRemaining ?? 10) : '∞', 
+      value: metrics.likesLeft, 
       label: 'Likes Left',
       colorClass: 'text-brand-pink'
     },

@@ -1,32 +1,67 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Settings,
   Edit3,
   Calendar,
   Users,
-  Star,
+  Heart,
   ChevronRight,
   LogOut,
   CreditCard,
-  Shield,
   Moon,
   Sun,
-  BarChart3,
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
 import { Switch } from '@/components/ui/switch';
 import { SubscriptionModal } from '@/components/modals/SubscriptionModal';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Profile() {
   const navigate = useNavigate();
   const { user, theme, toggleTheme, logout } = useApp();
+  const [metrics, setMetrics] = useState({ events: 0, matches: 0, likesLeft: 0 as number | string });
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+
+  // Fetch real metrics from database
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const fetchMetrics = async () => {
+      try {
+        // Fetch events attended (check-ins count)
+        const { count: eventsCount } = await supabase
+          .from('check_ins')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+        
+        // Fetch matches count
+        const { count: matchesCount } = await supabase
+          .from('matches')
+          .select('*', { count: 'exact', head: true })
+          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+          .eq('status', 'active');
+        
+        setMetrics({
+          events: eventsCount || 0,
+          matches: matchesCount || 0,
+          likesLeft: user.subscription?.tier === 'free' 
+            ? (user.likesRemaining ?? 10) 
+            : '∞'
+        });
+      } catch (err) {
+        console.error('Error fetching metrics:', err);
+      }
+    };
+    
+    fetchMetrics();
+  }, [user?.id, user?.subscription?.tier, user?.likesRemaining]);
 
   const stats = [
-    { icon: Calendar, value: user?.bookmarkedEvents.length ?? 0, label: 'Events' },
-    { icon: Users, value: 12, label: 'Matches' },
-    { icon: Star, value: '95%', label: 'Response' },
+    { icon: Calendar, value: metrics.events, label: 'Events' },
+    { icon: Users, value: metrics.matches, label: 'Matches' },
+    { icon: Heart, value: metrics.likesLeft, label: 'Likes Left' },
   ];
 
   const menuItems = [
@@ -43,22 +78,13 @@ export default function Profile() {
       isMax: user?.subscription.tier === 'max',
       onClick: () => setShowSubscriptionModal(true),
     },
-    { 
-      icon: Shield, 
-      label: 'Privacy Settings', 
-      onClick: () => navigate('/settings/privacy') 
-    },
-    ...(user?.subscription.tier !== 'free' ? [{
-      icon: BarChart3,
-      label: 'Analytics',
-      onClick: () => {},
-    }] : []),
   ];
 
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    // Clear cache on logout
+    localStorage.removeItem('ampz_cached_user');
+    localStorage.removeItem('ampz_cached_events');
+    await logout();
     navigate('/');
   };
 
@@ -85,9 +111,12 @@ export default function Profile() {
             <div className="flex items-center gap-4 mb-4">
               <div className="relative">
                 <img
-                  src={user?.profile.profilePhoto}
+                  src={user?.profile.profilePhoto || '/default-avatar.png'}
                   alt={user?.profile.name}
                   className="w-20 h-20 rounded-full object-cover border-2 border-primary"
+                  onError={(e) => {
+                    e.currentTarget.src = '/default-avatar.png';
+                  }}
                 />
                 <button 
                   onClick={() => navigate('/settings/edit-profile')}

@@ -64,7 +64,7 @@ const profileToUser = (profile: any, supabaseUser?: SupabaseUser): User => ({
     location: profile.location || 'Windhoek, Namibia',
     gender: profile.gender || '',
     interests: profile.interests || [],
-    profilePhoto: profile.profile_photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.email}`,
+    profilePhoto: profile.profile_photo || '/default-avatar.png',
     phone: profile.phone || '',
   },
   subscription: {
@@ -84,6 +84,13 @@ const profileToUser = (profile: any, supabaseUser?: SupabaseUser): User => ({
   lastLikeReset: profile.last_like_reset || new Date().toISOString(),
   isDemo: profile.is_demo_account || false,
 });
+
+// Cache keys for localStorage
+const CACHE_KEYS = {
+  user: 'ampz_cached_user',
+  events: 'ampz_cached_events',
+  subscription: 'ampz_cached_subscription',
+};
 
 // Convert database row to Event type with all new fields
 const rowToEvent = (row: any): Event => ({
@@ -124,11 +131,26 @@ const rowToEvent = (row: any): Event => ({
 });
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  // Load cached data instantly for better UX
+  const cachedUser = (() => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEYS.user);
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  })();
+  
+  const cachedEvents = (() => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEYS.events);
+      return cached ? JSON.parse(cached) : [];
+    } catch { return []; }
+  })();
+
+  const [user, setUser] = useState<User | null>(cachedUser);
   const [session, setSession] = useState<Session | null>(null);
   const [isDemo, setIsDemo] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [events, setEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<Event[]>(cachedEvents);
   const [matches, setMatches] = useState<Match[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [connectionProfiles, setConnectionProfiles] = useState<ConnectionProfile[]>([]);
@@ -138,6 +160,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [communityPhotos, setCommunityPhotos] = useState<CommunityPhoto[]>([]);
   const [communityComments, setCommunityComments] = useState<CommunityComment[]>([]);
+
+  // Cache user data when it changes
+  useEffect(() => {
+    if (user) {
+      try {
+        localStorage.setItem(CACHE_KEYS.user, JSON.stringify(user));
+      } catch (e) {
+        console.warn('Failed to cache user data');
+      }
+    }
+  }, [user]);
+
+  // Cache events data when it changes
+  useEffect(() => {
+    if (events.length > 0) {
+      try {
+        localStorage.setItem(CACHE_KEYS.events, JSON.stringify(events));
+      } catch (e) {
+        console.warn('Failed to cache events data');
+      }
+    }
+  }, [events]);
 
   // Fetch user profile from database - only select needed columns
   const fetchProfile = useCallback(async (userId: string): Promise<any> => {
