@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, Users, UserPlus, QrCode, Share2, Check, Clock, X, Loader2, UserCheck } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Search, Plus, Users, UserPlus, QrCode, Share2, Check, Clock, X, Loader2, UserCheck, Sparkles, UserCog } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
 import { Input } from '@/components/ui/input';
@@ -8,12 +8,16 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { useToast } from '@/hooks/use-toast';
 import { useFriends } from '@/hooks/useFriends';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-interface SearchResult {
+interface Connection {
   id: string;
   name: string;
   photo: string;
-  bio: string;
+  eventContext: string;
+  timestamp: string;
+  online: boolean;
 }
 
 export default function Social() {
@@ -23,25 +27,27 @@ export default function Social() {
     friends, 
     receivedRequests, 
     sentRequests, 
+    suggestedUsers,
     isLoading, 
     sendFriendRequest, 
     acceptFriendRequest, 
     declineFriendRequest,
     cancelFriendRequest,
-    searchUsers 
+    searchUsers,
+    getRelationshipStatus
   } = useFriends(user?.id);
   
   const [mode, setMode] = useState<'friends' | 'connections' | 'requests'>('friends');
   const [searchQuery, setSearchQuery] = useState('');
   const [sheetSearchQuery, setSheetSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 
   // Debounced search in add friends sheet
   useEffect(() => {
-    if (sheetSearchQuery.length < 2) {
-      setSearchResults([]);
+    if (sheetSearchQuery.length === 0) {
+      setSearchResults(suggestedUsers);
       return;
     }
 
@@ -53,7 +59,14 @@ export default function Social() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [sheetSearchQuery, searchUsers]);
+  }, [sheetSearchQuery, searchUsers, suggestedUsers]);
+
+  // Initialize search results with suggested users
+  useEffect(() => {
+    if (suggestedUsers.length > 0 && searchResults.length === 0 && sheetSearchQuery === '') {
+      setSearchResults(suggestedUsers);
+    }
+  }, [suggestedUsers, searchResults.length, sheetSearchQuery]);
 
   const handleSendRequest = async (userId: string, name: string) => {
     if (processingIds.has(userId)) return;
@@ -101,6 +114,7 @@ export default function Social() {
       next.delete(requestId);
       return next;
     });
+    toast({ title: 'Friend request declined' });
   };
 
   const handleCancelRequest = async (requestId: string) => {
@@ -116,22 +130,16 @@ export default function Social() {
     toast({ title: 'Friend request cancelled' });
   };
 
-  // Check if user is already a friend or has pending request
-  const getRelationshipStatus = useCallback((userId: string): 'friend' | 'pending_sent' | 'pending_received' | 'none' => {
-    if (friends.some(f => f.friendId === userId)) return 'friend';
-    if (sentRequests.some(r => r.receiverId === userId)) return 'pending_sent';
-    if (receivedRequests.some(r => r.senderId === userId)) return 'pending_received';
-    return 'none';
-  }, [friends, sentRequests, receivedRequests]);
-
-  const connections = matches.map(m => ({
-    id: m.id,
-    name: m.matchProfile.name,
-    photo: m.matchProfile.photo,
-    eventContext: m.eventName,
-    timestamp: m.timestamp,
-    online: m.online,
-  }));
+  const connections = useMemo(() => 
+    matches.map(m => ({
+      id: m.id,
+      name: m.matchProfile.name,
+      photo: m.matchProfile.photo,
+      eventContext: m.eventName,
+      timestamp: m.timestamp,
+      online: m.online,
+    })), 
+  [matches]);
 
   // Filter friends by search
   const filteredFriends = friends.filter(f => 
@@ -144,6 +152,86 @@ export default function Social() {
   );
 
   const pendingRequestsCount = receivedRequests.length;
+
+  // Quick Add suggestions with mutual connections
+  const QuickAddUser = ({ person }: { person: any }) => {
+    const status = getRelationshipStatus(person.id);
+    const isPending = processingIds.has(person.id);
+    
+    return (
+      <div key={person.id} className="flex items-center gap-4 p-4 rounded-xl bg-card hover:bg-accent transition-all border border-border">
+        <Avatar className="w-14 h-14">
+          <AvatarImage src={person.photo} alt={person.name} />
+          <AvatarFallback>{person.name.charAt(0)}</AvatarFallback>
+        </Avatar>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="font-semibold truncate">{person.name}</p>
+            {person.mutualConnections > 0 && (
+              <Badge variant="outline" className="text-xs">
+                {person.mutualConnections} mutual
+              </Badge>
+            )}
+          </div>
+          {person.bio && (
+            <p className="text-sm text-muted-foreground truncate">{person.bio}</p>
+          )}
+          <div className="flex items-center gap-2 mt-1">
+            {person.mutualConnections > 0 && (
+              <span className="text-xs text-primary flex items-center gap-1">
+                <Users className="w-3 h-3" />
+                {person.mutualConnections} mutual friend{person.mutualConnections !== 1 ? 's' : ''}
+              </span>
+            )}
+            {person.sharedEvents > 0 && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Check className="w-3 h-3" />
+                {person.sharedEvents} shared event{person.sharedEvents !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex-shrink-0">
+          {status === 'friend' ? (
+            <span className="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-500/10 text-green-600 dark:text-green-400">
+              Friends
+            </span>
+          ) : status === 'pending_sent' ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const request = sentRequests.find(r => r.receiverId === person.id);
+                if (request) handleCancelRequest(request.id);
+              }}
+              disabled={isPending}
+            >
+              {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Pending'}
+            </Button>
+          ) : status === 'pending_received' ? (
+            <Button
+              size="sm"
+              onClick={() => {
+                const request = receivedRequests.find(r => r.senderId === person.id);
+                if (request) handleAcceptRequest(request.id, person.name);
+              }}
+              disabled={isPending}
+            >
+              {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Accept'}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={() => handleSendRequest(person.id, person.name)}
+              disabled={isPending}
+            >
+              {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add'}
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="app-container min-h-screen bg-background pb-nav">
@@ -158,7 +246,10 @@ export default function Social() {
             </SheetTrigger>
             <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl">
               <SheetHeader className="mb-6">
-                <SheetTitle className="text-xl">Add Friends</SheetTitle>
+                <SheetTitle className="text-xl flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  Quick Add
+                </SheetTitle>
               </SheetHeader>
               
               {/* Search Input */}
@@ -167,7 +258,7 @@ export default function Social() {
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     type="text"
-                    placeholder="Search by name..."
+                    placeholder="Search by name, bio, or email..."
                     value={sheetSearchQuery}
                     onChange={(e) => setSheetSearchQuery(e.target.value)}
                     className="h-12 pl-12 bg-card border-border"
@@ -186,75 +277,95 @@ export default function Social() {
                 )}
               </div>
 
-              {/* Search Results */}
-              {sheetSearchQuery.length >= 2 && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-                    {isSearching ? 'Searching...' : `Results (${searchResults.length})`}
-                  </h3>
-                  {isSearching ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                    </div>
-                  ) : searchResults.length > 0 ? (
-                    <div className="space-y-3 max-h-[40vh] overflow-y-auto">
-                      {searchResults.map((person) => {
-                        const status = getRelationshipStatus(person.id);
-                        const isPending = processingIds.has(person.id);
-                        
-                        return (
-                          <div key={person.id} className="flex items-center gap-4 p-3 rounded-xl bg-card">
-                            <Avatar className="w-12 h-12">
-                              <AvatarImage src={person.photo} alt={person.name} />
-                              <AvatarFallback>{person.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold truncate">{person.name}</p>
-                              {person.bio && (
-                                <p className="text-xs text-muted-foreground truncate">{person.bio}</p>
-                              )}
-                            </div>
-                            {status === 'friend' ? (
-                              <span className="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-500/10 text-green-600 dark:text-green-400">
-                                Friends
-                              </span>
-                            ) : status === 'pending_sent' ? (
-                              <span className="px-3 py-1.5 text-xs font-medium rounded-lg bg-muted text-muted-foreground">
-                                Pending
-                              </span>
-                            ) : status === 'pending_received' ? (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  const request = receivedRequests.find(r => r.senderId === person.id);
-                                  if (request) handleAcceptRequest(request.id, person.name);
-                                }}
-                                disabled={isPending}
-                              >
-                                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Accept'}
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                onClick={() => handleSendRequest(person.id, person.name)}
-                                disabled={isPending}
-                              >
-                                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add'}
-                              </Button>
-                            )}
-                          </div>
-                        );
-                      })}
+              <Tabs defaultValue="suggested" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-6">
+                  <TabsTrigger value="suggested">
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Suggested
+                  </TabsTrigger>
+                  <TabsTrigger value="mutual">
+                    <UserCog className="w-4 h-4 mr-2" />
+                    Mutual
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="suggested" className="space-y-4">
+                  {/* Quick Add Section */}
+                  {sheetSearchQuery.length >= 2 ? (
+                    <div className="mb-6">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                        {isSearching ? 'Searching...' : `Search Results (${searchResults.length})`}
+                      </h3>
+                      {isSearching ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                        </div>
+                      ) : searchResults.length > 0 ? (
+                        <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
+                          {searchResults.map((person) => (
+                            <QuickAddUser key={person.id} person={person} />
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-center text-muted-foreground py-8">No users found</p>
+                      )}
                     </div>
                   ) : (
-                    <p className="text-center text-muted-foreground py-8">No users found</p>
+                    <div className="mb-6">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                        Suggested For You
+                      </h3>
+                      {isLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                        </div>
+                      ) : searchResults.length > 0 ? (
+                        <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
+                          {searchResults.slice(0, 10).map((person) => (
+                            <QuickAddUser key={person.id} person={person} />
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-center text-muted-foreground py-8">
+                          No suggestions available. Try searching for users.
+                        </p>
+                      )}
+                    </div>
                   )}
-                </div>
-              )}
+                </TabsContent>
+                
+                <TabsContent value="mutual" className="space-y-4">
+                  {/* Mutual Friends Section */}
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                      People with Mutual Connections
+                    </h3>
+                    {isLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                      </div>
+                    ) : searchResults.filter(p => p.mutualConnections > 0).length > 0 ? (
+                      <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
+                        {searchResults
+                          .filter(person => person.mutualConnections > 0)
+                          .sort((a, b) => b.mutualConnections - a.mutualConnections)
+                          .slice(0, 10)
+                          .map((person) => (
+                            <QuickAddUser key={person.id} person={person} />
+                          ))}
+                      </div>
+                    ) : (
+                      <p className="text-center text-muted-foreground py-8">
+                        No mutual connections found
+                      </p>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
 
               {/* Quick Actions */}
               {sheetSearchQuery.length < 2 && (
-                <div className="space-y-3">
+                <div className="space-y-3 mt-6">
                   <button className="w-full bg-card rounded-xl p-4 flex items-center gap-4 hover:bg-accent transition-all border border-border">
                     <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
                       <QrCode className="w-6 h-6 text-primary" />
@@ -374,6 +485,14 @@ export default function Social() {
                     <p className="text-muted-foreground text-sm mb-4">
                       Add friends to see them here
                     </p>
+                    <Sheet>
+                      <SheetTrigger asChild>
+                        <Button>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Friends
+                        </Button>
+                      </SheetTrigger>
+                    </Sheet>
                   </div>
                 )}
               </div>
@@ -383,45 +502,48 @@ export default function Social() {
             {mode === 'connections' && (
               <div className="space-y-3">
                 {filteredConnections.length > 0 ? (
-                  filteredConnections.map((connection) => (
-                    <div key={connection.id} className="bg-card rounded-xl border border-border p-4 flex items-center gap-4">
-                      <div className="relative">
-                        <Avatar className="w-14 h-14">
-                          <AvatarImage src={connection.photo} alt={connection.name} />
-                          <AvatarFallback>{connection.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        {connection.online && (
-                          <span className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-background" />
-                        )}
+                  filteredConnections.map((connection) => {
+                    const status = getRelationshipStatus(connection.id);
+                    const isPending = processingIds.has(connection.id);
+                    
+                    return (
+                      <div key={connection.id} className="bg-card rounded-xl border border-border p-4 flex items-center gap-4">
+                        <div className="relative">
+                          <Avatar className="w-14 h-14">
+                            <AvatarImage src={connection.photo} alt={connection.name} />
+                            <AvatarFallback>{connection.name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          {connection.online && (
+                            <span className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-background" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold">{connection.name}</h3>
+                          <p className="text-sm text-primary truncate">
+                            Met at {connection.eventContext}
+                          </p>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                            <Clock className="w-3 h-3" />
+                            {new Date(connection.timestamp).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => {
+                            if (status === 'none') {
+                              handleSendRequest(connection.id, connection.name);
+                            }
+                          }}
+                          disabled={status !== 'none' || isPending}
+                        >
+                          {status === 'friend' ? 'Friends' : 
+                           status === 'pending_sent' ? 'Pending' : 
+                           isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add Friend'}
+                        </Button>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold">{connection.name}</h3>
-                        <p className="text-sm text-primary truncate">
-                          Met at {connection.eventContext}
-                        </p>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                          <Clock className="w-3 h-3" />
-                          {new Date(connection.timestamp).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => {
-                          // Check if already friends
-                          const status = getRelationshipStatus(connection.id);
-                          if (status === 'none') {
-                            handleSendRequest(connection.id, connection.name);
-                          }
-                        }}
-                        disabled={getRelationshipStatus(connection.id) !== 'none' || processingIds.has(connection.id)}
-                      >
-                        {getRelationshipStatus(connection.id) === 'friend' ? 'Friends' : 
-                         getRelationshipStatus(connection.id) === 'pending_sent' ? 'Pending' : 
-                         processingIds.has(connection.id) ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add Friend'}
-                      </Button>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="text-center py-16">
                     <div className="w-20 h-20 rounded-full bg-card flex items-center justify-center mx-auto mb-4">
@@ -506,7 +628,7 @@ export default function Social() {
                             onClick={() => handleCancelRequest(request.id)}
                             disabled={processingIds.has(request.id)}
                           >
-                            {processingIds.has(request.id) ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Cancel'}
+                            {processingIds.has(requestId) ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Cancel'}
                           </Button>
                         </div>
                       ))}
