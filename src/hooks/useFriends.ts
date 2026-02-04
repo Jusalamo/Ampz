@@ -34,7 +34,6 @@ export interface SearchResult {
   photo: string;
   bio: string;
   email?: string;
-  username?: string;
   mutualConnections?: number;
   sharedEvents?: number;
 }
@@ -51,48 +50,50 @@ export function useFriends(userId?: string) {
   const fetchFriends = useCallback(async () => {
     if (!userId) return;
     
-    const { data, error } = await supabase
-      .from('friendships')
-      .select('*')
-      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error('Error fetching friends:', error);
-      return;
+    try {
+      const { data, error } = await supabase
+        .from('friendships')
+        .select('*')
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
+      
+      if (error) {
+        console.error('Error fetching friends:', error);
+        return;
+      }
+
+      const friendIds = data?.map(f => f.user1_id === userId ? f.user2_id : f.user1_id) || [];
+      
+      if (friendIds.length === 0) {
+        setFriends([]);
+        return;
+      }
+
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, name, profile_photo, bio')
+        .in('id', friendIds);
+
+      if (profilesError) {
+        console.error('Error fetching friend profiles:', profilesError);
+        return;
+      }
+
+      const friendsList: Friendship[] = (data || []).map(f => {
+        const friendId = f.user1_id === userId ? f.user2_id : f.user1_id;
+        const profile = profiles?.find(p => p.id === friendId);
+        return {
+          id: f.id,
+          friendId,
+          friendName: profile?.name || 'Unknown User',
+          friendPhoto: profile?.profile_photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friendId}`,
+          createdAt: f.created_at,
+        };
+      });
+
+      setFriends(friendsList);
+    } catch (error) {
+      console.error('Error in fetchFriends:', error);
     }
-
-    // Fetch profiles for friends
-    const friendIds = data.map(f => f.user1_id === userId ? f.user2_id : f.user1_id);
-    
-    if (friendIds.length === 0) {
-      setFriends([]);
-      return;
-    }
-
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, name, profile_photo, bio')
-      .in('id', friendIds);
-
-    if (profilesError) {
-      console.error('Error fetching friend profiles:', profilesError);
-      return;
-    }
-
-    const friendsList: Friendship[] = data.map(f => {
-      const friendId = f.user1_id === userId ? f.user2_id : f.user1_id;
-      const profile = profiles?.find(p => p.id === friendId);
-      return {
-        id: f.id,
-        friendId,
-        friendName: profile?.name || 'Unknown User',
-        friendPhoto: profile?.profile_photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friendId}`,
-        createdAt: f.created_at,
-      };
-    });
-
-    setFriends(friendsList);
   }, [userId]);
 
   // Fetch friend requests
@@ -105,8 +106,7 @@ export function useFriends(userId?: string) {
         .from('friend_requests')
         .select('*')
         .eq('receiver_id', userId)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+        .eq('status', 'pending');
 
       if (receivedError) {
         console.error('Error fetching received requests:', receivedError);
@@ -117,8 +117,7 @@ export function useFriends(userId?: string) {
         .from('friend_requests')
         .select('*')
         .eq('sender_id', userId)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+        .eq('status', 'pending');
 
       if (sentError) {
         console.error('Error fetching sent requests:', sentError);
@@ -131,16 +130,12 @@ export function useFriends(userId?: string) {
 
       let profiles: any[] = [];
       if (allIds.length > 0) {
-        const { data: profileData, error: profileError } = await supabase
+        const { data: profileData } = await supabase
           .from('profiles')
           .select('id, name, profile_photo, bio')
           .in('id', allIds);
         
-        if (profileError) {
-          console.error('Error fetching profiles:', profileError);
-        } else {
-          profiles = profileData || [];
-        }
+        profiles = profileData || [];
       }
 
       const receivedRequestsList: FriendRequest[] = (received || []).map(r => {
@@ -184,146 +179,168 @@ export function useFriends(userId?: string) {
     }
   }, [userId]);
 
-  // Search users from database
+  // FIXED: Use the SQL function for searching
   const searchUsers = useCallback(async (query: string): Promise<SearchResult[]> => {
     if (!query.trim() || query.length < 2 || !userId) {
+      console.log('Search query too short or no userId');
       return [];
     }
 
     try {
-      console.log('🔍 Searching for:', query);
+      console.log(`🔍 Searching for: "${query}" with user ID: ${userId}`);
       
-      // Use the database function to search users
+      // Call the SQL function you created
       const { data: users, error } = await supabase
-        .rpc('search_all_users', {
+        .rpc('search_users_simple', {
           search_query: query,
           current_user_id: userId
         });
 
       if (error) {
-        console.error('Error searching users:', error);
-        // Fallback to simple profile search
-        const { data: profilesData } = await supabase
+        console.error('❌ Error calling search_users_simple:', error);
+        
+        // Fallback to direct search if RPC fails
+        console.log('Trying fallback direct search...');
+        const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, name, profile_photo, bio, username')
+          .select('id, name, profile_photo, bio')
           .neq('id', userId)
-          .or(`name.ilike.%${query}%,bio.ilike.%${query}%,username.ilike.%${query}%`)
+          .or(`name.ilike.%${query}%,bio.ilike.%${query}%`)
           .limit(20);
-
-        if (!profilesData || profilesData.length === 0) {
+        
+        if (!profiles || profiles.length === 0) {
+          console.log('No users found in fallback search');
           return [];
         }
-
+        
         const results = await Promise.all(
-          profilesData.map(async (profile) => {
-            // Get mutual connections
+          profiles.map(async (profile) => {
             const { data: mutualCount } = await supabase
               .rpc('get_mutual_connections_count', {
                 user1_id: userId,
                 user2_id: profile.id
-              });
+              }).catch(() => ({ data: 0 }));
 
             return {
               id: profile.id,
-              name: profile.name || profile.username || 'Unknown User',
+              name: profile.name || 'Unknown User',
               photo: profile.profile_photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.id}`,
               bio: profile.bio || '',
-              username: profile.username,
               mutualConnections: mutualCount || 0,
             };
           })
         );
-
+        
+        console.log(`✅ Fallback found ${results.length} users`);
         return results;
       }
 
       if (!users || users.length === 0) {
+        console.log('No users found from SQL function');
         return [];
       }
 
-      console.log('🎯 Users found:', users.length);
+      console.log(`📊 SQL function found ${users.length} users`);
 
       // Get mutual connections for each user
-      const results = await Promise.all(
+      const resultsWithDetails = await Promise.all(
         users.map(async (user: any) => {
-          const { data: mutualCount } = await supabase
-            .rpc('get_mutual_connections_count', {
-              user1_id: userId,
-              user2_id: user.id
-            });
+          let mutualConnections = 0;
+          
+          try {
+            const { data: mutualCount } = await supabase
+              .rpc('get_mutual_connections_count', {
+                user1_id: userId,
+                user2_id: user.id
+              });
+            
+            mutualConnections = mutualCount || 0;
+          } catch (mutualError) {
+            console.error('Error getting mutual connections:', mutualError);
+          }
 
           return {
             id: user.id,
-            name: user.name || user.username || 'Unknown User',
+            name: user.name || 'Unknown User',
             photo: user.profile_photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
             bio: user.bio || '',
-            email: user.email,
-            username: user.username,
-            mutualConnections: mutualCount || 0,
+            email: user.email || '',
+            mutualConnections,
           };
         })
       );
 
+      console.log(`✅ Final results: ${resultsWithDetails.length} users`);
+      
       // Sort by mutual connections, then by name
-      const sortedResults = results.sort((a, b) => {
+      return resultsWithDetails.sort((a, b) => {
         if (b.mutualConnections !== a.mutualConnections) {
           return b.mutualConnections - a.mutualConnections;
         }
         return a.name.localeCompare(b.name);
       });
 
-      console.log('✅ Final results:', sortedResults.length);
-      return sortedResults;
-
     } catch (error) {
-      console.error('❌ Error in searchUsers:', error);
+      console.error('❌ Unexpected error in searchUsers:', error);
       return [];
     }
   }, [userId]);
 
-  // Fetch suggested users (all users who are not friends or pending)
+  // Fetch suggested users
   const fetchSuggestedUsers = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) {
+      console.log('No userId for suggestions');
+      return;
+    }
 
     try {
-      // Get all users except current user
+      console.log('Fetching suggested users...');
+      
+      // Get ALL users except current user
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, name, profile_photo, bio, username')
+        .select('id, name, profile_photo, bio')
         .neq('id', userId)
-        .limit(50); // Increased limit for better suggestions
+        .limit(50);
 
       if (error) {
-        console.error('Error fetching suggested users:', error);
+        console.error('Error fetching all users:', error);
         setSuggestedUsers([]);
         return;
       }
+
+      console.log(`Total users in database (excluding self): ${profiles?.length || 0}`);
 
       if (!profiles || profiles.length === 0) {
+        console.log('No users found in database');
         setSuggestedUsers([]);
         return;
       }
 
-      // Get current user's connections
-      const { data: userConnections } = await supabase
+      // Get current user's friends
+      const { data: userFriendships } = await supabase
         .from('friendships')
         .select('user1_id, user2_id')
         .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
 
-      const friendIds = userConnections?.map(conn => 
+      const friendIds = userFriendships?.map(conn => 
         conn.user1_id === userId ? conn.user2_id : conn.user1_id
       ) || [];
+
+      console.log(`User has ${friendIds.length} friends`);
 
       // Get pending requests
       const { data: pendingRequests } = await supabase
         .from('friend_requests')
-        .select('sender_id, receiver_id, status')
-        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-        .eq('status', 'pending');
+        .select('sender_id, receiver_id')
+        .eq('status', 'pending')
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
 
       const pendingIds = pendingRequests?.map(req => 
         req.sender_id === userId ? req.receiver_id : req.sender_id
       ) || [];
+
+      console.log(`User has ${pendingIds.length} pending requests`);
 
       // Filter out friends and pending requests
       const filteredProfiles = profiles.filter(profile => {
@@ -332,64 +349,53 @@ export function useFriends(userId?: string) {
         return !isFriend && !isPending;
       });
 
-      // Get mutual connections for each suggested user
-      const suggested = await Promise.all(
+      console.log(`Users available for suggestions: ${filteredProfiles.length}`);
+
+      if (filteredProfiles.length === 0) {
+        setSuggestedUsers([]);
+        return;
+      }
+
+      // Get suggestions with mutual connections
+      const suggestions = await Promise.all(
         filteredProfiles.slice(0, 20).map(async (profile) => {
-          const { data: mutualCount } = await supabase
-            .rpc('get_mutual_connections_count', {
-              user1_id: userId,
-              user2_id: profile.id
-            });
-
-          // Count shared events (if you have an events table)
-          let sharedEvents = 0;
+          let mutualConnections = 0;
+          
           try {
-            const { data: events } = await supabase
-              .from('event_attendees')
-              .select('event_id')
-              .eq('user_id', userId);
-
-            const { data: otherEvents } = await supabase
-              .from('event_attendees')
-              .select('event_id')
-              .eq('user_id', profile.id);
-
-            if (events && otherEvents) {
-              const eventIds = events.map(e => e.event_id);
-              const otherEventIds = otherEvents.map(e => e.event_id);
-              sharedEvents = eventIds.filter(id => otherEventIds.includes(id)).length;
+            if (friendIds.length > 0) {
+              const { data: mutualCount } = await supabase
+                .rpc('get_mutual_connections_count', {
+                  user1_id: userId,
+                  user2_id: profile.id
+                });
+              
+              mutualConnections = mutualCount || 0;
             }
-          } catch (eventError) {
-            // Event tracking might not be implemented yet
-            console.log('Event tracking not available');
+          } catch (error) {
+            console.error(`Error getting mutual for ${profile.name}:`, error);
           }
 
           return {
             id: profile.id,
-            name: profile.name || profile.username || 'Unknown User',
+            name: profile.name || 'Unknown User',
             photo: profile.profile_photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.id}`,
             bio: profile.bio || '',
-            username: profile.username,
-            mutualConnections: mutualCount || 0,
-            sharedEvents,
+            mutualConnections,
+            sharedEvents: 0,
           };
         })
       );
 
-      // Sort by mutual connections and shared events
-      const sortedSuggested = suggested.sort((a, b) => {
-        if (b.mutualConnections !== a.mutualConnections) {
-          return b.mutualConnections - a.mutualConnections;
-        }
-        if (b.sharedEvents !== a.sharedEvents) {
-          return b.sharedEvents - a.sharedEvents;
-        }
-        return a.name.localeCompare(b.name);
-      });
+      // Sort by mutual connections
+      const sortedSuggestions = suggestions.sort((a, b) => 
+        (b.mutualConnections || 0) - (a.mutualConnections || 0)
+      );
 
-      setSuggestedUsers(sortedSuggested.slice(0, 10)); // Show top 10 suggestions
+      console.log(`Setting ${sortedSuggestions.length} suggested users`);
+      setSuggestedUsers(sortedSuggestions.slice(0, 10));
+
     } catch (error) {
-      console.error('Error fetching suggested users:', error);
+      console.error('Error in fetchSuggestedUsers:', error);
       setSuggestedUsers([]);
     }
   }, [userId]);
@@ -411,7 +417,6 @@ export function useFriends(userId?: string) {
       if (existing) {
         toast({ 
           title: 'Friend request already sent!', 
-          description: 'You have already sent a request to this user.',
           variant: 'default' 
         });
         return false;
@@ -421,13 +426,13 @@ export function useFriends(userId?: string) {
       const { data: existingFriendship } = await supabase
         .from('friendships')
         .select('*')
-        .or(`and(user1_id.eq.${userId},user2_id.eq.${receiverId}),and(user1_id.eq.${receiverId},user2_id.eq.${userId})`)
+        .or(`user1_id.eq.${userId},user2_id.eq.${receiverId})`)
+        .or(`user1_id.eq.${receiverId},user2_id.eq.${userId}`)
         .single();
 
       if (existingFriendship) {
         toast({ 
           title: 'Already friends!', 
-          description: 'You are already friends with this user.',
           variant: 'default' 
         });
         return false;
@@ -445,7 +450,6 @@ export function useFriends(userId?: string) {
         console.error('Error sending friend request:', error);
         toast({ 
           title: 'Failed to send request', 
-          description: 'Please try again later.',
           variant: 'destructive' 
         });
         return false;
@@ -453,18 +457,15 @@ export function useFriends(userId?: string) {
 
       toast({ 
         title: 'Friend request sent!', 
-        description: 'They will be notified of your request.',
         variant: 'default' 
       });
 
-      // Refresh data
       await Promise.all([fetchRequests(), fetchSuggestedUsers()]);
       return true;
     } catch (error) {
       console.error('Error in sendFriendRequest:', error);
       toast({ 
         title: 'Failed to send request', 
-        description: 'An unexpected error occurred.',
         variant: 'destructive' 
       });
       return false;
@@ -480,7 +481,6 @@ export function useFriends(userId?: string) {
         console.error('Error accepting friend request:', error);
         toast({ 
           title: 'Failed to accept request', 
-          description: 'Please try again later.',
           variant: 'destructive' 
         });
         return false;
@@ -488,7 +488,6 @@ export function useFriends(userId?: string) {
 
       toast({ 
         title: 'Friend request accepted!', 
-        description: 'You are now friends.',
         variant: 'default' 
       });
 
@@ -498,7 +497,6 @@ export function useFriends(userId?: string) {
       console.error('Error in acceptFriendRequest:', error);
       toast({ 
         title: 'Failed to accept request', 
-        description: 'An unexpected error occurred.',
         variant: 'destructive' 
       });
       return false;
@@ -520,7 +518,6 @@ export function useFriends(userId?: string) {
         console.error('Error declining friend request:', error);
         toast({ 
           title: 'Failed to decline request', 
-          description: 'Please try again later.',
           variant: 'destructive' 
         });
         return false;
@@ -537,7 +534,6 @@ export function useFriends(userId?: string) {
       console.error('Error in declineFriendRequest:', error);
       toast({ 
         title: 'Failed to decline request', 
-        description: 'An unexpected error occurred.',
         variant: 'destructive' 
       });
       return false;
@@ -556,7 +552,6 @@ export function useFriends(userId?: string) {
         console.error('Error cancelling friend request:', error);
         toast({ 
           title: 'Failed to cancel request', 
-          description: 'Please try again later.',
           variant: 'destructive' 
         });
         return false;
@@ -573,50 +568,13 @@ export function useFriends(userId?: string) {
       console.error('Error in cancelFriendRequest:', error);
       toast({ 
         title: 'Failed to cancel request', 
-        description: 'An unexpected error occurred.',
         variant: 'destructive' 
       });
       return false;
     }
   }, [fetchRequests, fetchSuggestedUsers, toast]);
 
-  // Remove friend
-  const removeFriend = useCallback(async (friendshipId: string): Promise<boolean> => {
-    try {
-      const { error } = await supabase
-        .from('friendships')
-        .delete()
-        .eq('id', friendshipId);
-
-      if (error) {
-        console.error('Error removing friend:', error);
-        toast({ 
-          title: 'Failed to remove friend', 
-          description: 'Please try again later.',
-          variant: 'destructive' 
-        });
-        return false;
-      }
-
-      toast({ 
-        title: 'Friend removed', 
-        variant: 'default' 
-      });
-
-      await Promise.all([fetchFriends(), fetchSuggestedUsers()]);
-      return true;
-    } catch (error) {
-      console.error('Error in removeFriend:', error);
-      toast({ 
-        title: 'Failed to remove friend', 
-        description: 'An unexpected error occurred.',
-        variant: 'destructive' 
-      });
-      return false;
-    }
-  }, [fetchFriends, fetchSuggestedUsers, toast]);
-
-  // Check if user is already a friend or has pending request
+  // Get relationship status
   const getRelationshipStatus = useCallback((targetUserId: string): 'friend' | 'pending_sent' | 'pending_received' | 'none' => {
     if (friends.some(f => f.friendId === targetUserId)) return 'friend';
     if (sentRequests.some(r => r.receiverId === targetUserId)) return 'pending_sent';
@@ -634,7 +592,11 @@ export function useFriends(userId?: string) {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        await Promise.all([fetchFriends(), fetchRequests(), fetchSuggestedUsers()]);
+        await Promise.all([
+          fetchFriends(),
+          fetchRequests(),
+          fetchSuggestedUsers()
+        ]);
       } catch (error) {
         console.error('Error loading friend data:', error);
       } finally {
@@ -644,9 +606,9 @@ export function useFriends(userId?: string) {
 
     loadData();
 
-    // Subscribe to realtime updates
+    // Realtime subscriptions
     const friendRequestsChannel = supabase
-      .channel('friend-requests-realtime')
+      .channel('friend-requests')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -655,18 +617,10 @@ export function useFriends(userId?: string) {
       }, () => {
         fetchRequests();
       })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'friend_requests',
-        filter: `sender_id=eq.${userId}`,
-      }, () => {
-        fetchRequests();
-      })
       .subscribe();
 
     const friendshipsChannel = supabase
-      .channel('friendships-realtime')
+      .channel('friendships')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -692,9 +646,12 @@ export function useFriends(userId?: string) {
     acceptFriendRequest,
     declineFriendRequest,
     cancelFriendRequest,
-    removeFriend,
     searchUsers,
     getRelationshipStatus,
-    refetch: () => Promise.all([fetchFriends(), fetchRequests(), fetchSuggestedUsers()]),
+    refetch: () => Promise.all([
+      fetchFriends(), 
+      fetchRequests(), 
+      fetchSuggestedUsers()
+    ]),
   };
 }
