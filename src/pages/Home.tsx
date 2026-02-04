@@ -33,16 +33,28 @@ export default function Home() {
     
     const fetchMetrics = async () => {
       try {
-        const { count: eventsCount } = await supabase
+        // Fixed: Removed 'head: true' from check_ins query
+        const { count: eventsCount, error: eventsError } = await supabase
           .from('check_ins')
-          .select('*', { count: 'exact', head: true })
+          .select('*', { count: 'exact' })
           .eq('user_id', user.id);
         
-        const { count: matchesCount } = await supabase
+        if (eventsError) {
+          console.error('Error fetching check-ins:', eventsError);
+          throw eventsError;
+        }
+        
+        // Fixed: Removed 'head: true' from matches query
+        const { count: matchesCount, error: matchesError } = await supabase
           .from('matches')
-          .select('*', { count: 'exact', head: true })
+          .select('*', { count: 'exact' })
           .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
           .eq('status', 'active');
+        
+        if (matchesError) {
+          console.error('Error fetching matches:', matchesError);
+          throw matchesError;
+        }
         
         setMetrics({
           events: eventsCount || 0,
@@ -53,6 +65,12 @@ export default function Home() {
         });
       } catch (err) {
         console.error('Error fetching metrics:', err);
+        // Set default values on error
+        setMetrics({
+          events: 0,
+          matches: 0,
+          likesLeft: user?.subscription?.tier === 'free' ? 10 : '∞'
+        });
       }
     };
     
