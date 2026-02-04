@@ -35,7 +35,6 @@ export interface SearchResult {
   bio: string;
   email?: string;
   mutualConnections?: number;
-  sharedEvents?: number;
 }
 
 export function useFriends(userId?: string) {
@@ -68,15 +67,10 @@ export function useFriends(userId?: string) {
         return;
       }
 
-      const { data: profiles, error: profilesError } = await supabase
+      const { data: profiles } = await supabase
         .from('profiles')
         .select('id, name, profile_photo, bio')
         .in('id', friendIds);
-
-      if (profilesError) {
-        console.error('Error fetching friend profiles:', profilesError);
-        return;
-      }
 
       const friendsList: Friendship[] = (data || []).map(f => {
         const friendId = f.user1_id === userId ? f.user2_id : f.user1_id;
@@ -102,28 +96,20 @@ export function useFriends(userId?: string) {
     
     try {
       // Fetch received requests
-      const { data: received, error: receivedError } = await supabase
+      const { data: received } = await supabase
         .from('friend_requests')
         .select('*')
         .eq('receiver_id', userId)
         .eq('status', 'pending');
 
-      if (receivedError) {
-        console.error('Error fetching received requests:', receivedError);
-      }
-
       // Fetch sent requests
-      const { data: sent, error: sentError } = await supabase
+      const { data: sent } = await supabase
         .from('friend_requests')
         .select('*')
         .eq('sender_id', userId)
         .eq('status', 'pending');
 
-      if (sentError) {
-        console.error('Error fetching sent requests:', sentError);
-      }
-
-      // Fetch profiles for senders/receivers
+      // Fetch profiles
       const senderIds = received?.map(r => r.sender_id) || [];
       const receiverIds = sent?.map(r => r.receiver_id) || [];
       const allIds = [...new Set([...senderIds, ...receiverIds])];
@@ -134,7 +120,6 @@ export function useFriends(userId?: string) {
           .from('profiles')
           .select('id, name, profile_photo, bio')
           .in('id', allIds);
-        
         profiles = profileData || [];
       }
 
@@ -179,101 +164,74 @@ export function useFriends(userId?: string) {
     }
   }, [userId]);
 
-  // FIXED: Use the SQL function for searching
+  // SIMPLE SEARCH - Searches name and bio
   const searchUsers = useCallback(async (query: string): Promise<SearchResult[]> => {
     if (!query.trim() || query.length < 2 || !userId) {
-      console.log('Search query too short or no userId');
       return [];
     }
 
     try {
-      console.log(`🔍 Searching for: "${query}" with user ID: ${userId}`);
+      console.log(`🔍 Searching for: "${query}"`);
       
-      // Call the SQL function you created
-      const { data: users, error } = await supabase
-        .rpc('search_users_simple', {
-          search_query: query,
-          current_user_id: userId
-        });
+      // Search in name and bio fields
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('id, name, profile_photo, bio')
+        .neq('id', userId) // Exclude current user
+        .or(`name.ilike.%${query}%,bio.ilike.%${query}%`)
+        .limit(20);
 
       if (error) {
-        console.error('❌ Error calling search_users_simple:', error);
-        
-        // Fallback to direct search if RPC fails
-        console.log('Trying fallback direct search...');
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, name, profile_photo, bio')
-          .neq('id', userId)
-          .or(`name.ilike.%${query}%,bio.ilike.%${query}%`)
-          .limit(20);
-        
-        if (!profiles || profiles.length === 0) {
-          console.log('No users found in fallback search');
-          return [];
-        }
-        
-        const results = await Promise.all(
-          profiles.map(async (profile) => {
-            const { data: mutualCount } = await supabase
-              .rpc('get_mutual_connections_count', {
-                user1_id: userId,
-                user2_id: profile.id
-              }).catch(() => ({ data: 0 }));
-
-            return {
-              id: profile.id,
-              name: profile.name || 'Unknown User',
-              photo: profile.profile_photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.id}`,
-              bio: profile.bio || '',
-              mutualConnections: mutualCount || 0,
-            };
-          })
-        );
-        
-        console.log(`✅ Fallback found ${results.length} users`);
-        return results;
-      }
-
-      if (!users || users.length === 0) {
-        console.log('No users found from SQL function');
+        console.error('Search error:', error);
         return [];
       }
 
-      console.log(`📊 SQL function found ${users.length} users`);
+      if (!profiles || profiles.length === 0) {
+        console.log('No users found');
+        return [];
+      }
 
-      // Get mutual connections for each user
-      const resultsWithDetails = await Promise.all(
-        users.map(async (user: any) => {
+      console.log(`Found ${profiles.length} users`);
+
+      // Get mutual connections for each result
+      const results = await Promise.all(
+        profiles.map(async (profile) => {
           let mutualConnections = 0;
           
           try {
-            const { data: mutualCount } = await supabase
-              .rpc('get_mutual_connections_count', {
-                user1_id: userId,
-                user2_id: user.id
-              });
-            
-            mutualConnections = mutualCount || 0;
-          } catch (mutualError) {
-            console.error('Error getting mutual connections:', mutualError);
+            if (friends.length > 0) {
+              // Get this user's friends
+              const { data: userFriends } = await supabase
+                .from('friendships')
+                .select('user1_id, user2_id')
+                .or(`user1_id.eq.${profile.id},user2_id.eq.${profile.id}`);
+              
+              if (userFriends && userFriends.length > 0) {
+                const userFriendIds = userFriends.map(f => 
+                  f.user1_id === profile.id ? f.user2_id : f.user1_id
+                );
+                
+                mutualConnections = userFriendIds.filter(friendId => 
+                  friends.some(f => f.friendId === friendId)
+                ).length;
+              }
+            }
+          } catch (error) {
+            console.error('Error calculating mutual connections:', error);
           }
 
           return {
-            id: user.id,
-            name: user.name || 'Unknown User',
-            photo: user.profile_photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
-            bio: user.bio || '',
-            email: user.email || '',
+            id: profile.id,
+            name: profile.name || 'Unknown User',
+            photo: profile.profile_photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.id}`,
+            bio: profile.bio || '',
             mutualConnections,
           };
         })
       );
 
-      console.log(`✅ Final results: ${resultsWithDetails.length} users`);
-      
-      // Sort by mutual connections, then by name
-      return resultsWithDetails.sort((a, b) => {
+      // Sort by mutual connections (highest first), then by name
+      return results.sort((a, b) => {
         if (b.mutualConnections !== a.mutualConnections) {
           return b.mutualConnections - a.mutualConnections;
         }
@@ -281,41 +239,39 @@ export function useFriends(userId?: string) {
       });
 
     } catch (error) {
-      console.error('❌ Unexpected error in searchUsers:', error);
+      console.error('Error in searchUsers:', error);
       return [];
     }
-  }, [userId]);
+  }, [userId, friends]);
 
-  // Fetch suggested users
+  // Fetch ALL users for suggestions
   const fetchSuggestedUsers = useCallback(async () => {
-    if (!userId) {
-      console.log('No userId for suggestions');
-      return;
-    }
+    if (!userId) return;
 
     try {
-      console.log('Fetching suggested users...');
+      console.log('Fetching all users for suggestions...');
       
-      // Get ALL users except current user
+      // Get ALL users from database except current user
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select('id, name, profile_photo, bio')
         .neq('id', userId)
-        .limit(50);
+        .order('created_at', { ascending: false })
+        .limit(50); // Limit to 50 most recent users
 
       if (error) {
-        console.error('Error fetching all users:', error);
+        console.error('Error fetching users:', error);
         setSuggestedUsers([]);
         return;
       }
-
-      console.log(`Total users in database (excluding self): ${profiles?.length || 0}`);
 
       if (!profiles || profiles.length === 0) {
-        console.log('No users found in database');
+        console.log('No other users in database');
         setSuggestedUsers([]);
         return;
       }
+
+      console.log(`Total users in database: ${profiles.length}`);
 
       // Get current user's friends
       const { data: userFriendships } = await supabase
@@ -327,7 +283,7 @@ export function useFriends(userId?: string) {
         conn.user1_id === userId ? conn.user2_id : conn.user1_id
       ) || [];
 
-      console.log(`User has ${friendIds.length} friends`);
+      console.log(`Current user has ${friendIds.length} friends`);
 
       // Get pending requests
       const { data: pendingRequests } = await supabase
@@ -340,39 +296,53 @@ export function useFriends(userId?: string) {
         req.sender_id === userId ? req.receiver_id : req.sender_id
       ) || [];
 
-      console.log(`User has ${pendingIds.length} pending requests`);
+      console.log(`Current user has ${pendingIds.length} pending requests`);
 
       // Filter out friends and pending requests
-      const filteredProfiles = profiles.filter(profile => {
+      const availableUsers = profiles.filter(profile => {
         const isFriend = friendIds.includes(profile.id);
         const isPending = pendingIds.includes(profile.id);
-        return !isFriend && !isPending;
+        const isAvailable = !isFriend && !isPending;
+        
+        if (!isAvailable) {
+          console.log(`Excluding ${profile.name}: friend=${isFriend}, pending=${isPending}`);
+        }
+        
+        return isAvailable;
       });
 
-      console.log(`Users available for suggestions: ${filteredProfiles.length}`);
+      console.log(`Available users for suggestions: ${availableUsers.length}`);
 
-      if (filteredProfiles.length === 0) {
+      if (availableUsers.length === 0) {
         setSuggestedUsers([]);
         return;
       }
 
-      // Get suggestions with mutual connections
+      // Get mutual connections for each user
       const suggestions = await Promise.all(
-        filteredProfiles.slice(0, 20).map(async (profile) => {
+        availableUsers.slice(0, 20).map(async (profile) => {
           let mutualConnections = 0;
           
           try {
             if (friendIds.length > 0) {
-              const { data: mutualCount } = await supabase
-                .rpc('get_mutual_connections_count', {
-                  user1_id: userId,
-                  user2_id: profile.id
-                });
+              // Get this user's friends
+              const { data: userFriends } = await supabase
+                .from('friendships')
+                .select('user1_id, user2_id')
+                .or(`user1_id.eq.${profile.id},user2_id.eq.${profile.id}`);
               
-              mutualConnections = mutualCount || 0;
+              if (userFriends && userFriends.length > 0) {
+                const userFriendIds = userFriends.map(f => 
+                  f.user1_id === profile.id ? f.user2_id : f.user1_id
+                );
+                
+                mutualConnections = userFriendIds.filter(friendId => 
+                  friendIds.includes(friendId)
+                ).length;
+              }
             }
           } catch (error) {
-            console.error(`Error getting mutual for ${profile.name}:`, error);
+            console.error(`Error calculating mutual for ${profile.name}:`, error);
           }
 
           return {
@@ -381,17 +351,21 @@ export function useFriends(userId?: string) {
             photo: profile.profile_photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.id}`,
             bio: profile.bio || '',
             mutualConnections,
-            sharedEvents: 0,
           };
         })
       );
 
-      // Sort by mutual connections
-      const sortedSuggestions = suggestions.sort((a, b) => 
-        (b.mutualConnections || 0) - (a.mutualConnections || 0)
-      );
+      // Sort suggestions by:
+      // 1. Mutual connections (highest first)
+      // 2. Most recent users first
+      const sortedSuggestions = suggestions.sort((a, b) => {
+        if (b.mutualConnections !== a.mutualConnections) {
+          return b.mutualConnections - a.mutualConnections;
+        }
+        return 0; // Already sorted by created_at in the query
+      });
 
-      console.log(`Setting ${sortedSuggestions.length} suggested users`);
+      console.log(`Setting ${Math.min(sortedSuggestions.length, 10)} suggested users`);
       setSuggestedUsers(sortedSuggestions.slice(0, 10));
 
     } catch (error) {
@@ -415,26 +389,7 @@ export function useFriends(userId?: string) {
         .single();
 
       if (existing) {
-        toast({ 
-          title: 'Friend request already sent!', 
-          variant: 'default' 
-        });
-        return false;
-      }
-
-      // Check if already friends
-      const { data: existingFriendship } = await supabase
-        .from('friendships')
-        .select('*')
-        .or(`user1_id.eq.${userId},user2_id.eq.${receiverId})`)
-        .or(`user1_id.eq.${receiverId},user2_id.eq.${userId}`)
-        .single();
-
-      if (existingFriendship) {
-        toast({ 
-          title: 'Already friends!', 
-          variant: 'default' 
-        });
+        toast({ title: 'Friend request already sent!' });
         return false;
       }
 
@@ -448,26 +403,16 @@ export function useFriends(userId?: string) {
 
       if (error) {
         console.error('Error sending friend request:', error);
-        toast({ 
-          title: 'Failed to send request', 
-          variant: 'destructive' 
-        });
+        toast({ title: 'Failed to send request', variant: 'destructive' });
         return false;
       }
 
-      toast({ 
-        title: 'Friend request sent!', 
-        variant: 'default' 
-      });
-
+      toast({ title: 'Friend request sent!' });
       await Promise.all([fetchRequests(), fetchSuggestedUsers()]);
       return true;
     } catch (error) {
       console.error('Error in sendFriendRequest:', error);
-      toast({ 
-        title: 'Failed to send request', 
-        variant: 'destructive' 
-      });
+      toast({ title: 'Failed to send request', variant: 'destructive' });
       return false;
     }
   }, [userId, fetchRequests, fetchSuggestedUsers, toast]);
@@ -479,26 +424,16 @@ export function useFriends(userId?: string) {
 
       if (error) {
         console.error('Error accepting friend request:', error);
-        toast({ 
-          title: 'Failed to accept request', 
-          variant: 'destructive' 
-        });
+        toast({ title: 'Failed to accept request', variant: 'destructive' });
         return false;
       }
 
-      toast({ 
-        title: 'Friend request accepted!', 
-        variant: 'default' 
-      });
-
+      toast({ title: 'Friend request accepted!' });
       await Promise.all([fetchFriends(), fetchRequests(), fetchSuggestedUsers()]);
       return true;
     } catch (error) {
       console.error('Error in acceptFriendRequest:', error);
-      toast({ 
-        title: 'Failed to accept request', 
-        variant: 'destructive' 
-      });
+      toast({ title: 'Failed to accept request', variant: 'destructive' });
       return false;
     }
   }, [fetchFriends, fetchRequests, fetchSuggestedUsers, toast]);
@@ -508,34 +443,21 @@ export function useFriends(userId?: string) {
     try {
       const { error } = await supabase
         .from('friend_requests')
-        .update({ 
-          status: 'declined', 
-          updated_at: new Date().toISOString() 
-        })
+        .update({ status: 'declined', updated_at: new Date().toISOString() })
         .eq('id', requestId);
 
       if (error) {
         console.error('Error declining friend request:', error);
-        toast({ 
-          title: 'Failed to decline request', 
-          variant: 'destructive' 
-        });
+        toast({ title: 'Failed to decline request', variant: 'destructive' });
         return false;
       }
 
-      toast({ 
-        title: 'Friend request declined', 
-        variant: 'default' 
-      });
-
+      toast({ title: 'Friend request declined' });
       await fetchRequests();
       return true;
     } catch (error) {
       console.error('Error in declineFriendRequest:', error);
-      toast({ 
-        title: 'Failed to decline request', 
-        variant: 'destructive' 
-      });
+      toast({ title: 'Failed to decline request', variant: 'destructive' });
       return false;
     }
   }, [fetchRequests, toast]);
@@ -550,26 +472,16 @@ export function useFriends(userId?: string) {
 
       if (error) {
         console.error('Error cancelling friend request:', error);
-        toast({ 
-          title: 'Failed to cancel request', 
-          variant: 'destructive' 
-        });
+        toast({ title: 'Failed to cancel request', variant: 'destructive' });
         return false;
       }
 
-      toast({ 
-        title: 'Friend request cancelled', 
-        variant: 'default' 
-      });
-
+      toast({ title: 'Friend request cancelled' });
       await Promise.all([fetchRequests(), fetchSuggestedUsers()]);
       return true;
     } catch (error) {
       console.error('Error in cancelFriendRequest:', error);
-      toast({ 
-        title: 'Failed to cancel request', 
-        variant: 'destructive' 
-      });
+      toast({ title: 'Failed to cancel request', variant: 'destructive' });
       return false;
     }
   }, [fetchRequests, fetchSuggestedUsers, toast]);
@@ -648,10 +560,6 @@ export function useFriends(userId?: string) {
     cancelFriendRequest,
     searchUsers,
     getRelationshipStatus,
-    refetch: () => Promise.all([
-      fetchFriends(), 
-      fetchRequests(), 
-      fetchSuggestedUsers()
-    ]),
+    refetch: () => Promise.all([fetchFriends(), fetchRequests(), fetchSuggestedUsers()]),
   };
 }
