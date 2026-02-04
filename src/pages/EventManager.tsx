@@ -287,7 +287,6 @@ interface QRCodeModalProps {
 function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [qrCodeURL, setQrCodeURL] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -301,12 +300,11 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
     
     setLoading(true);
     try {
-      // Generate the check-in URL with geofence check parameter
-      const checkinURL = `${window.location.origin}/event/${event.id}/checkin?checkGeofence=true`;
-      setQrCodeURL(checkinURL);
+      // Create display text with event name and location only
+      const displayText = `${event.name}\n📍 ${event.location}`;
       
       // Generate QR code using QRCode library
-      const qrUrl = await QRCode.toDataURL(checkinURL, {
+      const qrUrl = await QRCode.toDataURL(displayText, {
         width: 400,
         margin: 2,
         color: {
@@ -379,8 +377,8 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
     ctx.fillText(event.name.substring(0, 25), 200, 30);
     
     ctx.font = '12px Arial';
-    ctx.fillText(`ID: ${event.id.substring(0, 8)}...`, 200, 365);
-    ctx.fillText(`📍 Geofence: ${event.geofenceRadius}m radius`, 200, 385);
+    ctx.fillText(`📍 ${event.location.substring(0, 30)}`, 200, 365);
+    ctx.fillText(`Geofence: ${event.geofenceRadius}m radius`, 200, 385);
     
     setQrDataUrl(canvas.toDataURL());
   };
@@ -402,20 +400,6 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
     });
   };
 
-  const handleCopyURL = () => {
-    navigator.clipboard.writeText(qrCodeURL)
-      .then(() => {
-        toast({
-          title: 'Copied!',
-          description: 'Check-in URL copied to clipboard',
-          duration: 3000
-        });
-      })
-      .catch(err => {
-        console.error('Failed to copy:', err);
-      });
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -429,7 +413,7 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
             </div>
             <div>
               <h2 className="text-lg font-bold text-white">Event QR Code</h2>
-              <p className="text-xs text-gray-400">Scan to check in at event</p>
+              <p className="text-xs text-gray-400">Scan for event information</p>
             </div>
           </div>
           <button 
@@ -470,7 +454,8 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
               
               <div className="text-center w-full">
                 <h3 className="text-base font-bold text-white mb-1">{event?.name || 'Event'}</h3>
-                <p className="text-xs text-gray-400 mb-3">Scan this QR code to check in at the event</p>
+                <p className="text-sm text-gray-300 mb-2">📍 {event?.location || 'Location'}</p>
+                <p className="text-xs text-gray-400 mb-3">Scan this QR code for event information</p>
                 
                 {/* Geofence Information */}
                 <div className="bg-primary/10 rounded-lg p-3 mb-3 border border-primary/30">
@@ -483,11 +468,18 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
                   </p>
                 </div>
                 
-                {/* Check-in URL */}
-                <div className="bg-background rounded-lg p-2.5 mt-2 border border-white/10 overflow-hidden">
-                  <p className="text-[11px] text-gray-400 font-mono text-left break-all">
-                    {qrCodeURL}
-                  </p>
+                {/* Event Details */}
+                <div className="bg-background rounded-lg p-3 mt-2 border border-white/10">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-gray-400">Date</span>
+                    <span className="text-xs text-white">
+                      {event?.date ? new Date(event.date).toLocaleDateString() : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-400">Time</span>
+                    <span className="text-xs text-white">{event?.time || 'TBA'}</span>
+                  </div>
                 </div>
               </div>
             </>
@@ -495,18 +487,11 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-white/10 flex gap-3">
-          <button
-            onClick={handleCopyURL}
-            className="flex-1 px-3 py-3 border border-primary rounded-xl bg-transparent text-primary text-sm font-medium cursor-pointer flex items-center justify-center gap-2 hover:bg-primary/10 transition-colors"
-          >
-            <ExternalLink className="w-4 h-4" />
-            Copy URL
-          </button>
+        <div className="p-4 border-t border-white/10">
           <button
             onClick={handleDownload}
             disabled={!qrDataUrl}
-            className={`flex-1 px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity
+            className={`w-full px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity
               ${!qrDataUrl ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             style={{
               background: DESIGN.colors.primary,
@@ -514,7 +499,7 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
             }}
           >
             <Download className="w-4 h-4" />
-            Download
+            Download QR Code
           </button>
         </div>
       </div>
@@ -1015,18 +1000,16 @@ function EventCard({ event, onEdit, onDelete, onViewQR, isSelected }: EventCardP
         <span className="text-sm text-gray-300">Geofence: {event.geofenceRadius}m radius</span>
       </div>
 
-      {/* Map Coordinates Info */}
-      {event.coordinates && (
-        <div className="bg-blue-500/10 rounded-lg p-2 mb-3 border border-blue-500/20">
-          <div className="flex items-center gap-2 text-sm text-gray-300">
-            <MapPin className="w-4 h-4 text-blue-400" />
-            <span>Location: {event.coordinates.lat.toFixed(6)}, {event.coordinates.lng.toFixed(6)}</span>
-          </div>
-          <div className="mt-1 text-xs text-gray-400">
-            {event.address || event.location}
-          </div>
+      {/* Location Info */}
+      <div className="bg-blue-500/10 rounded-lg p-2 mb-3 border border-blue-500/20">
+        <div className="flex items-center gap-2 text-sm text-gray-300">
+          <MapPin className="w-4 h-4 text-blue-400" />
+          <span>Location: {event.location}</span>
         </div>
-      )}
+        <div className="mt-1 text-xs text-gray-400">
+          {event.address}
+        </div>
+      </div>
 
       {/* Media Info */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
