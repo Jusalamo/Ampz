@@ -1,275 +1,210 @@
 
-# Comprehensive AMPZ UX & Code Quality Improvement Plan
+# Comprehensive Fix Plan: Real-Time Database Integration & Check-In Flow
 
 ## Overview
-This plan addresses 17 interconnected improvement areas across the AMPZ app, focusing on map persistence, performance optimization, check-in flow fixes, real database queries, Tailwind theming consistency, and UX refinements following Instagram/Snapchat best practices.
+This plan addresses all critical build errors, removes mock data dependencies, fixes the check-in flow, implements WebSocket real-time chat, and converts remaining files to semantic Tailwind CSS.
 
 ---
 
-## Phase 1: MapContext for Persistent Map Instance
+## Phase 1: Fix Critical Build Errors
 
-### Problem
-The map reloads every time the user navigates, causing flickering and delays.
+### 1.1 Fix `useCheckIn.ts` - Database Column Mismatch
 
-### Solution
-Create a `MapContext` that maintains a singleton Mapbox instance across all navigations.
+**Problem**: The code uses `check_in_location` but the table has `check_in_latitude` and `check_in_longitude`
 
-### Implementation
-**New File: `src/contexts/MapContext.tsx`**
-- Create context with `map` instance, `isReady` state, and container ref
-- Initialize map once on app mount
-- Move map container to root level (above routes)
-- MapDrawer and other components reference the shared instance
+**File**: `src/hooks/useCheckIn.ts`
 
-**Changes to `src/App.tsx`**
-- Wrap routes with `MapProvider`
-- Render hidden map container at app root
-
-**Changes to `src/components/MapDrawer.tsx`**
-- Remove local map initialization
-- Use `useMapContext()` to access shared map
-- Add/remove layers and markers without recreating map
-
----
-
-## Phase 2: Performance & Caching Optimization
-
-### Problem
-User data and events take noticeable time to load, causing UX lag.
-
-### Solution
-Implement local caching with instant display and background refresh.
-
-### Implementation
-**Changes to `src/contexts/AppContext.tsx`**
-1. Add localStorage caching for:
-   - User profile data
-   - Events list
-   - Subscription status (persist and never reset on restart)
-2. On app launch:
-   - Immediately display cached data (< 100ms)
-   - Fetch fresh data in background
-   - Update UI only if data changed
-3. Add subscription persistence:
-   - Store tier/status in database
-   - Never reset on app restart
-   - Only change when user explicitly upgrades/downgrades
-
-**Cache Implementation**
-```text
-Load Flow:
-1. App mounts → Load cached user + events from localStorage
-2. Display cached data instantly
-3. Background fetch from Supabase
-4. If different, update state and cache
-```
-
----
-
-## Phase 3: Remove Avatar Placeholders
-
-### Problem
-Using DiceBear avatar placeholders instead of real profile photos.
-
-### Solution
-Replace all avatar fallbacks with a consistent user profile photo image that they choose.
-
-### Implementation
-**Changes to `src/contexts/AppContext.tsx`**
-- Line 67: Change `profilePhoto: profile.profile_photo || '/default-avatar.png'`
-- Remove DiceBear URL generation
-
-**Changes to all components using avatars:**
-- `src/pages/Home.tsx`
-- `src/pages/Profile.tsx`
-- `src/pages/Social.tsx`
-- `src/components/MapDrawer.tsx`
-- Use `/default-avatar.png` as fallback everywhere
-- Add `onError` handler to show default if image fails to load
-
-**Create default avatar asset:**
-- Add `/public/default-avatar.png` (simple silhouette icon)
-
----
-
-## Phase 4: Fix Check-In Flow Loop
-
-### Problem
-The flow gets stuck switching between "Checking Location" and "Choose Visibility" steps.
-
-### Solution
-Simplify the flow: once geofence check passes, proceed directly to privacy choice without re-checking.
-
-### Implementation
-**Changes to `src/components/modals/QRScannerModal.tsx`**
-
-**Simplified Flow:**
-```text
-1. Scan QR → Extract event ID
-2. Validate event (active, not ended)
-3. Check already checked in → Show success
-4. Geofence check (one-time):
-   - Pass → Go to privacy_choice
-   - Fail → Show outside_geofence with retry
-5. Privacy choice (public/private)
-6. Execute check-in
-7. If public → Navigate to /connect
-8. If private → Show "Welcome to event"
-```
-
-**Key Fixes:**
-- Remove redundant geofence re-check after privacy choice
-- Cache geofence result to prevent re-verification
-- After successful check-in with "public" mode → Navigate to Connect page
-- After successful check-in with "private" mode → Show welcome message and close
-
----
-
-## Phase 5: Real Database Metrics (Home & Profile)
-
-### Problem
-Profile shows mock data (12 matches, 95% response rate) instead of real metrics.
-
-### Solution
-Query database for actual events attended, matches count, and likes remaining.
-
-### Implementation
-**Changes to `src/pages/Home.tsx`**
-
-Remove the hardcoded stats array (lines 134-153) and replace with:
+**Changes** (Lines 203-214):
 ```typescript
-// Fetch real metrics
-const [metrics, setMetrics] = useState({ events: 0, matches: 0, likesLeft: 0 });
+// BEFORE (incorrect)
+.insert({
+  user_id: userId,
+  event_id: event.id,
+  visibility_mode: visibilityMode,
+  check_in_location: `POINT(${location.longitude} ${location.latitude})`,
+  ...
+})
 
-useEffect(() => {
-  if (!user?.id) return;
+// AFTER (correct - matching database schema)
+.insert({
+  event_id: event.id,
+  visibility_mode: visibilityMode,
+  verification_method: 'geolocation',
+  check_in_latitude: location.latitude,
+  check_in_longitude: location.longitude,
+  within_geofence: true,
+  distance_from_venue: calculateDistance(
+    location.latitude,
+    location.longitude,
+    event.coordinates.lat,
+    event.coordinates.lng
+  ),
+  checked_in_at: new Date().toISOString(),
+})
+```
+
+**Remove**: Line 229 - The `increment_event_attendees` RPC call (function doesn't exist, use direct update instead)
+
+### 1.2 Fix `useFriends.ts` - Remove `username` Column References
+
+**Problem**: The `profiles` table doesn't have a `username` column
+
+**File**: `src/hooks/useFriends.ts`
+
+**Changes**:
+- Remove `username` from all `.select()` queries (lines 166, 286)
+- Remove `username` from search filter `.or()` clause
+- Add missing `toast` import from `@/hooks/use-toast`
+- Handle RPC function gracefully (it exists but may have different return type)
+
+### 1.3 Fix `EventManager.tsx` - Event Type Properties
+
+**Problem**: TypeScript errors with `duration` property and `payload.new` type casting
+
+**File**: `src/pages/EventManager.tsx`
+
+**Changes**:
+- Add `duration?: number` to Event type in `src/lib/types.ts`
+- Properly type-cast `payload.new` in the realtime subscription handler
+- Remove `duration` from the mapped event or handle it properly
+
+---
+
+## Phase 2: Fix Check-In Flow Loop
+
+### 2.1 Prevent State Loop in QRScannerModal
+
+**Problem**: The flow switches repeatedly between "Checking Location" and "Choose Visibility"
+
+**Root Cause**: The `processQRCode` function is being re-called or state is not being properly locked
+
+**File**: `src/components/modals/QRScannerModal.tsx`
+
+**Solution**:
+```text
+Flow Fix:
+1. Add a `geofenceCheckComplete` boolean flag
+2. Once geofence check passes, set flag to true
+3. Never re-run geofence check after flag is set
+4. Direct transition: scanning → verifying → geofence_check → privacy_choice → checking_in → success
+5. Remove any state that could cause loops
+```
+
+**Key Changes**:
+- Cache geofence result in state to prevent re-verification
+- Lock the step progression with explicit transitions
+- Ensure `completeCheckIn` is only called once per flow
+
+### 2.2 Fix Public Check-In Navigation
+
+**Problem**: Public check-in shows "failed" instead of navigating to Connect page
+
+**Solution**:
+- After successful check-in with `visibility_mode = 'public'`:
+  1. Show success briefly (1.5s)
+  2. Navigate to `/connect` page
+- After successful check-in with `visibility_mode = 'private'`:
+  1. Show "Welcome to [Event Name]!" message
+  2. User can close modal or view event
+
+---
+
+## Phase 3: Remove All Mock Data Dependencies
+
+### 3.1 Files to Update
+
+| File | Current State | Required Change |
+|------|---------------|-----------------|
+| `demo-data.ts` | `isDemoUser = false` | Already production-ready, verify no imports leak mock data |
+| `AppContext.tsx` | Imports demo data | Remove conditional demo data usage in production flows |
+| `useFriends.ts` | Uses DiceBear avatars | Replace with `/default-avatar.png` |
+| `Home.tsx` | Hardcoded stats | Use real database queries |
+| `Profile.tsx` | Mock metrics | Use real database queries |
+| `Social.tsx` | May show demo data | Use only real friend data |
+
+### 3.2 Database-Backed Profile Metrics
+
+**Implementation** (Home.tsx + Profile.tsx):
+```typescript
+// Real metrics from database
+const fetchRealMetrics = async (userId: string) => {
+  const [checkIns, matches, profile] = await Promise.all([
+    supabase.from('check_ins').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    supabase.from('matches').select('id', { count: 'exact', head: true })
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+      .eq('status', 'active'),
+    supabase.from('profiles').select('likes_remaining, subscription_tier').eq('id', userId).single()
+  ]);
   
-  // Fetch events attended (check-ins)
-  const fetchMetrics = async () => {
-    const { count: eventsCount } = await supabase
-      .from('check_ins')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id);
-    
-    const { count: matchesCount } = await supabase
-      .from('matches')
-      .select('*', { count: 'exact', head: true })
-      .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
-    
-    setMetrics({
-      events: eventsCount || 0,
-      matches: matchesCount || 0,
-      likesLeft: user.subscription.tier === 'free' 
-        ? (user.likesRemaining ?? 10) 
-        : 'Unlimited'
-    });
+  return {
+    eventsAttended: checkIns.count || 0,
+    matches: matches.count || 0,
+    likesRemaining: profile.data?.subscription_tier === 'free' 
+      ? (profile.data?.likes_remaining ?? 25) 
+      : '∞'
   };
-  
-  fetchMetrics();
-}, [user?.id]);
-```
-
-**Changes to `src/pages/Profile.tsx`**
-- Remove mock stats (lines 26-30)
-- Replace "95% Response" with "Likes Left"
-- Use same real database queries as Home
-
----
-
-## Phase 6: Remove Redundant Items (Profile vs Settings)
-
-### Problem
-Duplicate items exist in both Profile and Settings pages.
-
-### Solution
-Follow Instagram pattern - Profile for viewing, Settings for configuration.
-
-### Implementation
-**Profile Page keeps:**
-- Profile card (photo, name, bio, interests)
-- Real metrics (Events, Matches, Likes Left)
-- Quick actions: Edit Profile, Subscription
-- Theme toggle (convenience)
-- Log Out
-
-**Profile Page removes:**
-- Privacy Settings (move to Settings only)
-- Analytics (keep in Settings only)
-- Duplicate menu items
-
-**Settings Page keeps:**
-- Account management (email, password, phone)
-- Privacy & Security
-- Preferences (theme, currency, notifications)
-- Subscription management
-- Help & Support
-- Delete Account
-
----
-
-## Phase 7: Remove Analytics from Home Page
-
-### Problem
-Analytics tabs on home page are redundant (exist in Profile).
-
-### Solution
-Remove analytics section from Home, keep quick actions and event sections.
-
-### Implementation
-**Changes to `src/pages/Home.tsx`**
-- Remove any analytics tabs/sections
-- Keep: Welcome, Stats Grid (with real data), Quick Actions, Explore Map button, My Events, Featured Events
-
----
-
-## Phase 8: Event Map Pins with Images
-
-### Problem
-Map pins use generic circles/stars instead of event images.
-
-### Solution
-Use event cover images as map markers like Instagram but the pins should still have the circle border.
-
-### Implementation
-**Changes to `src/components/MapDrawer.tsx`**
-
-Replace the marker creation (lines 296-307) with image-based markers:
-```typescript
-const markerEl = document.createElement('div');
-markerEl.className = 'event-marker cursor-pointer';
-markerEl.innerHTML = `
-  <div class="w-12 h-12 rounded-full overflow-hidden border-3 border-white shadow-lg transform transition-transform duration-200 hover:scale-110">
-    <img 
-      src="${sanitizeImageUrl(event.coverImage)}" 
-      alt="${escapeHtml(event.name)}"
-      class="w-full h-full object-cover"
-      onerror="this.src='/default-event.png'"
-    />
-    ${event.isFeatured ? `
-      <div class="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center">
-        <svg class="w-3 h-3 text-yellow-900" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292..."></path>
-        </svg>
-      </div>
-    ` : ''}
-  </div>
-`;
+};
 ```
 
 ---
 
-## Phase 9: Friend Locations on Map (Foundation)
+## Phase 4: Real-Time WebSocket Chat
 
-### Problem
-No ability to see friends on map like Snapchat.
+### 4.1 Enable Real-Time for Messages Table
 
-### Solution
-Add foundation for friend location tracking (opt-in).
-
-### Implementation
-**Database Migration:**
+**Database Migration**:
 ```sql
-CREATE TABLE user_locations (
+-- Enable realtime for messages table if not already
+ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+```
+
+### 4.2 Update Chat Component
+
+**File**: `src/pages/Chats.tsx`
+
+**Implementation**:
+```typescript
+// Subscribe to new messages
+useEffect(() => {
+  if (!matchId) return;
+  
+  const channel = supabase
+    .channel(`chat:${matchId}`)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'messages',
+      filter: `match_id=eq.${matchId}`
+    }, (payload) => {
+      // Add new message to local state instantly
+      setMessages(prev => [...prev, payload.new as Message]);
+      // Mark as read if user is viewing
+      if (payload.new.receiver_id === userId) {
+        markMessageAsRead(payload.new.id);
+      }
+    })
+    .subscribe();
+  
+  return () => supabase.removeChannel(channel);
+}, [matchId, userId]);
+```
+
+### 4.3 Typing Indicators
+
+**Implementation**:
+- Use Supabase Realtime Presence for typing status
+- Debounce typing events (300ms)
+- Show "User is typing..." indicator
+
+---
+
+## Phase 5: Friend Location on Map (Foundation)
+
+### 5.1 Database Schema
+
+**Migration**:
+```sql
+CREATE TABLE IF NOT EXISTS public.user_locations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES profiles(id) NOT NULL UNIQUE,
   latitude DECIMAL NOT NULL,
@@ -279,278 +214,322 @@ CREATE TABLE user_locations (
   is_visible BOOLEAN DEFAULT false
 );
 
+-- RLS Policies
+ALTER TABLE user_locations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can update their own location" ON user_locations
+  FOR ALL USING (user_id = auth.uid());
+
+CREATE POLICY "Friends can view visible locations" ON user_locations
+  FOR SELECT USING (
+    is_visible = true AND 
+    user_id IN (
+      SELECT CASE WHEN user1_id = auth.uid() THEN user2_id ELSE user1_id END
+      FROM friendships
+      WHERE user1_id = auth.uid() OR user2_id = auth.uid()
+    )
+  );
+
 -- Enable realtime
 ALTER PUBLICATION supabase_realtime ADD TABLE public.user_locations;
 ```
 
-**New File: `src/hooks/useFriendLocations.ts`**
-- Subscribe to friends' locations via realtime
-- Only show friends with `is_visible = true`
-- Return array of friend markers
+### 5.2 New Hook: `useFriendLocations.ts`
 
-**Changes to MapDrawer:**
-- Add friend markers with profile photos
-- Different styling from event markers (smaller, blue border)
-
----
-
-## Phase 10: Convert EventDetail.tsx to Semantic Tailwind
-
-### Problem
-EventDetails uses hardcoded DESIGN object for colors.
-
-### Solution
-Replace with semantic Tailwind classes while keeping layout unchanged.
-
-### Implementation
-**Changes to `src/pages/EventDetail.tsx`**
-
-Remove DESIGN object (lines 17-56) and replace all inline styles:
-
-| DESIGN Property | Tailwind Class |
-|----------------|----------------|
-| `DESIGN.colors.primary` | `text-primary`, `bg-primary` |
-| `DESIGN.colors.background` | `bg-background` |
-| `DESIGN.colors.card` | `bg-card` |
-| `DESIGN.colors.textPrimary` | `text-foreground` |
-| `DESIGN.colors.textSecondary` | `text-muted-foreground` |
-| `DESIGN.borderRadius.card` | `rounded-ampz-lg` or `rounded-[24px]` |
-
-Example conversion:
 ```typescript
-// Before
-style={{ background: DESIGN.colors.card, borderRadius: DESIGN.borderRadius.card }}
-
-// After
-className="bg-card rounded-[24px]"
+export function useFriendLocations(userId?: string) {
+  const [friendLocations, setFriendLocations] = useState<FriendLocation[]>([]);
+  
+  useEffect(() => {
+    if (!userId) return;
+    
+    // Initial fetch
+    fetchFriendLocations();
+    
+    // Real-time subscription
+    const channel = supabase
+      .channel('friend-locations')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'user_locations',
+      }, () => {
+        fetchFriendLocations();
+      })
+      .subscribe();
+    
+    return () => supabase.removeChannel(channel);
+  }, [userId]);
+  
+  return friendLocations;
+}
 ```
 
 ---
 
-## Phase 11: Convert EventManager.tsx to Semantic Tailwind
+## Phase 6: Convert to Semantic Tailwind CSS
 
-### Problem
-EventManager uses hardcoded DESIGN object.
+### 6.1 EventDetail.tsx
 
-### Solution
-Same approach as EventDetail - replace inline styles with Tailwind classes.
+**Remove**: Lines 17-56 (DESIGN object)
 
-### Implementation
-**Changes to `src/pages/EventManager.tsx`**
-- Remove DESIGN object (lines 54-90)
-- Replace all `style={}` with `className=""`
-- Ensure event updates persist and reflect in real-time
+**Replace inline styles with Tailwind**:
+```text
+DESIGN.colors.background → bg-background
+DESIGN.colors.card → bg-card
+DESIGN.colors.primary → text-primary, bg-primary
+DESIGN.colors.textPrimary → text-foreground
+DESIGN.colors.textSecondary → text-muted-foreground
+DESIGN.borderRadius.card → rounded-[24px]
+```
+
+### 6.2 EventManager.tsx
+
+**Remove**: Lines 212-248 (DESIGN object)
+
+**Apply same Tailwind replacements**
+
+### 6.3 MapDrawer.tsx
+
+**Remove**: Lines 14-43 (DESIGN object)
+
+**Apply same Tailwind replacements**
 
 ---
 
-## Phase 12: Convert MapDrawer.tsx to Semantic Tailwind
+## Phase 7: Event Image Map Pins
 
-### Problem
-MapDrawer uses hardcoded DESIGN object.
+### 7.1 Update MapDrawer.tsx Marker Creation
 
-### Solution
-Replace with semantic Tailwind classes.
+**Current** (generic markers):
+```typescript
+markerEl.style.background = 'linear-gradient(...)';
+```
 
-### Implementation
-**Changes to `src/components/MapDrawer.tsx`**
-- Remove DESIGN object (lines 14-43)
-- Update all components to use `bg-card`, `text-foreground`, `rounded-ampz-lg`, etc.
+**New** (image-based like Instagram):
+```typescript
+markerEl.innerHTML = `
+  <div class="relative w-12 h-12">
+    <div class="w-full h-full rounded-full overflow-hidden border-3 border-white shadow-lg">
+      <img 
+        src="${sanitizeImageUrl(event.coverImage)}" 
+        class="w-full h-full object-cover"
+        onerror="this.src='/placeholder.svg'"
+      />
+    </div>
+    ${event.isFeatured ? `
+      <div class="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center">
+        <svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+        </svg>
+      </div>
+    ` : ''}
+  </div>
+`;
+```
+
+### 7.2 Friend Markers (Different Style)
+
+```typescript
+// Blue border for friends
+friendMarkerEl.innerHTML = `
+  <div class="w-10 h-10 rounded-full overflow-hidden border-3 border-blue-500 shadow-lg">
+    <img 
+      src="${friendPhoto}" 
+      class="w-full h-full object-cover"
+      onerror="this.src='/default-avatar.png'"
+    />
+  </div>
+`;
+```
 
 ---
 
-## Phase 13: Fix Modal Clipping Issues
+## Phase 8: Modal Safe Area Fixes
 
-### Problem
-Modal headers/footers clip against screen edges.
+### 8.1 Global CSS Updates
 
-### Solution
-Add safe area padding and proper max-height constraints.
+**File**: `src/index.css`
 
-### Implementation
-**Changes to all modals:**
-
-Add to modal containers:
-```typescript
-className="fixed inset-0 z-50 flex items-center justify-center p-4 safe-area-inset"
-```
-
-Modal content:
-```typescript
-className="max-h-[calc(100vh-4rem)] flex flex-col overflow-hidden"
-```
-
-Modal footer:
-```typescript
-className="sticky bottom-0 p-4 bg-background border-t border-border pb-safe"
-```
-
-**Global CSS addition to `src/index.css`:**
 ```css
-.modal-safe-top {
+/* Modal safe area helpers */
+.modal-container {
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+}
+
+.modal-header {
   padding-top: max(1rem, env(safe-area-inset-top));
 }
 
-.modal-safe-bottom {
+.modal-footer {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+/* Bottom nav spacing */
+.pb-nav {
+  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
 }
 ```
 
+### 8.2 Apply to All Modals
+
+- QRScannerModal
+- CheckInModal
+- EditEventModal
+- SubscriptionModal
+- FiltersModal
+- TicketsModal
+
 ---
 
-## Phase 14: User Search Enhancement
+## Phase 9: User Search Enhancement
 
-### Problem
-Need autocomplete with fuzzy matching for friend search.
+### 9.1 Fuzzy Search with Progressive Filtering
 
-### Solution
-Enhance search with Levenshtein-like fuzzy matching and instant results.
+**File**: `src/hooks/useFriends.ts`
 
-### Implementation
-**Changes to `src/hooks/useFriends.ts`**
-
-Enhance `searchUsers` function:
 ```typescript
-const searchUsers = async (query: string) => {
-  if (query.length < 2) return [];
+const searchUsers = async (query: string): Promise<SearchResult[]> => {
+  if (!query || query.length < 2) return [];
   
   // Use ilike for fuzzy matching
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, profile_photo, bio')
-    .or(`name.ilike.%${query}%,email.ilike.%${query}%`)
-    .neq('id', userId)
-    .limit(10);
+    .select('id, name, profile_photo, bio, email')
+    .or(`name.ilike.%${query}%,bio.ilike.%${query}%,email.ilike.%${query}%`)
+    .neq('id', userId || '')
+    .order('name')
+    .limit(20);
   
-  return data?.map(p => ({
+  if (error) {
+    console.error('Search error:', error);
+    return [];
+  }
+  
+  return data.map(p => ({
     id: p.id,
-    name: p.name,
+    name: p.name || p.email?.split('@')[0] || 'User',
     photo: p.profile_photo || '/default-avatar.png',
-    bio: p.bio || ''
-  })) || [];
+    bio: p.bio || '',
+    email: p.email,
+  }));
 };
 ```
 
-**Changes to `src/pages/Social.tsx`**
-- Show results starting from 2 characters
-- Results refine as more letters are typed
-- Show "Quick Add" suggestions section
-
 ---
 
-## Phase 15: Global CSS Consistency Audit
+## Phase 10: Event Manager Real-Time Sync
 
-### Problem
-Inconsistent styling across pages.
+### 10.1 Real-Time Check-In Notifications
 
-### Solution
-Ensure all pages use global CSS classes from index.css.
+**File**: `src/pages/EventManager.tsx`
 
-### Implementation
-**Audit all pages for:**
-1. Replace any `style={}` with Tailwind classes
-2. Use `ampz-card`, `ampz-btn-primary`, `ampz-interactive` consistently
-3. Use `bg-background`, `bg-card`, `text-foreground`, `text-muted-foreground`
-4. Use `rounded-ampz-lg`, `rounded-ampz-md`, `rounded-ampz-sm` (add to tailwind.config if needed)
-
-**Add to `tailwind.config.ts`:**
 ```typescript
-borderRadius: {
-  'ampz-sm': 'var(--radius-sm)',
-  'ampz-md': 'var(--radius-md)',
-  'ampz-lg': 'var(--radius-lg)',
-}
+// Subscribe to check-ins for organizer's events
+useEffect(() => {
+  if (!myEvents.length) return;
+  
+  const channel = supabase
+    .channel('organizer-check-ins')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'check_ins',
+    }, async (payload) => {
+      const checkIn = payload.new;
+      // Check if this is for one of our events
+      if (myEvents.some(e => e.id === checkIn.event_id)) {
+        // Fetch user profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('name, profile_photo')
+          .eq('id', checkIn.user_id)
+          .single();
+        
+        // Update attendee count
+        setAttendeeCount(prev => ({
+          ...prev,
+          [checkIn.event_id]: (prev[checkIn.event_id] || 0) + 1
+        }));
+        
+        // Show toast
+        toast({
+          title: 'New Check-in!',
+          description: `${profile?.name || 'Someone'} just checked in`,
+        });
+      }
+    })
+    .subscribe();
+  
+  return () => supabase.removeChannel(channel);
+}, [myEvents]);
 ```
 
----
+### 10.2 Event Status Badges
 
-## Phase 16: Subscription Persistence
-
-### Problem
-Subscription resets on app restart.
-
-### Solution
-Persist subscription in database and load on app start.
-
-### Implementation
-**Changes to `src/contexts/AppContext.tsx`**
-- On login/session restore, fetch subscription from database
-- Store in localStorage for instant load
-- Never reset subscription state on app restart
-- Only update when user explicitly changes
-
----
-
-## Phase 17: Event Manager Real-Time Sync
-
-### Problem
-Edits in Event Manager don't persist properly and even when an event is still on it shows past badge.
-
-### Solution
-Ensure all edits trigger database updates and reflect in real-time and the bages should live or ended.
-
-### Implementation
-**Verify in `src/pages/EventManager.tsx`:**
-- All edit actions call `updateEvent` from AppContext
-- Real-time subscription updates local state
-- Toast confirmations on successful saves
+- Use `ended_at` timestamp to determine if event is "Live" or "Ended"
+- Show "Live" badge with pulse animation for active events
+- Show "Ended" badge for past events
 
 ---
 
 ## Implementation Order
 
-| Priority | Phase | Estimated Files |
-|----------|-------|-----------------|
-| Critical | Phase 4: Fix Check-In Flow | 1 file |
-| Critical | Phase 1: MapContext | 3 files |
-| Critical | Phase 2: Caching | 1 file |
-| High | Phase 5: Real Metrics | 2 files |
-| High | Phase 3: Remove Avatars | 5 files |
-| High | Phase 10-12: Tailwind Conversion | 3 files |
-| Medium | Phase 6: Profile/Settings Cleanup | 2 files |
-| Medium | Phase 7: Remove Home Analytics | 1 file |
-| Medium | Phase 8: Event Image Pins | 1 file |
-| Medium | Phase 13: Modal Clipping | 5+ files |
-| Medium | Phase 14: Search Enhancement | 2 files |
-| Low | Phase 9: Friend Locations | 3 files |
-| Low | Phase 15-17: Polish | Various |
+| Priority | Phase | Files Modified |
+|----------|-------|----------------|
+| Critical | Phase 1: Build Errors | `useCheckIn.ts`, `useFriends.ts`, `EventManager.tsx`, `types.ts` |
+| Critical | Phase 2: Check-In Flow | `QRScannerModal.tsx` |
+| High | Phase 3: Remove Mock Data | `AppContext.tsx`, `Home.tsx`, `Profile.tsx`, `useFriends.ts` |
+| High | Phase 6: Tailwind CSS | `EventDetail.tsx`, `EventManager.tsx`, `MapDrawer.tsx` |
+| Medium | Phase 4: WebSocket Chat | `Chats.tsx`, Database migration |
+| Medium | Phase 5: Friend Locations | New hook, `MapDrawer.tsx`, Database migration |
+| Medium | Phase 7: Map Pins | `MapDrawer.tsx` |
+| Medium | Phase 8: Modal Fixes | `index.css`, All modal components |
+| Low | Phase 9: Search | `useFriends.ts`, `Social.tsx` |
+| Low | Phase 10: Event Manager | `EventManager.tsx` |
+
+---
+
+## Database Migrations Required
+
+1. **Enable realtime for messages** (if not already)
+2. **Create user_locations table** with RLS policies
+3. **Enable realtime for user_locations**
 
 ---
 
 ## Files to Create
-1. `src/contexts/MapContext.tsx`
-2. `src/hooks/useFriendLocations.ts`
-3. `public/default-avatar.png` (asset)
+
+1. `src/hooks/useFriendLocations.ts` - Friend location tracking hook
+
+---
 
 ## Files to Modify
-- `src/App.tsx`
-- `src/contexts/AppContext.tsx`
-- `src/components/MapDrawer.tsx`
-- `src/components/modals/QRScannerModal.tsx`
-- `src/pages/Home.tsx`
-- `src/pages/Profile.tsx`
-- `src/pages/Settings.tsx`
-- `src/pages/EventDetail.tsx`
-- `src/pages/EventManager.tsx`
-- `src/pages/Social.tsx`
-- `src/index.css`
-- `tailwind.config.ts`
-- Various modal components
 
-## Database Migration Required
-- `user_locations` table for friend tracking feature
+- `src/hooks/useCheckIn.ts` - Fix column names
+- `src/hooks/useFriends.ts` - Remove username, add toast, fix search
+- `src/pages/EventManager.tsx` - Fix types, add realtime, convert to Tailwind
+- `src/pages/EventDetail.tsx` - Convert to Tailwind
+- `src/components/MapDrawer.tsx` - Convert to Tailwind, add image pins
+- `src/components/modals/QRScannerModal.tsx` - Fix flow loop
+- `src/lib/types.ts` - Add duration to Event type
+- `src/pages/Home.tsx` - Real database metrics
+- `src/pages/Profile.tsx` - Real database metrics
+- `src/index.css` - Safe area classes
 
 ---
 
 ## Testing Checklist
-- [ ] Map persists across navigation (no reload)
-- [ ] User data loads instantly from cache
-- [ ] Check-in flow completes without loops
+
+- [ ] Build compiles without errors
+- [ ] Check-in flow completes (Scan → Geofence → Privacy → Success)
 - [ ] Public check-in navigates to Connect page
 - [ ] Private check-in shows welcome message
-- [ ] Profile shows real events/matches/likes
-- [ ] No placeholder avatars (only real photos or default)
-- [ ] Event pins show cover images
-- [ ] All modals have proper safe area padding
-- [ ] Friend search works with 2+ characters
-- [ ] Subscription persists across restarts
-- [ ] All pages use consistent Tailwind classes
+- [ ] User search works with 2+ characters
+- [ ] Profile shows real events/matches/likes counts
+- [ ] Event pins show cover images on map
+- [ ] Modals don't clip at top/bottom edges
+- [ ] All pages use consistent Tailwind styling
+- [ ] Real-time chat messages appear instantly
+- [ ] Event Manager updates when attendees check in
