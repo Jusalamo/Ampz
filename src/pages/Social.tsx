@@ -53,13 +53,24 @@ export default function Social() {
 
     const timer = setTimeout(async () => {
       setIsSearching(true);
-      const results = await searchUsers(sheetSearchQuery);
-      setSearchResults(results);
-      setIsSearching(false);
-    }, 300);
+      try {
+        const results = await searchUsers(sheetSearchQuery);
+        setSearchResults(results);
+      } catch (error) {
+        console.error('Error searching users:', error);
+        toast({
+          title: 'Search failed',
+          description: 'Unable to search for users. Please try again.',
+          variant: 'destructive'
+        });
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500); // Increased debounce time for better UX
 
     return () => clearTimeout(timer);
-  }, [sheetSearchQuery, searchUsers, suggestedUsers]);
+  }, [sheetSearchQuery, searchUsers, suggestedUsers, toast]);
 
   // Initialize search results with suggested users
   useEffect(() => {
@@ -79,10 +90,9 @@ export default function Social() {
       return next;
     });
     
-    if (success) {
-      toast({ title: `Friend request sent to ${name}!` });
-    } else {
-      toast({ title: 'Failed to send request', variant: 'destructive' });
+    if (!success) {
+      // Error toast is already shown in sendFriendRequest
+      return;
     }
   };
 
@@ -97,10 +107,9 @@ export default function Social() {
       return next;
     });
     
-    if (success) {
-      toast({ title: `You're now friends with ${name}!` });
-    } else {
-      toast({ title: 'Failed to accept request', variant: 'destructive' });
+    if (!success) {
+      // Error toast is already shown in acceptFriendRequest
+      return;
     }
   };
 
@@ -114,7 +123,6 @@ export default function Social() {
       next.delete(requestId);
       return next;
     });
-    toast({ title: 'Friend request declined' });
   };
 
   const handleCancelRequest = async (requestId: string) => {
@@ -127,7 +135,6 @@ export default function Social() {
       next.delete(requestId);
       return next;
     });
-    toast({ title: 'Friend request cancelled' });
   };
 
   const connections = useMemo(() => 
@@ -628,7 +635,7 @@ export default function Social() {
                             onClick={() => handleCancelRequest(request.id)}
                             disabled={processingIds.has(request.id)}
                           >
-                            {processingIds.has(requestId) ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Cancel'}
+                            {processingIds.has(request.id) ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Cancel'}
                           </Button>
                         </div>
                       ))}
