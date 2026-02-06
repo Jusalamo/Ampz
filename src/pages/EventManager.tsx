@@ -147,7 +147,7 @@ function useEventStatus(event: AppEvent) {
 }
 
 // Add real-time subscription for event updates
-function useEventUpdates(events: AppEvent[], updateEvent: (event: AppEvent) => void) {
+function useEventUpdates(events: AppEvent[], updateEventById: (eventId: string, updates: Partial<AppEvent>) => Promise<boolean>) {
   useEffect(() => {
     if (!events.length) return;
     
@@ -164,48 +164,51 @@ function useEventUpdates(events: AppEvent[], updateEvent: (event: AppEvent) => v
       }, (payload) => {
         console.log('Event update received:', payload);
         
-        // Map Supabase response to AppEvent type
-        const updatedEvent: AppEvent = {
-          id: payload.new.id,
-          name: payload.new.name,
-          description: payload.new.description || '',
-          category: payload.new.category,
-          location: payload.new.location,
-          address: payload.new.address,
+        // Type assertion for payload.new
+        const newData = payload.new as Record<string, any>;
+        if (!newData || !newData.id) return;
+        
+        // Map Supabase response to partial update
+        const updates: Partial<AppEvent> = {
+          name: newData.name,
+          description: newData.description || '',
+          category: newData.category,
+          location: newData.location,
+          address: newData.address,
           coordinates: { 
-            lat: payload.new.latitude, 
-            lng: payload.new.longitude 
+            lat: newData.latitude, 
+            lng: newData.longitude 
           },
-          date: payload.new.date,
-          time: payload.new.time,
-          price: payload.new.price || 0,
-          currency: payload.new.currency || 'NAD',
-          maxAttendees: payload.new.max_attendees || 500,
-          attendees: payload.new.attendees_count || 0,
-          organizerId: payload.new.organizer_id,
-          qrCode: payload.new.qr_code,
-          geofenceRadius: payload.new.geofence_radius || 50,
-          customTheme: payload.new.custom_theme || '#8B5CF6',
-          coverImage: payload.new.cover_image || '',
-          images: payload.new.images || [],
-          videos: payload.new.videos || [],
-          tags: payload.new.tags || [],
-          isFeatured: payload.new.is_featured || false,
-          isDemo: payload.new.is_demo || false,
-          isActive: payload.new.is_active ?? true,
-          qrCodeUrl: payload.new.qr_code_url,
-          duration: payload.new.duration || 4, // Add duration field
-          endTime: payload.new.end_time, // Add end time field
+          date: newData.date,
+          time: newData.time,
+          price: newData.price || 0,
+          currency: newData.currency || 'NAD',
+          maxAttendees: newData.max_attendees || 500,
+          attendees: newData.attendees_count || 0,
+          organizerId: newData.organizer_id,
+          qrCode: newData.qr_code,
+          geofenceRadius: newData.geofence_radius || 50,
+          customTheme: newData.custom_theme || '#8B5CF6',
+          coverImage: newData.cover_image || '',
+          images: newData.images || [],
+          videos: newData.videos || [],
+          tags: newData.tags || [],
+          isFeatured: newData.is_featured || false,
+          isDemo: newData.is_demo || false,
+          isActive: newData.is_active ?? true,
+          qrCodeUrl: newData.qr_code_url,
+          duration: newData.duration || 4,
+          endTime: newData.end_time,
         };
         
-        updateEvent(updatedEvent);
+        updateEventById(newData.id, updates);
       })
       .subscribe();
     
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [events, updateEvent]);
+  }, [events, updateEventById]);
 }
 
 // Design Constants - UPDATED TO USE TAILWIND
@@ -1207,8 +1210,18 @@ export default function EventManager() {
       
       if (error) throw error;
       
-      // Update local state
-      updateEvent(updatedEvent);
+      // Update local state using the correct signature
+      await updateEvent(updatedEvent.id, {
+        name: updatedEvent.name,
+        date: updatedEvent.date,
+        time: updatedEvent.time,
+        location: updatedEvent.location,
+        address: updatedEvent.address,
+        coordinates: updatedEvent.coordinates,
+        geofenceRadius: updatedEvent.geofenceRadius,
+        description: updatedEvent.description,
+        duration: updatedEvent.duration,
+      });
       
       toast({
         title: 'Success!',

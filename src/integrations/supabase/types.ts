@@ -43,7 +43,7 @@ export type Database = {
           verification_method?: string | null
           verification_photo?: string | null
           visibility_mode: string
-          within_geofence: boolean
+          within_geofence?: boolean
         }
         Update: {
           check_in_latitude?: number
@@ -66,6 +66,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_ins_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events_public"
             referencedColumns: ["id"]
           },
           {
@@ -140,6 +147,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_comments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events_public"
             referencedColumns: ["id"]
           },
           {
@@ -225,6 +239,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_photos_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events_public"
             referencedColumns: ["id"]
           },
           {
@@ -333,6 +354,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_tokens_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events_public"
             referencedColumns: ["id"]
           },
         ]
@@ -588,6 +616,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "match_profiles_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "match_profiles_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -661,6 +696,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events_public"
             referencedColumns: ["id"]
           },
           {
@@ -834,6 +876,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "notifications_related_event_id_fkey"
+            columns: ["related_event_id"]
+            isOneToOne: false
+            referencedRelation: "events_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "notifications_related_match_id_fkey"
             columns: ["related_match_id"]
             isOneToOne: false
@@ -994,6 +1043,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "swipes_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "swipes_swiped_id_fkey"
             columns: ["swiped_id"]
             isOneToOne: false
@@ -1093,6 +1149,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tickets_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tickets_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -1103,6 +1166,51 @@ export type Database = {
             foreignKeyName: "tickets_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_locations: {
+        Row: {
+          accuracy: number | null
+          id: string
+          is_visible: boolean | null
+          latitude: number
+          longitude: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          accuracy?: number | null
+          id?: string
+          is_visible?: boolean | null
+          latitude: number
+          longitude: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          accuracy?: number | null
+          id?: string
+          is_visible?: boolean | null
+          latitude?: number
+          longitude?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_locations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_locations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
             referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
@@ -1131,6 +1239,108 @@ export type Database = {
       }
     }
     Views: {
+      events_public: {
+        Row: {
+          address: string | null
+          attendees_count: number | null
+          category: string | null
+          cover_image: string | null
+          created_at: string | null
+          currency: string | null
+          custom_theme: string | null
+          date: string | null
+          description: string | null
+          end_time: string | null
+          ended_at: string | null
+          has_video: boolean | null
+          id: string | null
+          images: string[] | null
+          is_active: boolean | null
+          is_demo: boolean | null
+          is_featured: boolean | null
+          latitude: number | null
+          location: string | null
+          longitude: number | null
+          max_attendees: number | null
+          media_type: string | null
+          name: string | null
+          notifications_enabled: boolean | null
+          price: number | null
+          tags: string[] | null
+          ticket_link: string | null
+          time: string | null
+          timezone: string | null
+          updated_at: string | null
+          videos: string[] | null
+        }
+        Insert: {
+          address?: string | null
+          attendees_count?: number | null
+          category?: string | null
+          cover_image?: string | null
+          created_at?: string | null
+          currency?: string | null
+          custom_theme?: string | null
+          date?: string | null
+          description?: string | null
+          end_time?: string | null
+          ended_at?: string | null
+          has_video?: boolean | null
+          id?: string | null
+          images?: string[] | null
+          is_active?: boolean | null
+          is_demo?: boolean | null
+          is_featured?: boolean | null
+          latitude?: number | null
+          location?: string | null
+          longitude?: number | null
+          max_attendees?: number | null
+          media_type?: string | null
+          name?: string | null
+          notifications_enabled?: boolean | null
+          price?: number | null
+          tags?: string[] | null
+          ticket_link?: string | null
+          time?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          videos?: string[] | null
+        }
+        Update: {
+          address?: string | null
+          attendees_count?: number | null
+          category?: string | null
+          cover_image?: string | null
+          created_at?: string | null
+          currency?: string | null
+          custom_theme?: string | null
+          date?: string | null
+          description?: string | null
+          end_time?: string | null
+          ended_at?: string | null
+          has_video?: boolean | null
+          id?: string | null
+          images?: string[] | null
+          is_active?: boolean | null
+          is_demo?: boolean | null
+          is_featured?: boolean | null
+          latitude?: number | null
+          location?: string | null
+          longitude?: number | null
+          max_attendees?: number | null
+          media_type?: string | null
+          name?: string | null
+          notifications_enabled?: boolean | null
+          price?: number | null
+          tags?: string[] | null
+          ticket_link?: string | null
+          time?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          videos?: string[] | null
+        }
+        Relationships: []
+      }
       profiles_public: {
         Row: {
           age: number | null
@@ -1194,12 +1404,49 @@ export type Database = {
         }
         Returns: string
       }
+      get_mutual_connections_count: {
+        Args: { user1_id: string; user2_id: string }
+        Returns: number
+      }
+      get_suggested_users: {
+        Args: { current_user_id: string; limit_count?: number }
+        Returns: {
+          bio: string
+          id: string
+          mutual_count: number
+          name: string
+          profile_photo: string
+          shared_events: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      search_users_by_email_or_name: {
+        Args: { search_query: string }
+        Returns: {
+          bio: string
+          email: string
+          id: string
+          name: string
+          profile_photo: string
+          username: string
+        }[]
+      }
+      search_users_simple: {
+        Args: { current_user_id: string; search_query: string }
+        Returns: {
+          bio: string
+          email: string
+          id: string
+          name: string
+          profile_photo: string
+          username: string
+        }[]
       }
       secure_check_in: {
         Args: {
