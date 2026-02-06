@@ -221,16 +221,16 @@ export function useFriends(userId?: string) {
     }
   }, [userId]);
 
-  // Search users
+  // Search users - uses profiles_public view for RLS compatibility
   const searchUsers = useCallback(async (query: string): Promise<SuggestedUser[]> => {
     if (!query || query.length < 2 || !userId) return [];
 
     try {
-      // Use ilike for fuzzy matching
+      // Use profiles_public view which is accessible to all authenticated users
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id, name, profile_photo, bio, email')
-        .or(`name.ilike.%${query}%,bio.ilike.%${query}%,email.ilike.%${query}%`)
+        .from('profiles_public')
+        .select('id, name, profile_photo, bio')
+        .or(`name.ilike.%${query}%,bio.ilike.%${query}%`)
         .neq('id', userId)
         .order('name')
         .limit(20);
@@ -240,9 +240,21 @@ export function useFriends(userId?: string) {
         return [];
       }
 
-      return (data || []).map(p => ({
-        id: p.id,
-        name: p.name || p.email?.split('@')[0] || 'User',
+      // Filter out existing friends and pending requests
+      const friendIds = friends.map(f => f.friendId);
+      const sentIds = sentRequests.map(r => r.receiverId);
+      const receivedIds = receivedRequests.map(r => r.senderId);
+
+      const filteredData = (data || []).filter(p => 
+        p.id &&
+        !friendIds.includes(p.id) &&
+        !sentIds.includes(p.id) &&
+        !receivedIds.includes(p.id)
+      );
+
+      return filteredData.map(p => ({
+        id: p.id || '',
+        name: p.name || 'User',
         photo: p.profile_photo || '/default-avatar.png',
         bio: p.bio || '',
         mutualConnections: 0,
@@ -252,7 +264,7 @@ export function useFriends(userId?: string) {
       console.error('Error searching users:', error);
       return [];
     }
-  }, [userId]);
+  }, [userId, friends, sentRequests, receivedRequests]);
 
   // Send friend request
   const sendFriendRequest = useCallback(async (receiverId: string): Promise<boolean> => {

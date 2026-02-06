@@ -1098,6 +1098,47 @@ export default function EventManager() {
   // Use real-time updates hook
   useEventUpdates(userEvents, updateEvent);
 
+  // Real-time check-in notifications for organizers
+  useEffect(() => {
+    if (!userEvents.length || !user?.id) return;
+
+    const eventIds = userEvents.map(e => e.id);
+
+    const channel = supabase
+      .channel('organizer-checkins')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'check_ins',
+      }, async (payload) => {
+        const newCheckIn = payload.new as Record<string, any>;
+        
+        // Check if this check-in is for one of our events
+        if (!eventIds.includes(newCheckIn.event_id)) return;
+
+        // Fetch the user's profile
+        const { data: profile } = await supabase
+          .from('profiles_public')
+          .select('name, profile_photo')
+          .eq('id', newCheckIn.user_id)
+          .single();
+
+        const event = userEvents.find(e => e.id === newCheckIn.event_id);
+
+        // Show toast notification
+        toast({
+          title: '🎉 New Check-in!',
+          description: `${profile?.name || 'Someone'} just arrived at ${event?.name || 'your event'}`,
+          duration: 5000,
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userEvents, user?.id, toast]);
+
   // Filter events based on search and status WITH DURATION SUPPORT
   const filteredEvents = userEvents.filter(event => {
     // Search filter
