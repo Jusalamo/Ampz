@@ -478,7 +478,7 @@ export default function Social() {
                           <Check className="w-4 h-4 text-green-500" />
                         </div>
                         <p className="text-sm text-muted-foreground truncate">
-                          Friends since {new Date(friend.createdAt).toLocaleDateString()}
+                          Friends since {new Date(friend.friendsSince).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -578,11 +578,11 @@ export default function Social() {
                       {receivedRequests.map((request) => (
                         <div key={request.id} className="bg-card rounded-xl border border-border p-4 flex items-center gap-4">
                           <Avatar className="w-14 h-14">
-                            <AvatarImage src={request.senderProfile?.photo} alt={request.senderProfile?.name} />
-                            <AvatarFallback>{request.senderProfile?.name?.charAt(0)}</AvatarFallback>
+                            <AvatarImage src={request.senderPhoto} alt={request.senderName} />
+                            <AvatarFallback>{request.senderName?.charAt(0)}</AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold">{request.senderProfile?.name}</h3>
+                            <h3 className="font-semibold">{request.senderName}</h3>
                             <p className="text-xs text-muted-foreground">
                               {new Date(request.createdAt).toLocaleDateString()}
                             </p>
@@ -590,7 +590,7 @@ export default function Social() {
                           <div className="flex gap-2">
                             <Button
                               size="sm"
-                              onClick={() => handleAcceptRequest(request.id, request.senderProfile?.name || '')}
+                              onClick={() => handleAcceptRequest(request.id, request.senderName || '')}
                               disabled={processingIds.has(request.id)}
                             >
                               {processingIds.has(request.id) ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Accept'}
@@ -620,11 +620,11 @@ export default function Social() {
                       {sentRequests.map((request) => (
                         <div key={request.id} className="bg-card rounded-xl border border-border p-4 flex items-center gap-4">
                           <Avatar className="w-14 h-14">
-                            <AvatarImage src={request.receiverProfile?.photo} alt={request.receiverProfile?.name} />
-                            <AvatarFallback>{request.receiverProfile?.name?.charAt(0)}</AvatarFallback>
+                            <AvatarImage src={request.senderPhoto} alt={request.senderName} />
+                            <AvatarFallback>{request.senderName?.charAt(0)}</AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold">{request.receiverProfile?.name}</h3>
+                            <h3 className="font-semibold">{request.senderName}</h3>
                             <p className="text-xs text-muted-foreground">
                               Pending • {new Date(request.createdAt).toLocaleDateString()}
                             </p>

@@ -92,6 +92,7 @@ export interface Event {
   accessCode?: string;
   webTicketsLink?: string;
   createdAt?: string;
+  duration?: number; // Event duration in hours
 }
 
 export interface ConnectionProfile {
