@@ -303,11 +303,11 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
     
     setLoading(true);
     try {
-      // Create display text with event name and location only
-      const displayText = `${event.name}\n📍 ${event.location}`;
+      // Build a scannable check-in URL for the event
+      const checkInUrl = `${window.location.origin}/event/${event.id}/checkin`;
       
-      // Generate QR code using QRCode library
-      const qrUrl = await QRCode.toDataURL(displayText, {
+      // Generate QR code using QRCode library with the check-in URL
+      const qrUrl = await QRCode.toDataURL(checkInUrl, {
         width: 400,
         margin: 2,
         color: {
@@ -319,19 +319,16 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
       
       setQrDataUrl(qrUrl);
       
-      // Update event with QR code URL if not already set
-      if (!event.qrCodeUrl) {
-        const { error } = await supabase
-          .from('events')
-          .update({ 
-            qr_code_url: qrUrl,
-            qr_code: event.id
-          })
-          .eq('id', event.id);
-        
-        if (error) {
-          console.error('Error saving QR code:', error);
-        }
+      // Update event with QR code data
+      const { error } = await supabase
+        .from('events')
+        .update({ 
+          qr_code: event.id
+        })
+        .eq('id', event.id);
+      
+      if (error) {
+        console.error('Error saving QR code:', error);
       }
     } catch (error) {
       console.error('QR generation error:', error);
