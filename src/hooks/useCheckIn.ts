@@ -257,7 +257,7 @@ export function useCheckIn(userId?: string) {
           event_id: event.id,
           user_id: userId,
           visibility_mode: visibilityMode,
-          verification_method: 'geolocation',
+          verification_method: 'qr_scan',
           check_in_latitude: location.latitude,
           check_in_longitude: location.longitude,
           within_geofence: true,
@@ -279,38 +279,41 @@ export function useCheckIn(userId?: string) {
 
       // If public visibility, create or update match profile
       if (visibilityMode === 'public') {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('name, bio, age, interests, profile_photo, occupation, gender, location')
-          .eq('id', userId)
-          .single();
-
-        if (profile) {
-          // Get the check-in ID
-          const { data: checkIn } = await supabase
-            .from('check_ins')
-            .select('id')
-            .eq('user_id', userId)
-            .eq('event_id', event.id)
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('name, bio, age, interests, profile_photo, occupation, gender, location')
+            .eq('id', userId)
             .single();
 
-          await supabase
-            .from('match_profiles')
-            .upsert({
-              user_id: userId,
-              event_id: event.id,
-              check_in_id: checkIn?.id,
-              display_name: profile.name || 'Anonymous',
-              bio: profile.bio,
-              age: profile.age,
-              interests: profile.interests || [],
-              profile_photos: profile.profile_photo ? [profile.profile_photo] : [],
-              occupation: profile.occupation,
-              gender: profile.gender,
-              location: profile.location,
-              is_public: true,
-              is_active: true,
-            });
+          if (profile) {
+            const { data: checkIn } = await supabase
+              .from('check_ins')
+              .select('id')
+              .eq('user_id', userId)
+              .eq('event_id', event.id)
+              .single();
+
+            await supabase
+              .from('match_profiles')
+              .upsert({
+                user_id: userId,
+                event_id: event.id,
+                check_in_id: checkIn?.id,
+                display_name: profile.name || 'Anonymous',
+                bio: profile.bio,
+                age: profile.age,
+                interests: profile.interests || [],
+                profile_photos: profile.profile_photo ? [profile.profile_photo] : [],
+                occupation: profile.occupation,
+                gender: profile.gender,
+                location: profile.location,
+                is_public: true,
+                is_active: true,
+              }, { onConflict: 'user_id,event_id' });
+          }
+        } catch (matchErr) {
+          console.warn('Match profile creation failed (non-blocking):', matchErr);
         }
       }
 
