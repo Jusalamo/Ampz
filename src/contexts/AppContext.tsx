@@ -111,7 +111,7 @@ const rowToEvent = (row: any): Event => ({
   attendees: row.attendees_count || 0,
   organizerId: row.organizer_id,
   qrCode: row.qr_code,
-  qrCodeUrl: row.qr_code ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/#/event/${row.id}`)}&format=png&bgcolor=ffffff&color=000000&qzone=1&margin=10&ecc=H` : undefined,
+  qrCodeUrl: row.qr_code ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/event/${row.id}/checkin`)}&format=png&bgcolor=ffffff&color=000000&qzone=1&margin=10&ecc=H` : undefined,
   geofenceRadius: row.geofence_radius || 50,
   customTheme: row.custom_theme || '#8B5CF6',
   coverImage: row.cover_image || '',
