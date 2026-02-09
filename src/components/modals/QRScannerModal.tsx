@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, QrCode, Keyboard, Loader2, MapPin, AlertCircle, Check, ExternalLink, Navigation, Users, UserX, RefreshCw } from 'lucide-react';
+import { X, QrCode, Keyboard, Loader2, MapPin, AlertCircle, Check, ExternalLink, Navigation, Users, UserX, RefreshCw, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
@@ -16,7 +16,7 @@ interface QRScannerModalProps {
   onCheckInSuccess?: (eventId: string) => void;
 }
 
-type ScannerStep = 'scan' | 'code' | 'verifying' | 'privacy_choice' | 'checking_in' | 'success' | 'error' | 'outside_geofence';
+type ScannerStep = 'scan' | 'code' | 'verifying' | 'privacy_choice' | 'photo_capture' | 'checking_in' | 'success' | 'error' | 'outside_geofence';
 
 export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QRScannerModalProps) {
   const navigate = useNavigate();
@@ -36,9 +36,15 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
   // Holds the GPS result from preflight so processCheckIn never calls GPS again
   const cachedLocationRef = useRef<GeolocationResult | null>(null);
   const videoRef          = useRef<HTMLVideoElement>(null);
+  const photoVideoRef     = useRef<HTMLVideoElement>(null);
   const codeReaderRef     = useRef<BrowserMultiFormatReader | null>(null);
   const controlsRef       = useRef<{ stop: () => void } | null>(null);
   const isStartingRef     = useRef(false);
+  const photoStreamRef    = useRef<MediaStream | null>(null);
+
+  // Photo capture state
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   // ── reset everything when modal opens ───────────────────────────────────
   useEffect(() => {
@@ -51,9 +57,113 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       setDistance(null);
       setGeofenceRadius(50);
       setSelectedVisibility('public');
+      setCapturedPhoto(null);
+      setIsUploadingPhoto(false);
       cachedLocationRef.current = null;
+    } else {
+      // Clean up photo stream when modal closes
+      stopPhotoCamera();
     }
   }, [isOpen]);
+
+  // ── photo camera helpers ────────────────────────────────────────────────
+  const startPhotoCamera = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } }
+      });
+      photoStreamRef.current = stream;
+      if (photoVideoRef.current) {
+        photoVideoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error('Photo camera error:', err);
+      setErrorMessage('Camera access required for verification photo.');
+    }
+  }, []);
+
+  const stopPhotoCamera = useCallback(() => {
+    if (photoStreamRef.current) {
+      photoStreamRef.current.getTracks().forEach(t => t.stop());
+      photoStreamRef.current = null;
+    }
+  }, []);
+
+  const capturePhotoFromVideo = useCallback(() => {
+    if (!photoVideoRef.current) return;
+    const video = photoVideoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 640;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    setCapturedPhoto(dataUrl);
+    stopPhotoCamera();
+  }, [stopPhotoCamera]);
+
+  const uploadPhotoAndCheckIn = useCallback(async () => {
+    if (!scannedEvent || !cachedLocationRef.current) return;
+
+    setIsUploadingPhoto(true);
+    let photoUrl: string | undefined;
+
+    try {
+      if (capturedPhoto) {
+        // Convert base64 to blob
+        const res = await fetch(capturedPhoto);
+        const blob = await res.blob();
+        const fileName = `connection-${userId}-${scannedEvent.id}-${Date.now()}.jpg`;
+
+        const { data, error } = await supabase.storage
+          .from('community-photos')
+          .upload(fileName, blob, { contentType: 'image/jpeg', upsert: true });
+
+        if (!error && data) {
+          const { data: urlData } = supabase.storage.from('community-photos').getPublicUrl(data.path);
+          photoUrl = urlData?.publicUrl;
+        }
+      }
+    } catch (err) {
+      console.warn('Photo upload failed, proceeding without:', err);
+    }
+
+    setIsUploadingPhoto(false);
+    setStep('checking_in');
+
+    try {
+      const result = await processCheckIn(scannedEvent, cachedLocationRef.current, 'public', photoUrl);
+
+      if (result.success) {
+        setSuccessMessage(result.message || `Welcome to ${scannedEvent.name}!`);
+        setDistance(result.distance ?? distance);
+        setStep('success');
+        onCheckInSuccess?.(result.eventId || scannedEvent.id);
+        setTimeout(() => { onClose(); navigate('/connect'); }, 1500);
+      } else if (result.errorType === 'already_checked_in') {
+        setSuccessMessage(`You're already checked in to ${scannedEvent.name}!`);
+        setStep('success');
+        onCheckInSuccess?.(scannedEvent.id);
+      } else {
+        setErrorMessage(result.error || 'Check-in failed.');
+        setStep('error');
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Check-in failed.');
+      setStep('error');
+    }
+  }, [scannedEvent, capturedPhoto, userId, processCheckIn, distance, onCheckInSuccess, navigate, onClose]);
+
+  // Start photo camera when entering photo_capture step
+  useEffect(() => {
+    if (step === 'photo_capture' && !capturedPhoto) {
+      startPhotoCamera();
+    }
+    return () => {
+      if (step !== 'photo_capture') stopPhotoCamera();
+    };
+  }, [step, capturedPhoto, startPhotoCamera, stopPhotoCamera]);
 
   // ── process a scanned or manually-entered QR code ──────────────────────
   const processQRCode = useCallback(async (code: string) => {
@@ -290,6 +400,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
             {step === 'code'             && 'Enter Event Code'}
             {step === 'verifying'        && 'Verifying...'}
             {step === 'privacy_choice'   && 'Choose Visibility'}
+            {step === 'photo_capture'    && 'Verification Photo'}
             {step === 'checking_in'      && 'Checking In...'}
             {step === 'success'          && 'Check-In Complete!'}
             {step === 'error'            && 'Check-In Failed'}
@@ -389,7 +500,7 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
                 {/* Public */}
                 <motion.button
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => completeCheckIn('public')}
+                  onClick={() => { setSelectedVisibility('public'); setCapturedPhoto(null); setStep('photo_capture'); }}
                   disabled={isLoading}
                   className="w-full p-4 rounded-xl bg-card border-2 border-primary/50 hover:border-primary transition-colors text-left"
                 >
@@ -435,7 +546,72 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
             </>
           )}
 
-          {/* ─── CHECKING IN (spinner) ─── */}
+          {/* ─── PHOTO CAPTURE ─── */}
+          {step === 'photo_capture' && scannedEvent && (
+            <>
+              {!capturedPhoto ? (
+                <>
+                  <div className="relative w-64 h-64 mb-6 rounded-full overflow-hidden border-4 border-primary">
+                    <video
+                      ref={photoVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">Take a Verification Photo</h3>
+                  <p className="text-muted-foreground text-center mb-6 max-w-xs">
+                    This photo will be your connection profile picture for this event
+                  </p>
+                  <div className="flex gap-3">
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={capturePhotoFromVideo}
+                      className="w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-lg"
+                    >
+                      <Camera className="w-8 h-8 text-primary-foreground" />
+                    </motion.button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    className="mt-4 text-muted-foreground"
+                    onClick={() => uploadPhotoAndCheckIn()}
+                  >
+                    Skip — use profile photo
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="relative w-64 h-64 mb-6 rounded-full overflow-hidden border-4 border-primary">
+                    <img src={capturedPhoto} alt="Captured" className="w-full h-full object-cover" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">Looking good!</h3>
+                  <p className="text-muted-foreground text-center mb-6">
+                    This is how others will see you at {scannedEvent.name}
+                  </p>
+                  <div className="flex gap-3 w-full max-w-xs">
+                    <Button
+                      variant="outline"
+                      className="flex-1 h-12"
+                      onClick={() => { setCapturedPhoto(null); startPhotoCamera(); }}
+                    >
+                      Retake
+                    </Button>
+                    <Button
+                      className="flex-1 h-12"
+                      onClick={uploadPhotoAndCheckIn}
+                      disabled={isUploadingPhoto}
+                    >
+                      {isUploadingPhoto ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                      Use This Photo
+                    </Button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
           {step === 'checking_in' && (
             <>
               <Loader2 className="w-16 h-16 text-primary animate-spin mb-6" />

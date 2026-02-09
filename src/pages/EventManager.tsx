@@ -31,6 +31,7 @@ import {
   Filter,
   Search,
   User,
+  UserX,
   Mail,
   Smartphone,
   Globe,
@@ -45,6 +46,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Event as EventType } from '@/lib/types';
 import { EditEventModal } from '@/components/modals/EditEventModal';
 import { supabase } from '@/integrations/supabase/client';
+import { useEventAttendees } from '@/hooks/useEventAttendees';
 import QRCode from 'qrcode';
 
 // Type alias to avoid conflict with DOM Event
@@ -1171,36 +1173,19 @@ export default function EventManager() {
     return matchesSearch && matchesStatus;
   });
 
-  // Get real attendees from check-ins
-  const getRealAttendees = () => {
-    if (!user) return [];
-    
-    // For demo accounts, return some sample data
-    if (user.isDemo) {
-      return [
-        { id: '1', name: 'Sarah Chen', email: 'sarah@example.com', checkedIn: true, checkInTime: '2024-01-15T10:30:00Z', ticketType: 'VIP' },
-        { id: '2', name: 'Mike Johnson', email: 'mike@example.com', checkedIn: true, checkInTime: '2024-01-15T11:15:00Z', ticketType: 'General' },
-        { id: '3', name: 'Emily Davis', email: 'emily@example.com', checkedIn: false, ticketType: 'General' },
-        { id: '4', name: 'Alex Kim', email: 'alex@example.com', checkedIn: false, ticketType: 'VIP' },
-        { id: '5', name: 'John Smith', email: 'john@example.com', checkedIn: true, checkInTime: '2024-01-15T09:45:00Z', ticketType: 'General' },
-      ];
-    }
-    
-    // For production accounts, return empty as check-ins are not exposed in context
-    return [];
-  };
+  // Get real attendees from check-ins using the hook
+  const { attendees: realAttendees, loading: attendeesLoading } = useEventAttendees(selectedEventId || undefined);
 
-  const attendees = getRealAttendees();
-  const filteredAttendees = attendees.filter(attendee => {
-    if (attendeeFilter === 'checked-in') return attendee.checkedIn;
-    if (attendeeFilter === 'not-checked-in') return !attendee.checkedIn;
+  const filteredAttendees = realAttendees.filter(attendee => {
+    if (attendeeFilter === 'checked-in') return true; // All realAttendees are checked in
+    if (attendeeFilter === 'not-checked-in') return false; // None are pending - they're all check-ins
     return true;
   });
 
   // Get real analytics data
   const getAnalyticsData = () => {
     const totalAttendees = userEvents.reduce((sum, e) => sum + e.attendees, 0);
-    const checkedInAttendees = attendees.filter(a => a.checkedIn).length;
+    const checkedInAttendees = realAttendees.length;
     const checkInRate = totalAttendees > 0 ? Math.round((checkedInAttendees / totalAttendees) * 100) : 0;
     
     // Get messages/engagement from community comments
@@ -1302,9 +1287,9 @@ export default function EventManager() {
 
   const handleExportAttendees = () => {
     const csvContent = 'data:text/csv;charset=utf-8,' + 
-      'Name,Email,Ticket Type,Checked In,Check-in Time\n' +
+      'Name,Visibility,Checked In At\n' +
       filteredAttendees.map(a => 
-        `${a.name},${a.email},${a.ticketType},${a.checkedIn ? 'Yes' : 'No'},${a.checkInTime || ''}`
+        `${a.name || 'Anonymous'},${a.visibilityMode},${a.checkedInAt || ''}`
       ).join('\n');
     
     const encodedUri = encodeURI(csvContent);
@@ -1502,16 +1487,16 @@ export default function EventManager() {
             {/* Attendee Stats */}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-card p-3 rounded-2xl border border-white/10 text-center">
-                <p className="text-2xl font-bold text-primary">{attendees.length}</p>
+                <p className="text-2xl font-bold text-primary">{realAttendees.length}</p>
                 <p className="text-xs text-gray-400">Total</p>
               </div>
               <div className="bg-card p-3 rounded-2xl border border-white/10 text-center">
-                <p className="text-2xl font-bold text-success">{attendees.filter(a => a.checkedIn).length}</p>
-                <p className="text-xs text-gray-400">Checked In</p>
+                <p className="text-2xl font-bold text-success">{realAttendees.filter(a => a.visibilityMode === 'public').length}</p>
+                <p className="text-xs text-gray-400">Public</p>
               </div>
               <div className="bg-card p-3 rounded-2xl border border-white/10 text-center">
-                <p className="text-2xl font-bold text-warning">{attendees.filter(a => !a.checkedIn).length}</p>
-                <p className="text-xs text-gray-400">Pending</p>
+                <p className="text-2xl font-bold text-warning">{realAttendees.filter(a => a.visibilityMode === 'private').length}</p>
+                <p className="text-xs text-gray-400">Private</p>
               </div>
             </div>
 
@@ -1556,35 +1541,43 @@ export default function EventManager() {
 
             {/* Attendees List */}
             <div className="flex flex-col gap-2">
-              {filteredAttendees.length > 0 ? (
+              {attendeesLoading ? (
+                <div className="bg-card rounded-2xl p-8 text-center border border-white/10">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary mx-auto mb-3" />
+                  <p className="text-sm text-gray-400">Loading attendees...</p>
+                </div>
+              ) : filteredAttendees.length > 0 ? (
                 filteredAttendees.map(attendee => (
                   <div key={attendee.id} className="bg-card rounded-2xl p-3 border border-white/10 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                      <User className="w-5 h-5 text-primary" />
-                    </div>
+                    <img
+                      src={attendee.profilePhoto || '/default-avatar.png'}
+                      alt={attendee.name || 'Attendee'}
+                      className="w-10 h-10 rounded-full object-cover border border-white/10"
+                      onError={(e) => { (e.target as HTMLImageElement).src = '/default-avatar.png'; }}
+                    />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{attendee.name}</p>
+                      <p className="text-sm font-medium text-white truncate">{attendee.name || 'Anonymous'}</p>
                       <p className="text-xs text-gray-400">
-                        {attendee.ticketType} • {attendee.email}
+                        {attendee.checkedInAt
+                          ? `Checked in ${new Date(attendee.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                          : 'Checked in'}
                       </p>
                     </div>
                     <span className={`
                       px-2 py-1 rounded-full text-xs flex items-center gap-1
-                      ${attendee.checkedIn ? 'bg-green-500/20 text-green-500' : 'bg-warning/20 text-warning'}
+                      ${attendee.visibilityMode === 'public' ? 'bg-green-500/20 text-green-500' : 'bg-primary/20 text-primary'}
                     `}>
-                      {attendee.checkedIn ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                      {attendee.checkedIn ? 'Checked In' : 'Pending'}
+                      {attendee.visibilityMode === 'public' ? <Users className="w-3 h-3" /> : <UserX className="w-3 h-3" />}
+                      {attendee.visibilityMode === 'public' ? 'Public' : 'Private'}
                     </span>
                   </div>
                 ))
               ) : (
                 <div className="bg-card rounded-2xl p-8 text-center border border-white/10">
                   <Users className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-sm font-medium text-white mb-1">No attendees found</p>
+                  <p className="text-sm font-medium text-white mb-1">No attendees yet</p>
                   <p className="text-xs text-gray-400">
-                    {attendeeFilter !== 'all' 
-                      ? 'No attendees match your filter' 
-                      : 'Attendees will appear here once they register'}
+                    Attendees will appear here once they check in
                   </p>
                 </div>
               )}

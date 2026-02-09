@@ -215,7 +215,8 @@ export function useCheckIn(userId?: string) {
   const processCheckIn = useCallback(async (
     event: Event,
     location: GeolocationResult,
-    visibilityMode: 'public' | 'private'
+    visibilityMode: 'public' | 'private',
+    connectionPhoto?: string
   ): Promise<CheckInResult> => {
     if (!userId) {
       return { success: false, error: 'User not authenticated', errorType: 'unknown' };
@@ -304,7 +305,9 @@ export function useCheckIn(userId?: string) {
                 bio: profile.bio,
                 age: profile.age,
                 interests: profile.interests || [],
-                profile_photos: profile.profile_photo ? [profile.profile_photo] : [],
+                profile_photos: connectionPhoto 
+                  ? [connectionPhoto] 
+                  : (profile.profile_photo ? [profile.profile_photo] : []),
                 occupation: profile.occupation,
                 gender: profile.gender,
                 location: profile.location,
