@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ThumbsUp, ThumbsDown, RotateCcw, Sparkles, MapPin, Briefcase, Info, Lock, Tag, X, AlertTriangle } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, RotateCcw, Sparkles, MapPin, Briefcase, Info, Lock, Tag, X, AlertTriangle, Crown } from 'lucide-react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
@@ -10,6 +10,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Adjusted heights for better spacing
 const HEIGHTS = {
@@ -29,6 +30,7 @@ interface ProfileCardProps {
 function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProps) {
   const [exitX, setExitX] = useState(0);
   const [showHint, setShowHint] = useState<'like' | 'pass' | null>(null);
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   const handleDragEnd = useCallback((_: unknown, info: PanInfo) => {
     if (info.offset.x > 100) {
@@ -79,12 +81,14 @@ function ProfileCard({ profile, onSwipe, isTop, onViewProfile }: ProfileCardProp
         {/* Profile Photo - Centered properly */}
         <div className="relative h-[72%] flex items-center justify-center">
           <div className="relative w-[85%] h-full mt-4">
+            {!imgLoaded && <Skeleton className="absolute inset-0 rounded-ampz-md" />}
             <img
               src={profile.photo || '/default-avatar.png'}
               alt={profile.name}
-              className="w-full h-full object-cover rounded-ampz-md shadow-lg"
+              className={cn("w-full h-full object-cover rounded-ampz-md shadow-lg", !imgLoaded && "opacity-0")}
               draggable={false}
-              onError={(e) => { (e.target as HTMLImageElement).src = '/default-avatar.png'; }}
+              onLoad={() => setImgLoaded(true)}
+              onError={(e) => { (e.target as HTMLImageElement).src = '/default-avatar.png'; setImgLoaded(true); }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent rounded-ampz-md" />
             
