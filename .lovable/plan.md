@@ -1,148 +1,173 @@
 
-# Attendee Profiles, Live Photo Capture & Connection Flow Implementation
 
-## Overview
+# Fix: Check-In Connection Profile, Search, Skeleton Loading & Event Duration
 
-This plan covers 5 interconnected features:
-1. Real attendee profile cards in Event Manager (with actual data from database)
-2. Live photo capture step during public check-in
-3. Connect page fetches real public profiles from the event's `match_profiles` table
-4. Like limit enforcement (block swiping when likes run out)
-5. Connection access tied to geofence and event lifecycle
+## Issues Identified
+
+1. **Public check-in flow works but needs verification** - Photo capture and connection profile creation flow exists and looks correct
+2. **Quick Add search always shows "No users found"** - Root cause: `profiles_public` view inherits RLS from the `profiles` table, which only allows `auth.uid() = id`. So searching for other users returns 0 rows.
+3. **Event duration hardcoded to 4 hours** - `EventManager.tsx` uses `event.duration || 4` but the `events` table has no `duration` column. It should use `end_time` from the database instead.
+4. **No skeleton loading for images** - Profile photos and avatars show broken icon placeholders while loading
 
 ---
 
-## 1. Event Manager: Real Attendee Profile Cards
+## Fix 1: Search / Quick Add - RLS on profiles_public
 
-### Current Problem
-The "Attendees & Messages" tab in `EventManager.tsx` uses a `getRealAttendees()` function that returns hardcoded mock data for demo users and an empty array for real users. Attendee cards show a generic icon instead of real profile photos.
+The `profiles_public` view is created with `security_invoker=on`, meaning it runs queries as the authenticated user. But the `profiles` table only has SELECT policies for `auth.uid() = id` (own profile only). This blocks all searches for other users.
 
-### Changes to `src/pages/EventManager.tsx`
+**Database migration:**
+- Add a new SELECT policy on `profiles` that allows authenticated users to read non-sensitive columns via the `profiles_public` view
+- Alternatively, since `profiles_public` already excludes PII (email, phone), add a policy: `allow authenticated users to SELECT from profiles` scoped through the view
 
-- Import and use the existing `useEventAttendees` hook instead of `getRealAttendees()`
-- For each event selected, call `useEventAttendees(selectedEventId)` to get real check-in data with profile photos and names
-- Replace the generic `<User>` icon placeholder with actual `<img>` elements showing `attendee.profilePhoto` (fallback to `/default-avatar.png`)
-- Each attendee card will display:
-  - Profile photo (real image, not icon)
-  - Name
-  - Visibility mode badge (Public/Private)
-  - Check-in time
-  - If organizer's event has reports, show a small flag icon indicator
+The simplest safe fix: Add a SELECT policy on `profiles` for authenticated users that only allows access through the view columns already exposed:
 
-### Attendee Card Layout
-```
-[Photo] Name                    [Public] [Checked In]
-        Checked in 5 min ago
+```sql
+CREATE POLICY "Authenticated users can read public profile data"
+  ON public.profiles FOR SELECT TO authenticated
+  USING (true);
 ```
 
----
+This is safe because the `profiles_public` view already excludes sensitive fields (email, phone). Direct queries to `profiles` would expose email, but the app code only queries `profiles_public` for search. The existing "Users can view own profile" policy becomes redundant but harmless.
 
-## 2. Live Photo Capture During Public Check-In
+Also fix the `get_suggested_users` function to be `SECURITY DEFINER` so it can query profiles regardless of RLS:
 
-### Current Problem
-When a user selects "Public" in the privacy choice step, the flow immediately calls `completeCheckIn('public')` -- skipping the live photo capture. The connection profile uses the user's existing profile photo instead of a fresh event photo.
+```sql
+CREATE OR REPLACE FUNCTION public.get_suggested_users(...)
+  ...
+  SECURITY DEFINER
+  SET search_path TO 'public'
+  ...
+```
 
-### Changes to `src/components/modals/QRScannerModal.tsx`
+## Fix 2: Event Duration - Use end_time Instead of Hardcoded 4 Hours
 
-- Add new step type: `'photo_capture'` to the `ScannerStep` union
-- Add state for captured photo: `capturedPhoto` (base64 string)
-- Add a `photoVideoRef` for the camera feed in photo capture mode
+**File: `src/pages/EventManager.tsx`**
 
-**Updated Flow:**
-1. User selects "Public" -> transition to `photo_capture` step (instead of `checking_in`)
-2. User selects "Private" -> transition directly to `checking_in` (unchanged)
+Three locations where `event.duration || 4` is used (lines ~79-82, ~1160-1162, ~1228-1230):
 
-**Photo Capture Step UI:**
-- Full-screen camera preview with a circular capture button
-- "Take Photo" button at the bottom
-- "Skip" option (uses existing profile photo as fallback)
-- After capture, show preview with "Retake" and "Use This Photo" buttons
-- On confirm, call `completeCheckIn('public')` with the captured photo passed along
-
-**Photo Flow:**
-- Capture photo from video stream using canvas
-- Convert to blob, upload to `community-photos` storage bucket
-- Pass the public URL to `processCheckIn` as a new parameter
-
-### Changes to `src/hooks/useCheckIn.ts`
-
-- Add optional `connectionPhoto?: string` parameter to `processCheckIn`
-- When creating the `match_profiles` entry, use `connectionPhoto` as the first item in `profile_photos` array (if provided), falling back to the user's existing profile photo
-
----
-
-## 3. Connect Page: Fetch Real Event Profiles
-
-### Current Problem
-The Connect page filters `connectionProfiles` from AppContext (which are demo/locally managed), not from the database's `match_profiles` table.
-
-### Changes to `src/pages/Connect.tsx`
-
-- Add a `useEffect` that fetches real match profiles from the database on mount
-- Query: Get the user's most recent public check-in, then fetch all other public `match_profiles` for that same event
-- Replace the `availableProfiles` computation with database-fetched profiles
-- Map `match_profiles` rows to `ConnectionProfile` type:
-  - `photo` = `profile_photos[0]` or `/default-avatar.png`
-  - `name` = `display_name`
-  - Include `age`, `bio`, `interests`, `occupation`, `gender`, `location`
+Replace logic to use `event.endTime` (mapped from `end_time` database column) instead of a hardcoded duration:
 
 ```typescript
-// Pseudocode for fetching
-const { data: myCheckIn } = await supabase
-  .from('check_ins')
-  .select('event_id')
-  .eq('user_id', userId)
-  .eq('visibility_mode', 'public')
-  .order('checked_in_at', { ascending: false })
-  .limit(1)
-  .single();
+// BEFORE (line 79-82)
+let endTime = new Date(startTime);
+const durationHours = event.duration || 4;
+endTime.setHours(endTime.getHours() + durationHours);
 
-const { data: profiles } = await supabase
-  .from('match_profiles')
-  .select('*')
-  .eq('event_id', myCheckIn.event_id)
-  .eq('is_public', true)
-  .eq('is_active', true)
-  .neq('user_id', userId);
+// AFTER
+let endTime: Date;
+if (event.endTime) {
+  const [endH, endM] = event.endTime.split(':').map(Number);
+  endTime = new Date(startTime);
+  endTime.setHours(endH || 0, endM || 0, 0, 0);
+  // Handle overnight events
+  if (endTime <= startTime) endTime.setDate(endTime.getDate() + 1);
+} else {
+  // Fallback: event runs until manually ended
+  endTime = new Date(startTime);
+  endTime.setHours(endTime.getHours() + 24);
+}
 ```
 
-- Show event name from the check-in's event in the header
-- Add real-time subscription to `match_profiles` for the active event so new public check-ins appear live
+Apply the same fix to the filtering logic (~line 1160) and remove `duration` references from the save logic (~line 1228).
+
+## Fix 3: Skeleton Loading for Images
+
+**Files: `src/pages/Connect.tsx`, `src/pages/Social.tsx`, `src/pages/EventManager.tsx`**
+
+- Add `useState` for image loaded state on profile photos
+- Show `Skeleton` component (already exists at `src/components/ui/skeleton.tsx`) while image is loading
+- On `<img onLoad>`, hide skeleton and show image
+- On `<img onError>`, fallback to `/default-avatar.png`
+
+Example pattern for profile card images:
+
+```tsx
+const [imgLoaded, setImgLoaded] = useState(false);
+
+<div className="relative w-14 h-14">
+  {!imgLoaded && <Skeleton className="absolute inset-0 rounded-full" />}
+  <img
+    src={profile.photo}
+    onLoad={() => setImgLoaded(true)}
+    onError={(e) => { e.target.src = '/default-avatar.png'; setImgLoaded(true); }}
+    className={cn("w-14 h-14 rounded-full object-cover", !imgLoaded && "opacity-0")}
+  />
+</div>
+```
+
+Apply this pattern to:
+- Connect page `ProfileCard` component (main swipe card image)
+- Social page `QuickAddUser` avatars
+- EventManager attendee cards
+
+## Fix 4: Verify Photo Capture to Connect Flow
+
+The current flow in `QRScannerModal.tsx` already:
+1. Shows `photo_capture` step when "Public" is selected (line 503)
+2. Uploads photo to storage and calls `processCheckIn` with the photo URL
+3. Redirects to `/connect` after success (line 143)
+
+The `processCheckIn` in `useCheckIn.ts` already creates the `match_profiles` entry with the connection photo (lines 282-321).
+
+This flow is implemented correctly. No code changes needed here -- just needs testing.
 
 ---
 
-## 4. Like Limit Enforcement
+## Files to Change
 
-### Current Problem
-The `handleSwipe` function in Connect.tsx checks `likesRemaining` but the toast fires and the swipe still proceeds (the index increments regardless).
+| File | Change |
+|------|--------|
+| **Database migration** | Add SELECT policy on `profiles` for authenticated users; make `get_suggested_users` SECURITY DEFINER |
+| `src/pages/EventManager.tsx` | Replace `duration \|\| 4` with `endTime` parsing logic (3 locations) |
+| `src/pages/Connect.tsx` | Add skeleton loading for profile card images |
+| `src/pages/Social.tsx` | Add skeleton loading for Quick Add user avatars |
+| `src/pages/EventManager.tsx` | Add skeleton loading for attendee card images |
 
-### Fix in `src/pages/Connect.tsx`
+## Technical Details
 
-- When `likesRemaining <= 0` for free users, return early from `handleSwipe` BEFORE incrementing `currentIndex`
-- Disable the "Like" button visually when likes are exhausted
-- Show a clear "Upgrade to continue swiping" prompt instead of just a toast
+### Database Migration SQL
 
----
+```sql
+-- Allow authenticated users to read profiles (safe because
+-- profiles_public view already excludes PII fields)
+CREATE POLICY "Authenticated users can read profiles"
+  ON public.profiles FOR SELECT TO authenticated
+  USING (true);
 
-## 5. Connection Access: Geofence & Event Lifecycle
+-- Drop the now-redundant own-profile policies
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+DROP POLICY IF EXISTS "System can read profiles for internal operations" ON public.profiles;
 
-### Changes to `src/pages/Connect.tsx`
+-- Make get_suggested_users SECURITY DEFINER so it works with RLS
+CREATE OR REPLACE FUNCTION public.get_suggested_users(
+  current_user_id uuid, limit_count integer DEFAULT 20
+)
+RETURNS TABLE(id uuid, name text, profile_photo text, bio text,
+              mutual_count bigint, shared_events bigint)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+-- (same function body as existing)
+$function$;
+```
 
-- On mount and periodically (every 60 seconds), check:
-  1. Is the event still active? (not ended via `ended_at`)
-  2. Is the user still within geofence range?
-- If the event has ended OR user leaves geofence, show a "Connection session ended" overlay and prevent further swiping
-- The match profiles remain accessible (for existing matches/chats) but no new swipes allowed
+### Event Duration Fix Pattern
 
----
+All 3 occurrences of the duration calculation in EventManager.tsx will be replaced with a helper function:
 
-## Files Summary
-
-| File | Changes |
-|------|---------|
-| `src/pages/EventManager.tsx` | Replace mock attendees with `useEventAttendees` hook; render real profile cards with photos |
-| `src/components/modals/QRScannerModal.tsx` | Add `photo_capture` step with camera UI between privacy choice and check-in |
-| `src/hooks/useCheckIn.ts` | Add `connectionPhoto` parameter; use it in `match_profiles` upsert |
-| `src/pages/Connect.tsx` | Fetch real profiles from `match_profiles` table; enforce like limits properly; add geofence/event-end checks |
-
-No database migrations are needed -- all required tables and columns already exist.
+```typescript
+function calcEventEnd(startTime: Date, endTimeStr?: string): Date {
+  if (endTimeStr) {
+    const [h, m] = endTimeStr.split(':').map(Number);
+    const end = new Date(startTime);
+    end.setHours(h, m, 0, 0);
+    if (end <= startTime) end.setDate(end.getDate() + 1);
+    return end;
+  }
+  // No end time set -- treat as running until manually ended (24h fallback)
+  const fallback = new Date(startTime);
+  fallback.setHours(fallback.getHours() + 24);
+  return fallback;
+}
+```
