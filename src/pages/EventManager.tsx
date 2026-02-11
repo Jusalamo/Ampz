@@ -76,10 +76,17 @@ function useEventStatus(event: AppEvent) {
       
       setEventStart(startTime);
       
-      // Calculate event end time (default 4 hours duration, or use actual duration if available)
-      let endTime = new Date(startTime);
-      const durationHours = event.duration || 4; // Default 4 hours if not specified
-      endTime.setHours(endTime.getHours() + durationHours);
+      // Calculate event end time using actual end_time from database
+      let endTime: Date;
+      if (event.endTime) {
+        const [endH, endM] = event.endTime.split(':').map(Number);
+        endTime = new Date(startTime);
+        endTime.setHours(endH || 0, endM || 0, 0, 0);
+        if (endTime <= startTime) endTime.setDate(endTime.getDate() + 1);
+      } else {
+        endTime = new Date(startTime);
+        endTime.setHours(endTime.getHours() + 24);
+      }
       
       setEventEnd(endTime);
     };
@@ -199,7 +206,6 @@ function useEventUpdates(events: AppEvent[], updateEventById: (eventId: string, 
           isDemo: newData.is_demo || false,
           isActive: newData.is_active ?? true,
           qrCodeUrl: newData.qr_code_url,
-          duration: newData.duration || 4,
           endTime: newData.end_time,
         };
         
@@ -1157,9 +1163,16 @@ export default function EventManager() {
       eventStart.setHours(hours || 0, minutes || 0, 0, 0);
     }
     
-    const durationHours = event.duration || 4; // Default 4 hours
-    const eventEnd = new Date(eventStart);
-    eventEnd.setHours(eventEnd.getHours() + durationHours);
+    let eventEnd: Date;
+    if (event.endTime) {
+      const [endH, endM] = event.endTime.split(':').map(Number);
+      eventEnd = new Date(eventStart);
+      eventEnd.setHours(endH || 0, endM || 0, 0, 0);
+      if (eventEnd <= eventStart) eventEnd.setDate(eventEnd.getDate() + 1);
+    } else {
+      eventEnd = new Date(eventStart);
+      eventEnd.setHours(eventEnd.getHours() + 24);
+    }
     
     let matchesStatus = true;
     if (filterStatus === 'live') {
@@ -1227,7 +1240,7 @@ export default function EventManager() {
           longitude: updatedEvent.coordinates?.lng,
           geofence_radius: updatedEvent.geofenceRadius,
           description: updatedEvent.description,
-          duration: updatedEvent.duration || 4 // Save duration
+          end_time: updatedEvent.endTime || null
         })
         .eq('id', updatedEvent.id);
       
@@ -1549,12 +1562,17 @@ export default function EventManager() {
               ) : filteredAttendees.length > 0 ? (
                 filteredAttendees.map(attendee => (
                   <div key={attendee.id} className="bg-card rounded-2xl p-3 border border-white/10 flex items-center gap-3">
-                    <img
-                      src={attendee.profilePhoto || '/default-avatar.png'}
-                      alt={attendee.name || 'Attendee'}
-                      className="w-10 h-10 rounded-full object-cover border border-white/10"
-                      onError={(e) => { (e.target as HTMLImageElement).src = '/default-avatar.png'; }}
-                    />
+                    <div className="relative w-10 h-10 flex-shrink-0">
+                      <div className="absolute inset-0 rounded-full bg-muted animate-pulse" />
+                      <img
+                        src={attendee.profilePhoto || '/default-avatar.png'}
+                        alt={attendee.name || 'Attendee'}
+                        className="w-10 h-10 rounded-full object-cover border border-white/10 relative z-10"
+                        onLoad={(e) => { const el = e.target as HTMLImageElement; el.style.opacity = '1'; const skel = el.previousElementSibling as HTMLElement; if (skel) skel.style.display = 'none'; }}
+                        onError={(e) => { (e.target as HTMLImageElement).src = '/default-avatar.png'; }}
+                        style={{ opacity: 0, transition: 'opacity 0.2s' }}
+                      />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white truncate">{attendee.name || 'Anonymous'}</p>
                       <p className="text-xs text-gray-400">
