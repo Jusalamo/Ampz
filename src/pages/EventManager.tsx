@@ -462,8 +462,6 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
           <button
             onClick={handleDownload}
             disabled={!qrDataUrl}
-            className={`w-full px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity
-              ${!qrDataUrl ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             className={`w-full px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity bg-primary text-primary-foreground
               ${!qrDataUrl ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           >
