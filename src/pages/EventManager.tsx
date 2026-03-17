@@ -1478,7 +1478,6 @@ export default function EventManager() {
               </button>
               <button
                 onClick={handleOpenNotificationModal}
-                className="flex-1 px-3 py-3 border-none rounded-xl text-sm flex items-center justify-center gap-2 cursor-pointer hover:opacity-90 transition-opacity"
                 className="flex-1 px-3 py-3 border-none rounded-xl text-sm flex items-center justify-center gap-2 cursor-pointer hover:opacity-90 transition-opacity bg-primary text-primary-foreground"
               >
                 <Bell className="w-4 h-4" />
