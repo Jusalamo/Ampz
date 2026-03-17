@@ -1,222 +1,173 @@
 
 
-# AMPZ Comprehensive Update Plan
+# Fix: Check-In Connection Profile, Search, Skeleton Loading & Event Duration
 
-This plan addresses the 10 prompts in the user's request, organized into logical implementation phases. Many of these features already partially exist, so the work focuses on fixing gaps, removing hardcoded styles, and ensuring database-driven data throughout.
+## Issues Identified
 
----
-
-## Phase 1: Remove Hardcoded DESIGN Objects (Prompts 3, 10)
-
-**Files:** `src/pages/EventDetail.tsx`, `src/components/MapDrawer.tsx`
-
-### EventDetail.tsx (~1500 lines)
-- Delete the `DESIGN` constant object (lines 17-56)
-- Replace all `style={{ color: DESIGN.colors.textPrimary }}` with `className="text-foreground"`
-- Replace `DESIGN.colors.background` with `bg-background`
-- Replace `DESIGN.colors.card` with `bg-card`
-- Replace `DESIGN.colors.textSecondary` with `text-muted-foreground`
-- Replace `DESIGN.colors.primary` with `bg-primary` / `text-primary`
-- Replace `DESIGN.borderRadius.*` with `rounded-lg`, `rounded-xl`, `rounded-full`
-- Replace `DESIGN.spacing.*` with Tailwind spacing classes (`p-4`, `gap-3`, etc.)
-- Replace `DESIGN.typography.*` with Tailwind text sizing (`text-xl`, `text-sm`, etc.)
-- Approximately 80+ inline style references to convert
-
-### MapDrawer.tsx
-- Delete the `DESIGN` constant object (lines 14-43)
-- Same conversion pattern: inline styles to semantic Tailwind classes
-- Ensure dark mode compatibility through semantic class usage
+1. **Public check-in flow works but needs verification** - Photo capture and connection profile creation flow exists and looks correct
+2. **Quick Add search always shows "No users found"** - Root cause: `profiles_public` view inherits RLS from the `profiles` table, which only allows `auth.uid() = id`. So searching for other users returns 0 rows.
+3. **Event duration hardcoded to 4 hours** - `EventManager.tsx` uses `event.duration || 4` but the `events` table has no `duration` column. It should use `end_time` from the database instead.
+4. **No skeleton loading for images** - Profile photos and avatars show broken icon placeholders while loading
 
 ---
 
-## Phase 2: Homepage Restructure (Prompts 1, 5)
+## Fix 1: Search / Quick Add - RLS on profiles_public
 
-**File:** `src/pages/Home.tsx`
+The `profiles_public` view is created with `security_invoker=on`, meaning it runs queries as the authenticated user. But the `profiles` table only has SELECT policies for `auth.uid() = id` (own profile only). This blocks all searches for other users.
 
-The homepage already has most of the requested structure. Changes needed:
+**Database migration:**
+- Add a new SELECT policy on `profiles` that allows authenticated users to read non-sensitive columns via the `profiles_public` view
+- Alternatively, since `profiles_public` already excludes PII (email, phone), add a policy: `allow authenticated users to SELECT from profiles` scoped through the view
 
-1. **Dynamic greeting rotation** - Replace static "Welcome back" with random rotation:
-   - "Welcome back, [First Name]!"
-   - "Getting ready to party, [First Name]?"
-   - "What's the agenda today, [First Name]?"
-   - Use `useMemo` with random selection on mount
-
-2. **Remove stats grid** - Delete the stats section (lines 276-292) showing Events/Matches/Likes Left (this analytics belongs on Profile page only)
-
-3. **Quick Actions update** - Replace current 4 actions with:
-   - Create Event, Scan QR, View Profile (3 buttons)
-   - Keep existing handlers
-
-4. **Keep existing sections** - My Events and Featured Events carousels already fetch from database and work correctly
-
----
-
-## Phase 3: Profile Analytics Fix (Prompts 2, 4)
-
-**File:** `src/pages/Profile.tsx`
-
-The profile page already queries real metrics from Supabase (lines 28-58). Changes:
-
-1. Stats are already correct: Events (check_ins count), Matches (matches count), Likes Left (from subscription)
-2. No "response rate" metric exists -- already removed
-3. Add loading skeleton while metrics fetch (wrap stats grid with skeleton state)
-4. These are already real database queries -- no mock data present
-
----
-
-## Phase 4: EventDetail CTA Buttons (Prompt 11 - RSVP & Buy)
-
-**File:** `src/pages/EventDetail.tsx`
-
-Update the sticky bottom CTA section (lines 1371-1428):
-
-1. Replace single button with two side-by-side buttons:
-   - **RSVP button** (primary): Inserts into `tickets` table with status `rsvp_pending`
-   - **Buy Now - $[price]** button (secondary): Shows real price from `event.price`, opens external ticket link or checkout
-2. If event is free, show "Free" instead of price
-3. If already RSVPed, show "RSVPed" badge
-4. All styling uses semantic Tailwind (part of Phase 1 conversion)
-
----
-
-## Phase 5: Event Detail - Fix Mock Data (Prompt 8)
-
-**File:** `src/pages/EventDetail.tsx`
-
-1. **Remove mock attendee avatars** (lines 1318-1349): Replace `pravatar.cc` placeholder images with real attendee data from `check_ins` table joined with `profiles`
-2. **Replace hardcoded "43 members"** with real `attendees_count` from the event record
-3. **Real comments count**: Already using `eventComments.length`
-4. **Real photos count**: Already using `eventPhotos.length`
-5. **Real-time attendee count**: Subscribe to `check_ins` changes for the event
-
----
-
-## Phase 6: Event Manager Editability (Prompt 5)
-
-**File:** `src/pages/EventManager.tsx`
-
-The Event Manager already supports editing via `EditEventModal`. Enhancements:
-
-1. Verify all fields are editable: title, description, category, start/end time, location with map, cover image, media, ticket price, tags
-2. Ensure each save calls `updateEvent()` which persists to Supabase immediately
-3. WebSocket broadcast already works via Supabase Realtime subscription (lines 205-220 of EventManager)
-4. Add "Changes saved" toast on successful update (if not already present)
-
----
-
-## Phase 7: Event Lifecycle (Prompt 6)
-
-**Files:** `src/pages/EventManager.tsx`, `src/contexts/AppContext.tsx`
-
-1. **Event statuses** already implemented: `useEventStatus` hook computes `live`/`upcoming`/`past` from database times
-2. **Auto-end**: Events with `end_time` already auto-transition to `past` status based on time comparison
-3. **"End Event Now" button**: Add a red button in Event Manager that sets `ended_at = now()` and `is_active = false`
-4. **Ended events filtering**: Events page already filters by `is_active`; verify ended events only show in history
-
-**Database migration needed:**
-- Add `ended_by` column (text, nullable) to `events` table to track 'auto' vs 'manual' ending
-
----
-
-## Phase 8: QR Code System (Prompts 3, 4)
-
-**Files:** `src/pages/EventManager.tsx`, `src/components/modals/QRScannerModal.tsx`
-
-### QR Generation (EventManager)
-- QR codes already encode check-in URLs: `${origin}/event/${event.id}/checkin`
-- Add 300x300px minimum display size
-- QR is stored in database and synced -- both EventManager and EventWizard use the same event record
-
-### QR Scanning (QRScannerModal)
-- Scanner already validates QR URL format, checks geofence, checks existing check-in
-- Add event time-range validation: verify current time is between `start_time` and `end_time`
-- Error messages already implemented for expired/distance/duplicate
-- Add specific message: "This event hasn't started yet" and "This event has ended"
-
----
-
-## Phase 9: Image Caching & Loading (Prompts 7, 6)
-
-**Files:** `src/pages/Home.tsx`, `src/pages/Connect.tsx`, `src/pages/EventDetail.tsx`, `src/contexts/AppContext.tsx`
-
-1. **Profile pictures**: Show user initials as placeholder while loading (instead of broken icon)
-2. **Event cards**: Already cache in localStorage with TTL; show cached data instantly
-3. **Avatar preload on login**: In AppContext, after successful auth, preload user's profile photo into browser cache
-4. **Pattern**: Already implemented in Events.tsx -- extend to all pages
-
----
-
-## Phase 10: WebSocket Real-Time (Prompt 8)
-
-**Files:** `src/contexts/AppContext.tsx`, `src/hooks/useRealtimeSubscriptions.ts`
-
-Supabase Realtime is already connected. Verify and extend:
-
-1. **Already subscribed**: events table changes (INSERT/UPDATE/DELETE)
-2. **Add subscriptions for**: messages (new message), community_comments (new comment), check_ins (new check-in)
-3. **Optimistic UI**: Already implemented for most operations
-4. **Connection status**: Add a small offline banner component when WebSocket disconnects
-5. **Auto-reconnect**: Supabase client handles reconnection automatically
-
----
-
-## Phase 11: Subscription Persistence (Prompts 7, 9)
-
-**File:** `src/contexts/AppContext.tsx`
-
-Subscription is already stored in `profiles` table (`subscription_tier`, `subscription_expires_at`). Verify:
-
-1. On app launch: subscription fetched from database and cached in `ampz_cached_user`
-2. Never reset on refresh -- already implemented via database fetch
-3. Upgrade modal logic: only show for `tier === 'free'`
-4. Verify no code resets subscription on page load
-
----
-
-## Phase 12: Community Photos Moderation (Prompt 2)
-
-**Files:** `src/pages/EventManager.tsx`, `src/components/modals/ModerationPanel.tsx`
-
-The ModerationPanel already exists with approve/reject/hide/delete functionality. Verify:
-
-1. `community_photos` table already has `moderation_status` column (pending/approved/rejected)
-2. ModerationPanel already fetches photos and comments with moderation controls
-3. Ensure EventDetail only shows `approved` photos in public view
-4. Add filter in `CommunityPhotos` query: `.eq('moderation_status', 'approved')`
-
----
-
-## Database Migration
+The simplest safe fix: Add a SELECT policy on `profiles` for authenticated users that only allows access through the view columns already exposed:
 
 ```sql
--- Add ended_by column to track auto vs manual event ending
-ALTER TABLE public.events ADD COLUMN IF NOT EXISTS ended_by text;
+CREATE POLICY "Authenticated users can read public profile data"
+  ON public.profiles FOR SELECT TO authenticated
+  USING (true);
 ```
+
+This is safe because the `profiles_public` view already excludes sensitive fields (email, phone). Direct queries to `profiles` would expose email, but the app code only queries `profiles_public` for search. The existing "Users can view own profile" policy becomes redundant but harmless.
+
+Also fix the `get_suggested_users` function to be `SECURITY DEFINER` so it can query profiles regardless of RLS:
+
+```sql
+CREATE OR REPLACE FUNCTION public.get_suggested_users(...)
+  ...
+  SECURITY DEFINER
+  SET search_path TO 'public'
+  ...
+```
+
+## Fix 2: Event Duration - Use end_time Instead of Hardcoded 4 Hours
+
+**File: `src/pages/EventManager.tsx`**
+
+Three locations where `event.duration || 4` is used (lines ~79-82, ~1160-1162, ~1228-1230):
+
+Replace logic to use `event.endTime` (mapped from `end_time` database column) instead of a hardcoded duration:
+
+```typescript
+// BEFORE (line 79-82)
+let endTime = new Date(startTime);
+const durationHours = event.duration || 4;
+endTime.setHours(endTime.getHours() + durationHours);
+
+// AFTER
+let endTime: Date;
+if (event.endTime) {
+  const [endH, endM] = event.endTime.split(':').map(Number);
+  endTime = new Date(startTime);
+  endTime.setHours(endH || 0, endM || 0, 0, 0);
+  // Handle overnight events
+  if (endTime <= startTime) endTime.setDate(endTime.getDate() + 1);
+} else {
+  // Fallback: event runs until manually ended
+  endTime = new Date(startTime);
+  endTime.setHours(endTime.getHours() + 24);
+}
+```
+
+Apply the same fix to the filtering logic (~line 1160) and remove `duration` references from the save logic (~line 1228).
+
+## Fix 3: Skeleton Loading for Images
+
+**Files: `src/pages/Connect.tsx`, `src/pages/Social.tsx`, `src/pages/EventManager.tsx`**
+
+- Add `useState` for image loaded state on profile photos
+- Show `Skeleton` component (already exists at `src/components/ui/skeleton.tsx`) while image is loading
+- On `<img onLoad>`, hide skeleton and show image
+- On `<img onError>`, fallback to `/default-avatar.png`
+
+Example pattern for profile card images:
+
+```tsx
+const [imgLoaded, setImgLoaded] = useState(false);
+
+<div className="relative w-14 h-14">
+  {!imgLoaded && <Skeleton className="absolute inset-0 rounded-full" />}
+  <img
+    src={profile.photo}
+    onLoad={() => setImgLoaded(true)}
+    onError={(e) => { e.target.src = '/default-avatar.png'; setImgLoaded(true); }}
+    className={cn("w-14 h-14 rounded-full object-cover", !imgLoaded && "opacity-0")}
+  />
+</div>
+```
+
+Apply this pattern to:
+- Connect page `ProfileCard` component (main swipe card image)
+- Social page `QuickAddUser` avatars
+- EventManager attendee cards
+
+## Fix 4: Verify Photo Capture to Connect Flow
+
+The current flow in `QRScannerModal.tsx` already:
+1. Shows `photo_capture` step when "Public" is selected (line 503)
+2. Uploads photo to storage and calls `processCheckIn` with the photo URL
+3. Redirects to `/connect` after success (line 143)
+
+The `processCheckIn` in `useCheckIn.ts` already creates the `match_profiles` entry with the connection photo (lines 282-321).
+
+This flow is implemented correctly. No code changes needed here -- just needs testing.
 
 ---
 
-## Files Summary
+## Files to Change
 
-| File | Changes |
-|------|---------|
-| `src/pages/EventDetail.tsx` | Remove DESIGN object, convert to Tailwind, add RSVP/Buy buttons, replace mock attendee avatars, real attendee count |
-| `src/components/MapDrawer.tsx` | Remove DESIGN object, convert to Tailwind |
-| `src/pages/Home.tsx` | Dynamic greeting rotation, remove stats grid, update quick actions to 3 buttons |
-| `src/pages/Profile.tsx` | Add loading skeleton for metrics |
-| `src/pages/EventManager.tsx` | Add "End Event Now" button, verify full editability |
-| `src/components/modals/QRScannerModal.tsx` | Add event time-range validation check |
-| `src/contexts/AppContext.tsx` | Avatar preload, verify subscription persistence |
-| `src/hooks/useRealtimeSubscriptions.ts` | Add message/comment/check-in subscriptions |
-| `src/components/CommunityPhotos.tsx` | Filter by moderation_status = 'approved' |
-| Database migration | Add `ended_by` column |
+| File | Change |
+|------|--------|
+| **Database migration** | Add SELECT policy on `profiles` for authenticated users; make `get_suggested_users` SECURITY DEFINER |
+| `src/pages/EventManager.tsx` | Replace `duration \|\| 4` with `endTime` parsing logic (3 locations) |
+| `src/pages/Connect.tsx` | Add skeleton loading for profile card images |
+| `src/pages/Social.tsx` | Add skeleton loading for Quick Add user avatars |
+| `src/pages/EventManager.tsx` | Add skeleton loading for attendee card images |
 
-## Implementation Order
+## Technical Details
 
-1. Database migration (ended_by column)
-2. EventDetail.tsx -- DESIGN removal + RSVP buttons + mock data fix (largest file)
-3. MapDrawer.tsx -- DESIGN removal
-4. Home.tsx -- Greeting rotation + stats removal
-5. QRScannerModal.tsx -- Time-range validation
-6. EventManager.tsx -- End Event button
-7. Remaining files (Profile, AppContext, CommunityPhotos, Realtime)
+### Database Migration SQL
 
+```sql
+-- Allow authenticated users to read profiles (safe because
+-- profiles_public view already excludes PII fields)
+CREATE POLICY "Authenticated users can read profiles"
+  ON public.profiles FOR SELECT TO authenticated
+  USING (true);
+
+-- Drop the now-redundant own-profile policies
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+DROP POLICY IF EXISTS "System can read profiles for internal operations" ON public.profiles;
+
+-- Make get_suggested_users SECURITY DEFINER so it works with RLS
+CREATE OR REPLACE FUNCTION public.get_suggested_users(
+  current_user_id uuid, limit_count integer DEFAULT 20
+)
+RETURNS TABLE(id uuid, name text, profile_photo text, bio text,
+              mutual_count bigint, shared_events bigint)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+-- (same function body as existing)
+$function$;
+```
+
+### Event Duration Fix Pattern
+
+All 3 occurrences of the duration calculation in EventManager.tsx will be replaced with a helper function:
+
+```typescript
+function calcEventEnd(startTime: Date, endTimeStr?: string): Date {
+  if (endTimeStr) {
+    const [h, m] = endTimeStr.split(':').map(Number);
+    const end = new Date(startTime);
+    end.setHours(h, m, 0, 0);
+    if (end <= startTime) end.setDate(end.getDate() + 1);
+    return end;
+  }
+  // No end time set -- treat as running until manually ended (24h fallback)
+  const fallback = new Date(startTime);
+  fallback.setHours(fallback.getHours() + 24);
+  return fallback;
+}
+```
