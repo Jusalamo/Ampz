@@ -546,8 +546,6 @@ function DeleteEventModal({ isOpen, onClose, event, onConfirm }: DeleteEventModa
           <button
             onClick={handleDelete}
             disabled={isDeleting}
-            className={`flex-1 px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity
-              ${isDeleting ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
             className={cn("flex-1 px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity bg-destructive text-destructive-foreground", isDeleting && 'opacity-70 cursor-not-allowed')}
           >
             {isDeleting ? (
