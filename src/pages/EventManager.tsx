@@ -219,44 +219,7 @@ function useEventUpdates(events: AppEvent[], updateEventById: (eventId: string, 
   }, [events, updateEventById]);
 }
 
-// Design Constants - UPDATED TO USE TAILWIND
-const DESIGN = {
-  colors: {
-    primary: '#C4B5FD',
-    lavenderLight: '#E9D5FF',
-    accentPink: '#FFB8E6',
-    background: '#1A1A1A',
-    card: '#2D2D2D',
-    textPrimary: '#FFFFFF',
-    textSecondary: '#B8B8B8',
-    success: '#10B981',
-    warning: '#F59E0B',
-    danger: '#EF4444',
-    info: '#3B82F6',
-    notification: '#8B5CF6'
-  },
-  spacing: {
-    default: '16px',
-    cardPadding: '20px',
-    buttonGap: '12px',
-    modalPadding: '20px',
-    modalFooterHeight: '72px'
-  },
-  borderRadius: {
-    card: '24px',
-    cardInner: '20px',
-    button: '12px',
-    roundButton: '50%',
-    modalTop: '20px',
-    smallPill: '8px',
-    small: '8px'
-  },
-  shadows: {
-    card: '0 8px 32px rgba(0, 0, 0, 0.4)',
-    button: '0 4px 16px rgba(0, 0, 0, 0.3)',
-    likeButton: '0 4px 16px rgba(255, 184, 230, 0.4)'
-  }
-};
+// No DESIGN constants - using semantic Tailwind classes throughout
 
 type Tab = 'events' | 'attendees-messages' | 'analytics' | 'settings';
 
@@ -499,12 +462,8 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
           <button
             onClick={handleDownload}
             disabled={!qrDataUrl}
-            className={`w-full px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity
+            className={`w-full px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity bg-primary text-primary-foreground
               ${!qrDataUrl ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-            style={{
-              background: DESIGN.colors.primary,
-              color: DESIGN.colors.background
-            }}
           >
             <Download className="w-4 h-4" />
             Download QR Code
@@ -587,9 +546,7 @@ function DeleteEventModal({ isOpen, onClose, event, onConfirm }: DeleteEventModa
           <button
             onClick={handleDelete}
             disabled={isDeleting}
-            className={`flex-1 px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity
-              ${isDeleting ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
-            style={{ background: DESIGN.colors.danger, color: DESIGN.colors.background }}
+            className={cn("flex-1 px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity bg-destructive text-destructive-foreground", isDeleting && 'opacity-70 cursor-not-allowed')}
           >
             {isDeleting ? (
               'Deleting...'
@@ -861,9 +818,7 @@ function NotificationModal({ isOpen, onClose, events, selectedEventId }: Notific
                       <button
                         onClick={handleAddTemplate}
                         disabled={!newTemplate.trim()}
-                        className={`px-4 py-2 rounded-xl border-none cursor-pointer transition-opacity
-                          ${!newTemplate.trim() ? 'opacity-50 cursor-not-allowed' : 'opacity-100'}`}
-                        style={{ background: DESIGN.colors.primary, color: DESIGN.colors.background }}
+                        className={`px-4 py-2 rounded-xl border-none cursor-pointer transition-opacity bg-primary text-primary-foreground ${!newTemplate.trim() ? 'opacity-50 cursor-not-allowed' : 'opacity-100'}`}
                       >
                         Add
                       </button>
@@ -908,12 +863,11 @@ function NotificationModal({ isOpen, onClose, events, selectedEventId }: Notific
           <button
             onClick={handleSend}
             disabled={isSending || !title.trim() || !message.trim()}
-            className={`flex-1 px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-opacity
-              ${(isSending || !title.trim() || !message.trim()) ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'}`}
-            style={{ 
-              background: notificationType === 'emergency' ? DESIGN.colors.danger : DESIGN.colors.primary, 
-              color: DESIGN.colors.background 
-            }}
+            className={cn(
+              "flex-1 px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-opacity text-primary-foreground",
+              notificationType === 'emergency' ? 'bg-destructive' : 'bg-primary',
+              (isSending || !title.trim() || !message.trim()) ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'
+            )}
           >
             {isSending ? (
               'Sending...'
@@ -1524,8 +1478,7 @@ export default function EventManager() {
               </button>
               <button
                 onClick={handleOpenNotificationModal}
-                className="flex-1 px-3 py-3 border-none rounded-xl text-sm flex items-center justify-center gap-2 cursor-pointer hover:opacity-90 transition-opacity"
-                style={{ background: DESIGN.colors.notification, color: DESIGN.colors.background }}
+                className="flex-1 px-3 py-3 border-none rounded-xl text-sm flex items-center justify-center gap-2 cursor-pointer hover:opacity-90 transition-opacity bg-primary text-primary-foreground"
               >
                 <Bell className="w-4 h-4" />
                 Notify

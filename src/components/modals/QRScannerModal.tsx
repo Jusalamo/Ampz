@@ -198,6 +198,30 @@ export function QRScannerModal({ isOpen, onClose, userId, onCheckInSuccess }: QR
       setScannedEvent(event);
       setGeofenceRadius(event.geofenceRadius || 50);
 
+      // Time-range validation
+      const now = new Date();
+      const eventDate = new Date(event.date);
+      const [startH, startM] = (event.time || '00:00').split(':').map(Number);
+      eventDate.setHours(startH, startM, 0, 0);
+
+      if (now < eventDate) {
+        setErrorMessage("This event hasn't started yet.");
+        setStep('error');
+        return;
+      }
+
+      if (event.endTime) {
+        const endDate = new Date(eventDate);
+        const [endH, endM] = event.endTime.split(':').map(Number);
+        endDate.setHours(endH, endM, 0, 0);
+        if (endDate <= eventDate) endDate.setDate(endDate.getDate() + 1);
+        if (now > endDate) {
+          setErrorMessage("This event has ended.");
+          setStep('error');
+          return;
+        }
+      }
+
       // 2) Already checked in?
       if (userId) {
         const { data: existing } = await supabase

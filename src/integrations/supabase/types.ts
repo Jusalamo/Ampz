@@ -379,6 +379,7 @@ export type Database = {
           description: string | null
           end_time: string | null
           ended_at: string | null
+          ended_by: string | null
           geofence_radius: number | null
           has_video: boolean | null
           id: string
@@ -416,6 +417,7 @@ export type Database = {
           description?: string | null
           end_time?: string | null
           ended_at?: string | null
+          ended_by?: string | null
           geofence_radius?: number | null
           has_video?: boolean | null
           id?: string
@@ -453,6 +455,7 @@ export type Database = {
           description?: string | null
           end_time?: string | null
           ended_at?: string | null
+          ended_by?: string | null
           geofence_radius?: number | null
           has_video?: boolean | null
           id?: string

@@ -18,6 +18,7 @@ export function useCommunityRealtime({ eventId, userId }: UseCommunityRealtimePr
       .from('community_photos')
       .select('*')
       .eq('event_id', eventId)
+      .eq('moderation_status', 'approved')
       .order('created_at', { ascending: false });
 
     if (error) {
