@@ -167,3 +167,26 @@ export function useNotificationsRealtime(userId: string, onNotification: (notifi
     };
   }, [userId, onNotification]);
 }
+
+// Hook for subscribing to messages in real-time
+export function useMessagesRealtime(userId: string, onMessage: (msg: any) => void) {
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`messages-${userId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `receiver_id=eq.${userId}`,
+      }, (payload) => {
+        onMessage(payload.new);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, onMessage]);
+}
