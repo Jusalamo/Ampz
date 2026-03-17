@@ -871,10 +871,11 @@ function NotificationModal({ isOpen, onClose, events, selectedEventId }: Notific
             disabled={isSending || !title.trim() || !message.trim()}
             className={`flex-1 px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-opacity
               ${(isSending || !title.trim() || !message.trim()) ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'}`}
-            style={{ 
-              background: notificationType === 'emergency' ? DESIGN.colors.danger : DESIGN.colors.primary, 
-              color: DESIGN.colors.background 
-            }}
+            className={cn(
+              "flex-1 px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-opacity text-primary-foreground",
+              notificationType === 'emergency' ? 'bg-destructive' : 'bg-primary',
+              (isSending || !title.trim() || !message.trim()) ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'
+            )}
           >
             {isSending ? (
               'Sending...'
