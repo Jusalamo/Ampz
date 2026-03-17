@@ -464,10 +464,10 @@ function QRCodeModal({ isOpen, onClose, event }: QRCodeModalProps) {
             disabled={!qrDataUrl}
             className={`w-full px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity
               ${!qrDataUrl ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-            style={{
-              background: DESIGN.colors.primary,
-              color: DESIGN.colors.background
-            }}
+            style={{}}
+            className={`w-full px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity bg-primary text-primary-foreground
+              ${!qrDataUrl ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            /* replaced inline style */
           >
             <Download className="w-4 h-4" />
             Download QR Code
