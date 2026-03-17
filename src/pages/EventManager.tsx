@@ -863,8 +863,6 @@ function NotificationModal({ isOpen, onClose, events, selectedEventId }: Notific
           <button
             onClick={handleSend}
             disabled={isSending || !title.trim() || !message.trim()}
-            className={`flex-1 px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-opacity
-              ${(isSending || !title.trim() || !message.trim()) ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'}`}
             className={cn(
               "flex-1 px-3 py-3 border-none rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-opacity text-primary-foreground",
               notificationType === 'emergency' ? 'bg-destructive' : 'bg-primary',
