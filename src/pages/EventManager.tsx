@@ -219,44 +219,7 @@ function useEventUpdates(events: AppEvent[], updateEventById: (eventId: string, 
   }, [events, updateEventById]);
 }
 
-// Design Constants - UPDATED TO USE TAILWIND
-const DESIGN = {
-  colors: {
-    primary: '#C4B5FD',
-    lavenderLight: '#E9D5FF',
-    accentPink: '#FFB8E6',
-    background: '#1A1A1A',
-    card: '#2D2D2D',
-    textPrimary: '#FFFFFF',
-    textSecondary: '#B8B8B8',
-    success: '#10B981',
-    warning: '#F59E0B',
-    danger: '#EF4444',
-    info: '#3B82F6',
-    notification: '#8B5CF6'
-  },
-  spacing: {
-    default: '16px',
-    cardPadding: '20px',
-    buttonGap: '12px',
-    modalPadding: '20px',
-    modalFooterHeight: '72px'
-  },
-  borderRadius: {
-    card: '24px',
-    cardInner: '20px',
-    button: '12px',
-    roundButton: '50%',
-    modalTop: '20px',
-    smallPill: '8px',
-    small: '8px'
-  },
-  shadows: {
-    card: '0 8px 32px rgba(0, 0, 0, 0.4)',
-    button: '0 4px 16px rgba(0, 0, 0, 0.3)',
-    likeButton: '0 4px 16px rgba(255, 184, 230, 0.4)'
-  }
-};
+// No DESIGN constants - using semantic Tailwind classes throughout
 
 type Tab = 'events' | 'attendees-messages' | 'analytics' | 'settings';
 
