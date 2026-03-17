@@ -818,8 +818,6 @@ function NotificationModal({ isOpen, onClose, events, selectedEventId }: Notific
                       <button
                         onClick={handleAddTemplate}
                         disabled={!newTemplate.trim()}
-                        className={`px-4 py-2 rounded-xl border-none cursor-pointer transition-opacity
-                          ${!newTemplate.trim() ? 'opacity-50 cursor-not-allowed' : 'opacity-100'}`}
                         className={`px-4 py-2 rounded-xl border-none cursor-pointer transition-opacity bg-primary text-primary-foreground ${!newTemplate.trim() ? 'opacity-50 cursor-not-allowed' : 'opacity-100'}`}
                       >
                         Add
