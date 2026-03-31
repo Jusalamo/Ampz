@@ -33,7 +33,7 @@ interface GeofenceCheckResult {
 
 // Haversine formula to calculate distance between two coordinates
 function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371e3; // Earth's radius in meters
+  const R = 6371e3;
   const φ1 = (lat1 * Math.PI) / 180;
   const φ2 = (lat2 * Math.PI) / 180;
   const Δφ = ((lat2 - lat1) * Math.PI) / 180;
@@ -44,7 +44,7 @@ function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
             Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-  return R * c; // Distance in meters
+  return R * c;
 }
 
 // Get user's current location
@@ -93,23 +93,21 @@ export function useCheckIn(userId?: string) {
   // Validate QR code and fetch event
   const validateQRCode = useCallback(async (code: string): Promise<ValidationResult> => {
     try {
-      // Extract event ID from QR code (could be URL or UUID)
       let eventId: string | null = null;
-      
+
       if (code.includes('/event/')) {
         const match = code.match(/\/event\/([a-f0-9-]+)/i);
         if (match) eventId = match[1];
       } else if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)) {
         eventId = code;
       } else {
-        // Try finding by access_code or qr_code
         const { data: eventByCode } = await supabase
           .from('events')
           .select('*')
           .or(`access_code.eq.${code},qr_code.eq.${code}`)
           .eq('is_active', true)
           .single();
-        
+
         if (eventByCode) eventId = eventByCode.id;
       }
 
@@ -117,7 +115,6 @@ export function useCheckIn(userId?: string) {
         return { valid: false, error: 'Invalid QR code format' };
       }
 
-      // Fetch event details
       const { data: event, error } = await supabase
         .from('events')
         .select('*')
@@ -129,7 +126,6 @@ export function useCheckIn(userId?: string) {
         return { valid: false, error: 'Event not found or is inactive' };
       }
 
-      // Map database event to Event type
       const mappedEvent: Event = {
         id: event.id,
         name: event.name,
@@ -174,7 +170,6 @@ export function useCheckIn(userId?: string) {
   // Pre-flight geofence check (gets location and validates distance)
   const preflightGeofenceCheck = useCallback(async (eventId: string): Promise<GeofenceCheckResult> => {
     try {
-      // Get event coordinates
       const { data: event, error } = await supabase
         .from('events')
         .select('latitude, longitude, geofence_radius')
@@ -185,10 +180,8 @@ export function useCheckIn(userId?: string) {
         return { success: false, error: 'Event not found' };
       }
 
-      // Get user's current location
       const location = await getCurrentLocation();
-      
-      // Calculate distance
+
       const distance = calculateDistance(
         location.latitude,
         location.longitude,
@@ -212,6 +205,9 @@ export function useCheckIn(userId?: string) {
   }, []);
 
   // Process check-in with cached location
+  // NOTE: within_geofence is calculated from real distance — not hardcoded.
+  // NOTE: attendees_count is incremented by the DB trigger `increment_attendees`,
+  //       so we do NOT manually UPDATE events here to avoid double-counting.
   const processCheckIn = useCallback(async (
     event: Event,
     location: GeolocationResult,
@@ -235,15 +231,15 @@ export function useCheckIn(userId?: string) {
 
       if (existingCheckIn && existingCheckIn.length > 0) {
         setIsLoading(false);
-        return { 
-          success: true, 
+        return {
+          success: true,
           message: `You're already checked in to ${event.name}!`,
           errorType: 'already_checked_in',
-          eventId: event.id 
+          eventId: event.id,
         };
       }
 
-      // Calculate distance for the record
+      // Calculate real distance from provided cached location
       const distance = calculateDistance(
         location.latitude,
         location.longitude,
@@ -251,7 +247,20 @@ export function useCheckIn(userId?: string) {
         event.coordinates.lng
       );
 
+      const withinGeofence = distance <= (event.geofenceRadius || 50);
+
+      if (!withinGeofence) {
+        setIsLoading(false);
+        return {
+          success: false,
+          error: `You must be within ${event.geofenceRadius || 50}m of the venue. Current distance: ${Math.round(distance)}m`,
+          errorType: 'outside_geofence',
+          distance: Math.round(distance),
+        };
+      }
+
       // Insert check-in record
+      // The DB trigger `increment_attendees` will update events.attendees_count automatically.
       const { error: insertError } = await supabase
         .from('check_ins')
         .insert({
@@ -261,7 +270,7 @@ export function useCheckIn(userId?: string) {
           verification_method: 'qr_scan',
           check_in_latitude: location.latitude,
           check_in_longitude: location.longitude,
-          within_geofence: true,
+          within_geofence: withinGeofence,
           distance_from_venue: Math.round(distance),
           checked_in_at: new Date().toISOString(),
         });
@@ -271,12 +280,6 @@ export function useCheckIn(userId?: string) {
         setIsLoading(false);
         return { success: false, error: 'Failed to complete check-in', errorType: 'unknown' };
       }
-
-      // Update event attendee count
-      await supabase
-        .from('events')
-        .update({ attendees_count: (event.attendees || 0) + 1 })
-        .eq('id', event.id);
 
       // If public visibility, create or update match profile
       if (visibilityMode === 'public') {
@@ -305,8 +308,8 @@ export function useCheckIn(userId?: string) {
                 bio: profile.bio,
                 age: profile.age,
                 interests: profile.interests || [],
-                profile_photos: connectionPhoto 
-                  ? [connectionPhoto] 
+                profile_photos: connectionPhoto
+                  ? [connectionPhoto]
                   : (profile.profile_photo ? [profile.profile_photo] : []),
                 occupation: profile.occupation,
                 gender: profile.gender,
