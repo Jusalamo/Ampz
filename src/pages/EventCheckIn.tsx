@@ -15,13 +15,15 @@ interface EventInfo {
   time: string;
   coverImage: string;
   attendeesCount: number;
+  latitude: number;
+  longitude: number;
 }
 
 export default function EventCheckIn() {
   const { id: eventId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useApp();
-  
+
   const [event, setEvent] = useState<EventInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export default function EventCheckIn() {
       try {
         const { data, error: fetchError } = await supabase
           .from('events')
-          .select('id, name, location, address, date, time, cover_image, attendees_count')
+          .select('id, name, location, address, date, time, cover_image, attendees_count, latitude, longitude')
           .eq('id', eventId)
           .eq('is_active', true)
           .single();
@@ -59,9 +61,10 @@ export default function EventCheckIn() {
           time: data.time,
           coverImage: data.cover_image || '',
           attendeesCount: data.attendees_count || 0,
+          latitude: Number(data.latitude),
+          longitude: Number(data.longitude),
         });
 
-        // Check if user is already checked in
         if (user?.id) {
           const { data: checkIn } = await supabase
             .from('check_ins')
@@ -87,7 +90,6 @@ export default function EventCheckIn() {
 
   const handleCheckIn = () => {
     if (!isAuthenticated) {
-      // Redirect to auth with return URL
       navigate(`/auth?redirect=/event/${eventId}/checkin`);
       return;
     }
@@ -97,6 +99,25 @@ export default function EventCheckIn() {
   const handleCheckInSuccess = () => {
     setIsAlreadyCheckedIn(true);
     setShowScanner(false);
+  };
+
+  const handleGetDirections = () => {
+    if (!event) return;
+    // Use actual event coordinates — not hardcoded 0,0
+    if (event.latitude && event.longitude) {
+      window.open(
+        `https://www.google.com/maps/dir/?api=1&destination=${event.latitude},${event.longitude}`,
+        '_blank',
+        'noopener,noreferrer'
+      );
+    } else {
+      // Fallback to address text search if coordinates are somehow missing
+      window.open(
+        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.address || event.location)}`,
+        '_blank',
+        'noopener,noreferrer'
+      );
+    }
   };
 
   if (loading) {
@@ -120,11 +141,10 @@ export default function EventCheckIn() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Image */}
       <div className="relative h-64">
         {event.coverImage ? (
-          <img 
-            src={event.coverImage} 
+          <img
+            src={event.coverImage}
             alt={event.name}
             className="w-full h-full object-cover"
           />
@@ -134,19 +154,18 @@ export default function EventCheckIn() {
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
       </div>
 
-      {/* Content */}
       <div className="px-6 -mt-20 relative z-10">
         <div className="bg-card rounded-3xl p-6 shadow-xl border border-border">
           <h1 className="text-2xl font-bold mb-4">{event.name}</h1>
-          
+
           <div className="space-y-3 mb-6">
             <div className="flex items-center gap-3 text-muted-foreground">
               <Calendar className="w-5 h-5" />
-              <span>{new Date(event.date).toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+              <span>{new Date(event.date).toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
               })}</span>
             </div>
             <div className="flex items-center gap-3 text-muted-foreground">
@@ -174,7 +193,7 @@ export default function EventCheckIn() {
               </div>
             </div>
           ) : (
-            <Button 
+            <Button
               onClick={handleCheckIn}
               className="w-full h-14 text-lg font-semibold"
               size="lg"
@@ -190,29 +209,24 @@ export default function EventCheckIn() {
           )}
         </div>
 
-        {/* Quick Actions */}
         <div className="mt-6 flex gap-3">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="flex-1"
             onClick={() => navigate(`/event/${eventId}`)}
           >
             View Event Details
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="flex-1"
-            onClick={() => {
-              const { lat, lng } = { lat: 0, lng: 0 }; // Would use event coords
-              window.open(`https://www.google.com/maps/dir/?api=1&destination=${event.address}`, '_blank');
-            }}
+            onClick={handleGetDirections}
           >
             Get Directions
           </Button>
         </div>
       </div>
 
-      {/* QR Scanner Modal */}
       <QRScannerModal
         isOpen={showScanner}
         onClose={() => setShowScanner(false)}
