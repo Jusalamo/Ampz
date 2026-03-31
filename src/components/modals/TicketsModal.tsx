@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, QrCode, Calendar, MapPin, Ticket, Plus, Minus, Clock, Star, Filter } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Ticket as TicketType, Event } from '@/lib/types';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TicketsModalProps {
   isOpen: boolean;
@@ -24,13 +25,13 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
   const [quantity, setQuantity] = useState(1);
   const [viewingQR, setViewingQR] = useState<TicketType | null>(null);
   const [purchaseFilter, setPurchaseFilter] = useState<PurchaseFilter>('all');
+  const [isPurchasing, setIsPurchasing] = useState(false);
 
   const activeTickets = tickets.filter(t => t.status === 'active');
   const historyTickets = tickets.filter(t => t.status !== 'active');
   const bookmarkedEvents = events.filter(e => user?.bookmarkedEvents.includes(e.id));
   const featuredEvents = events.filter(e => e.isFeatured);
 
-  // Filter events for purchase tab
   const getFilteredPurchaseEvents = () => {
     const now = new Date();
     const oneWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -66,32 +67,72 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
     }
   };
 
-  const handlePurchase = () => {
-    if (!selectedEvent) return;
+  const handlePurchase = async () => {
+    if (!selectedEvent || !user?.id) return;
 
-    const newTicket: TicketType = {
-      id: crypto.randomUUID(),
-      eventId: selectedEvent.id,
-      eventName: selectedEvent.name,
-      eventDate: selectedEvent.date,
-      eventTime: selectedEvent.time,
-      eventLocation: selectedEvent.location,
-      purchaseDate: new Date().toISOString(),
-      price: selectedEvent.price * quantity,
-      currency: 'NAD',
-      quantity,
-      qrCode: `TKT-${Date.now().toString(36).toUpperCase()}`,
-      status: 'active',
-    };
+    setIsPurchasing(true);
+    try {
+      const purchaseRef = `TKT-${Date.now().toString(36).toUpperCase()}`;
+      const qrCode = purchaseRef;
 
-    addTicket(newTicket);
-    toast({
-      title: '🎉 Ticket Purchased!',
-      description: `You got ${quantity} ticket(s) to ${selectedEvent.name}`,
-    });
-    setSelectedEvent(null);
-    setQuantity(1);
-    setActiveTab('active');
+      // Write ticket to Supabase so it persists across sessions
+      const { data: dbTicket, error } = await supabase
+        .from('tickets')
+        .insert({
+          event_id: selectedEvent.id,
+          user_id: user.id,
+          purchase_source: selectedEvent.price === 0 ? 'free' : 'native',
+          purchase_reference: purchaseRef,
+          amount_paid: selectedEvent.price * quantity,
+          currency: 'NAD',
+          payment_provider: selectedEvent.price === 0 ? null : 'native',
+          payment_status: 'completed',
+          ticket_status: 'active',
+          quantity,
+          qr_code: qrCode,
+          is_demo: user.isDemo ?? false,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          toast({ title: 'Already have a ticket', description: `You already have a ticket for ${selectedEvent.name}`, variant: 'destructive' });
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      const newTicket: TicketType = {
+        id: dbTicket.id,
+        eventId: selectedEvent.id,
+        eventName: selectedEvent.name,
+        eventDate: selectedEvent.date,
+        eventTime: selectedEvent.time,
+        eventLocation: selectedEvent.location,
+        purchaseDate: dbTicket.purchased_at || new Date().toISOString(),
+        price: selectedEvent.price * quantity,
+        currency: 'NAD',
+        quantity,
+        qrCode,
+        status: 'active',
+      };
+
+      addTicket(newTicket);
+      toast({
+        title: '🎉 Ticket Purchased!',
+        description: `You got ${quantity} ticket(s) to ${selectedEvent.name}`,
+      });
+      setSelectedEvent(null);
+      setQuantity(1);
+      setActiveTab('active');
+    } catch (err: any) {
+      console.error('Ticket purchase error:', err);
+      toast({ title: 'Purchase failed', description: err.message || 'Please try again', variant: 'destructive' });
+    } finally {
+      setIsPurchasing(false);
+    }
   };
 
   const getEventForTicket = (ticket: TicketType) => {
@@ -138,10 +179,9 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
           </button>
         </div>
         <div className="flex-1 p-5 space-y-4 overflow-y-auto">
-          {/* Event Header with Image */}
           <div className="relative h-40 rounded-2xl overflow-hidden">
-            <img 
-              src={selectedEvent.coverImage} 
+            <img
+              src={selectedEvent.coverImage}
               alt={selectedEvent.name}
               className="w-full h-full object-cover"
             />
@@ -152,7 +192,6 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
             </div>
           </div>
 
-          {/* Event Info */}
           <div className="bg-card rounded-xl p-4 border border-border">
             <div className="space-y-3 text-sm">
               <div className="flex items-center gap-3">
@@ -166,7 +205,6 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
             </div>
           </div>
 
-          {/* Price */}
           <div className="bg-card rounded-xl p-4 text-center border border-border">
             <p className="text-muted-foreground text-sm mb-1">Price per ticket</p>
             <p className="text-3xl font-bold text-primary">
@@ -174,13 +212,12 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
             </p>
           </div>
 
-          {/* Quantity */}
           <div className="bg-card rounded-xl p-4 border border-border">
             <p className="text-sm font-medium mb-3 text-center">Quantity</p>
             <div className="flex items-center justify-center gap-6">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="w-12 h-12 rounded-full bg-background border border-border flex items-center justify-center hover:border-primary transition-colors disabled:opacity-50"
+                className="w-12 h-12 rounded-full bg-background border border-border flex items-center justify-center disabled:opacity-50"
                 disabled={quantity <= 1}
               >
                 <Minus className="w-5 h-5" />
@@ -188,7 +225,7 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
               <span className="text-3xl font-bold w-12 text-center">{quantity}</span>
               <button
                 onClick={() => setQuantity(Math.min(10, quantity + 1))}
-                className="w-12 h-12 rounded-full bg-background border border-border flex items-center justify-center hover:border-primary transition-colors disabled:opacity-50"
+                className="w-12 h-12 rounded-full bg-background border border-border flex items-center justify-center disabled:opacity-50"
                 disabled={quantity >= 10}
               >
                 <Plus className="w-5 h-5" />
@@ -196,7 +233,6 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
             </div>
           </div>
 
-          {/* Total */}
           <div className="bg-primary/10 rounded-xl p-4 flex items-center justify-between border border-primary/20">
             <span className="font-medium">Total</span>
             <span className="text-2xl font-bold text-primary">
@@ -209,9 +245,13 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
           <Button variant="outline" className="flex-1 h-12" onClick={() => setSelectedEvent(null)}>
             Cancel
           </Button>
-          <Button className="flex-1 h-12 gradient-pro glow-purple" onClick={handlePurchase}>
+          <Button
+            className="flex-1 h-12 gradient-pro glow-purple"
+            onClick={handlePurchase}
+            disabled={isPurchasing}
+          >
             <Ticket className="w-4 h-4 mr-2" />
-            {selectedEvent.price === 0 ? 'Get Free Ticket' : 'Purchase'}
+            {isPurchasing ? 'Processing...' : selectedEvent.price === 0 ? 'Get Free Ticket' : 'Purchase'}
           </Button>
         </div>
       </div>
@@ -220,7 +260,6 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
 
   return (
     <div className="fixed inset-0 bg-background z-50 flex flex-col">
-      {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <h2 className="text-lg font-bold">My Tickets</h2>
         <button onClick={onClose} className="w-10 h-10 rounded-full bg-card flex items-center justify-center">
@@ -228,7 +267,6 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
         </button>
       </div>
 
-      {/* Tabs */}
       <div className="flex border-b border-border">
         {(['active', 'purchase', 'history'] as Tab[]).map((tab) => (
           <button
@@ -252,21 +290,15 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
         ))}
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
-        {/* Active Tickets - Now with event images */}
         {activeTab === 'active' && (
           <div className="space-y-3">
             {activeTickets.length > 0 ? (
               activeTickets.map((ticket) => {
                 const event = getEventForTicket(ticket);
                 return (
-                  <div 
-                    key={ticket.id} 
-                    className="bg-card rounded-xl border border-border overflow-hidden"
-                  >
+                  <div key={ticket.id} className="bg-card rounded-xl border border-border overflow-hidden">
                     <div className="flex">
-                      {/* Event Image on Left */}
                       <div className="w-28 h-28 flex-shrink-0">
                         <img
                           src={event?.coverImage || '/placeholder.svg'}
@@ -274,8 +306,6 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      
-                      {/* Ticket Info on Right */}
                       <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                         <div>
                           <h4 className="font-bold text-sm truncate">{ticket.eventName}</h4>
@@ -291,13 +321,12 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
                             <span className="truncate">{ticket.eventLocation}</span>
                           </div>
                         </div>
-                        
                         <div className="flex items-center justify-between mt-2">
                           <span className="text-xs text-muted-foreground">
                             {ticket.quantity} ticket(s)
                           </span>
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant="outline"
                             className="h-7 text-xs"
                             onClick={() => setViewingQR(ticket)}
@@ -315,21 +344,15 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
               <div className="text-center py-16">
                 <Ticket className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="font-bold mb-2">No Active Tickets</h3>
-                <p className="text-muted-foreground text-sm mb-4">
-                  Get tickets to upcoming events
-                </p>
-                <Button onClick={() => setActiveTab('purchase')}>
-                  Browse Events
-                </Button>
+                <p className="text-muted-foreground text-sm mb-4">Get tickets to upcoming events</p>
+                <Button onClick={() => setActiveTab('purchase')}>Browse Events</Button>
               </div>
             )}
           </div>
         )}
 
-        {/* Purchase Tab with Filters */}
         {activeTab === 'purchase' && (
           <div className="space-y-4">
-            {/* Filter Pills */}
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
               {[
                 { key: 'all', label: 'All Events' },
@@ -352,7 +375,6 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
               ))}
             </div>
 
-            {/* Bookmarked Events Section */}
             {bookmarkedEvents.length > 0 && purchaseFilter === 'all' && (
               <div className="mb-4">
                 <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
@@ -361,9 +383,9 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
                 </h3>
                 <div className="space-y-2">
                   {bookmarkedEvents.slice(0, 3).map((event) => (
-                    <EventPurchaseCard 
-                      key={event.id} 
-                      event={event} 
+                    <EventPurchaseCard
+                      key={event.id}
+                      event={event}
                       onSelect={setSelectedEvent}
                       currencySymbol={getCurrencySymbol()}
                       isFeatured={false}
@@ -374,7 +396,6 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
               </div>
             )}
 
-            {/* Featured Events */}
             {featuredEvents.length > 0 && purchaseFilter === 'all' && (
               <div className="mb-4">
                 <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
@@ -383,9 +404,9 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
                 </h3>
                 <div className="space-y-2">
                   {featuredEvents.slice(0, 3).map((event) => (
-                    <EventPurchaseCard 
-                      key={event.id} 
-                      event={event} 
+                    <EventPurchaseCard
+                      key={event.id}
+                      event={event}
                       onSelect={setSelectedEvent}
                       currencySymbol={getCurrencySymbol()}
                       isFeatured={true}
@@ -395,18 +416,17 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
               </div>
             )}
 
-            {/* All Events */}
             <div>
               <h3 className="text-sm font-semibold text-muted-foreground mb-2">
-                {purchaseFilter === 'all' ? 'All Upcoming Events' : 
+                {purchaseFilter === 'all' ? 'All Upcoming Events' :
                  purchaseFilter === 'week' ? 'Events This Week' :
                  purchaseFilter === 'month' ? 'Events This Month' : 'Free Events'}
               </h3>
               <div className="space-y-2">
                 {getFilteredPurchaseEvents().map((event) => (
-                  <EventPurchaseCard 
-                    key={event.id} 
-                    event={event} 
+                  <EventPurchaseCard
+                    key={event.id}
+                    event={event}
                     onSelect={setSelectedEvent}
                     currencySymbol={getCurrencySymbol()}
                     isFeatured={event.isFeatured}
@@ -417,7 +437,6 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
           </div>
         )}
 
-        {/* History Tab */}
         {activeTab === 'history' && (
           <div className="space-y-3">
             {historyTickets.length > 0 ? (
@@ -459,9 +478,7 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
               <div className="text-center py-16">
                 <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="font-bold mb-2">No Ticket History</h3>
-                <p className="text-muted-foreground text-sm">
-                  Your past events will appear here
-                </p>
+                <p className="text-muted-foreground text-sm">Your past events will appear here</p>
               </div>
             )}
           </div>
@@ -471,15 +488,14 @@ export function TicketsModal({ isOpen, onClose }: TicketsModalProps) {
   );
 }
 
-// Sub-component for event cards in purchase tab
-function EventPurchaseCard({ 
-  event, 
-  onSelect, 
+function EventPurchaseCard({
+  event,
+  onSelect,
   currencySymbol,
   isFeatured,
   isBookmarked
-}: { 
-  event: Event; 
+}: {
+  event: Event;
   onSelect: (e: Event) => void;
   currencySymbol: string;
   isFeatured?: boolean;
