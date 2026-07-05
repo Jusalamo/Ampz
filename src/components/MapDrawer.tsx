@@ -215,13 +215,13 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
   // Update event markers when events change
   useEffect(() => {
-    if (map.current && mapReady) {
+    if (map && mapReady) {
       updateEventMarkers();
     }
   }, [events, selectedCategory, filteredEvents, mapReady]);
 
   const updateEventMarkers = () => {
-    if (!map.current || !mapReady) return;
+    if (!map || !mapReady) return;
     
     // Clear existing markers (except user marker)
     markersRef.current.forEach(marker => {
@@ -251,7 +251,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         anchor: 'bottom'
       })
         .setLngLat([event.coordinates.lng, event.coordinates.lat])
-        .addTo(map.current!);
+        .addTo(map!);
 
       markerEl.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -272,7 +272,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     add3DEventCard(event);
     
     // Fly to event location
-    map.current?.flyTo({
+    map?.flyTo({
       center: [event.coordinates.lng, event.coordinates.lat],
       zoom: 15,
       pitch: 60,
@@ -281,7 +281,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   };
 
   const add3DEventCard = (event: Event) => {
-    if (!map.current || !mapReady) return;
+    if (!map || !mapReady) return;
 
     // Create 3D card element
     const cardEl = document.createElement('div');
@@ -361,7 +361,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       offset: [0, -20] // Position above the pin
     })
       .setLngLat([event.coordinates.lng, event.coordinates.lat])
-      .addTo(map.current!);
+      .addTo(map!);
 
     // Store reference
     cardMarkersRef.current.set(event.id, cardMarker);
@@ -388,7 +388,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   };
 
   const addGeofenceCircle = (event: Event) => {
-    if (!map.current || !mapReady) return;
+    if (!map || !mapReady) return;
 
     const { lat, lng } = event.coordinates;
     const radiusInKm = event.geofenceRadius / 1000;
@@ -405,14 +405,14 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
     const sourceId = `geofence-${event.id}`;
     
-    if (map.current.getSource(sourceId)) {
-      (map.current.getSource(sourceId) as mapboxgl.GeoJSONSource).setData({
+    if (map.getSource(sourceId)) {
+      (map.getSource(sourceId) as mapboxgl.GeoJSONSource).setData({
         type: 'Feature',
         properties: {},
         geometry: { type: 'Polygon', coordinates: [coords] },
       });
     } else {
-      map.current.addSource(sourceId, {
+      map.addSource(sourceId, {
         type: 'geojson',
         data: {
           type: 'Feature',
@@ -421,7 +421,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         },
       });
 
-      map.current.addLayer({
+      map.addLayer({
         id: `${sourceId}-fill`,
         type: 'fill',
         source: sourceId,
@@ -431,7 +431,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         },
       });
 
-      map.current.addLayer({
+      map.addLayer({
         id: `${sourceId}-line`,
         type: 'line',
         source: sourceId,
@@ -445,19 +445,19 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   };
 
   const removeGeofenceCircle = () => {
-    if (!map.current || !mapReady) return;
+    if (!map || !mapReady) return;
     
     // Remove all geofence circles
     events.forEach(event => {
       const sourceId = `geofence-${event.id}`;
-      if (map.current!.getLayer(`${sourceId}-fill`)) {
-        map.current!.removeLayer(`${sourceId}-fill`);
+      if (map!.getLayer(`${sourceId}-fill`)) {
+        map!.removeLayer(`${sourceId}-fill`);
       }
-      if (map.current!.getLayer(`${sourceId}-line`)) {
-        map.current!.removeLayer(`${sourceId}-line`);
+      if (map!.getLayer(`${sourceId}-line`)) {
+        map!.removeLayer(`${sourceId}-line`);
       }
-      if (map.current!.getSource(sourceId)) {
-        map.current!.removeSource(sourceId);
+      if (map!.getSource(sourceId)) {
+        map!.removeSource(sourceId);
       }
     });
   };
