@@ -315,11 +315,32 @@ export function useFriends(userId?: string) {
     if (!userId) return false;
 
     try {
+      // Fetch the request first so we know who to pair up in matches
+      const { data: reqRow } = await supabase
+        .from('friend_requests')
+        .select('sender_id, receiver_id')
+        .eq('id', requestId)
+        .maybeSingle();
+
       // Use the RPC function to accept the request
       const { data, error } = await supabase
         .rpc('accept_friend_request', { request_id: requestId });
 
       if (error) throw error;
+
+      // Create a matches row so accepted friends appear in the Chats list.
+      // Ignore failures (e.g. duplicate) - the friendship itself is what matters.
+      if (reqRow?.sender_id && reqRow?.receiver_id) {
+        try {
+          await supabase.from('matches').insert({
+            user1_id: reqRow.sender_id,
+            user2_id: reqRow.receiver_id,
+            matched_at: new Date().toISOString(),
+          } as any);
+        } catch (matchErr) {
+          console.warn('Could not create match for accepted friend:', matchErr);
+        }
+      }
 
       toast({
         title: 'Friend added!',
