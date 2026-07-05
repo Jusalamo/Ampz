@@ -116,6 +116,7 @@ const SNAP_POSITIONS = {
 export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const navigate = useNavigate();
   const { user, events } = useApp();
+  const { map, isReady: mapReady, setMapVisible } = useMapContext();
   const { getSuggestedEvents, getUpcomingEvents } = useEvents(user?.id, user?.isDemo);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -125,7 +126,6 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [searchSuggestions, setSearchSuggestions] = useState<Event[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [mapReady, setMapReady] = useState(false);
   
   // Get suggested and upcoming events using database queries
   const suggestedEvents = useMemo(() => 
@@ -138,8 +138,6 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     [getUpcomingEvents]
   );
   
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const popupRef = useRef<mapboxgl.Popup | null>(null);
