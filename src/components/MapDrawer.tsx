@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Search, SlidersHorizontal, Plus, MapPin, Calendar, Clock, Heart, ChevronRight, Star } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
+import { useMapContext } from '@/contexts/MapContext';
 import { EventCard } from './EventCard';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -115,6 +116,7 @@ const SNAP_POSITIONS = {
 export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const navigate = useNavigate();
   const { user, events } = useApp();
+  const { map, isReady: mapReady, setMapVisible } = useMapContext();
   const { getSuggestedEvents, getUpcomingEvents } = useEvents(user?.id, user?.isDemo);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -124,7 +126,6 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [searchSuggestions, setSearchSuggestions] = useState<Event[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [mapReady, setMapReady] = useState(false);
   
   // Get suggested and upcoming events using database queries
   const suggestedEvents = useMemo(() => 
@@ -137,8 +138,6 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     [getUpcomingEvents]
   );
   
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const popupRef = useRef<mapboxgl.Popup | null>(null);
@@ -177,92 +176,33 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     }
   }, [search, events]);
 
-  // Initialize map immediately on component mount
+  // Show the persistent map on mount, hide on unmount
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
-
-    // Check if Mapbox token is available
-    if (!isMapboxAvailable) {
-      console.warn('VITE_MAPBOX_TOKEN environment variable is not set. Map will not be displayed.');
-      setMapReady(true);
-      return;
-    }
-
-    try {
-      mapboxgl.accessToken = MAPBOX_TOKEN;
-      
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/streets-v12',
-        center: [17.0658, -22.5609], // Windhoek
-        zoom: 12,
-        pitch: 45,
-        bearing: -17.6,
-        antialias: true,
-        attributionControl: false,
-      });
-
-      // Hide map loading tiles
-      map.current.on('load', () => {
-        setMapReady(true);
-        // Add controls after map is loaded
-        map.current!.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
-
-        // Add geolocate control
-        const geolocate = new mapboxgl.GeolocateControl({
-          positionOptions: { enableHighAccuracy: true },
-          trackUserLocation: true,
-          showUserLocation: true,
-          showUserHeading: true,
-        });
-        map.current!.addControl(geolocate, 'top-right');
-        
-        // Auto-trigger geolocation
-        setTimeout(() => {
-          try {
-            geolocate.trigger();
-          } catch (e) {
-            console.log('Geolocation not available');
-          }
-        }, 1000);
-
-        updateEventMarkers();
-      });
-
-      // Handle map click to clear selection
-      map.current.on('click', (e) => {
-        // Only clear if clicking on the map (not on markers)
-        const target = e.originalEvent.target as HTMLElement;
-        if (!target.closest('.event-marker') && !target.closest('.event-card-3d')) {
-          clearEventSelection();
-        }
-      });
-
-    } catch (error) {
-      console.error('Failed to initialize map:', error);
-      setMapReady(true);
-    }
-
+    setMapVisible(true);
     return () => {
-      // Clean up all markers
+      setMapVisible(false);
+      // Clear only markers we added (persistent map instance stays alive)
       markersRef.current.forEach(marker => marker.remove());
       markersRef.current = [];
-      
-      // Clean up 3D card markers
       cardMarkersRef.current.forEach(marker => marker.remove());
       cardMarkersRef.current.clear();
-      
-      if (userMarkerRef.current) {
-        userMarkerRef.current.remove();
-        userMarkerRef.current = null;
-      }
-      
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
+    };
+  }, [setMapVisible]);
+
+  // Attach click-to-clear-selection handler once map is ready
+  useEffect(() => {
+    if (!map || !mapReady) return;
+    const handler = (e: mapboxgl.MapMouseEvent) => {
+      const target = e.originalEvent.target as HTMLElement;
+      if (!target.closest('.event-marker') && !target.closest('.event-card-3d')) {
+        clearEventSelection();
       }
     };
-  }, []);
+    map.on('click', handler);
+    return () => {
+      map.off('click', handler);
+    };
+  }, [map, mapReady]);
 
   // Clear event selection
   const clearEventSelection = () => {
@@ -275,13 +215,13 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
   // Update event markers when events change
   useEffect(() => {
-    if (map.current && mapReady) {
+    if (map && mapReady) {
       updateEventMarkers();
     }
   }, [events, selectedCategory, filteredEvents, mapReady]);
 
   const updateEventMarkers = () => {
-    if (!map.current || !mapReady) return;
+    if (!map || !mapReady) return;
     
     // Clear existing markers (except user marker)
     markersRef.current.forEach(marker => {
@@ -311,7 +251,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         anchor: 'bottom'
       })
         .setLngLat([event.coordinates.lng, event.coordinates.lat])
-        .addTo(map.current!);
+        .addTo(map!);
 
       markerEl.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -332,7 +272,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     add3DEventCard(event);
     
     // Fly to event location
-    map.current?.flyTo({
+    map?.flyTo({
       center: [event.coordinates.lng, event.coordinates.lat],
       zoom: 15,
       pitch: 60,
@@ -341,7 +281,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   };
 
   const add3DEventCard = (event: Event) => {
-    if (!map.current || !mapReady) return;
+    if (!map || !mapReady) return;
 
     // Create 3D card element
     const cardEl = document.createElement('div');
@@ -421,7 +361,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       offset: [0, -20] // Position above the pin
     })
       .setLngLat([event.coordinates.lng, event.coordinates.lat])
-      .addTo(map.current!);
+      .addTo(map!);
 
     // Store reference
     cardMarkersRef.current.set(event.id, cardMarker);
@@ -448,7 +388,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   };
 
   const addGeofenceCircle = (event: Event) => {
-    if (!map.current || !mapReady) return;
+    if (!map || !mapReady) return;
 
     const { lat, lng } = event.coordinates;
     const radiusInKm = event.geofenceRadius / 1000;
@@ -465,14 +405,14 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
 
     const sourceId = `geofence-${event.id}`;
     
-    if (map.current.getSource(sourceId)) {
-      (map.current.getSource(sourceId) as mapboxgl.GeoJSONSource).setData({
+    if (map.getSource(sourceId)) {
+      (map.getSource(sourceId) as mapboxgl.GeoJSONSource).setData({
         type: 'Feature',
         properties: {},
         geometry: { type: 'Polygon', coordinates: [coords] },
       });
     } else {
-      map.current.addSource(sourceId, {
+      map.addSource(sourceId, {
         type: 'geojson',
         data: {
           type: 'Feature',
@@ -481,7 +421,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         },
       });
 
-      map.current.addLayer({
+      map.addLayer({
         id: `${sourceId}-fill`,
         type: 'fill',
         source: sourceId,
@@ -491,7 +431,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         },
       });
 
-      map.current.addLayer({
+      map.addLayer({
         id: `${sourceId}-line`,
         type: 'line',
         source: sourceId,
@@ -505,19 +445,19 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   };
 
   const removeGeofenceCircle = () => {
-    if (!map.current || !mapReady) return;
+    if (!map || !mapReady) return;
     
     // Remove all geofence circles
     events.forEach(event => {
       const sourceId = `geofence-${event.id}`;
-      if (map.current!.getLayer(`${sourceId}-fill`)) {
-        map.current!.removeLayer(`${sourceId}-fill`);
+      if (map!.getLayer(`${sourceId}-fill`)) {
+        map!.removeLayer(`${sourceId}-fill`);
       }
-      if (map.current!.getLayer(`${sourceId}-line`)) {
-        map.current!.removeLayer(`${sourceId}-line`);
+      if (map!.getLayer(`${sourceId}-line`)) {
+        map!.removeLayer(`${sourceId}-line`);
       }
-      if (map.current!.getSource(sourceId)) {
-        map.current!.removeSource(sourceId);
+      if (map!.getSource(sourceId)) {
+        map!.removeSource(sourceId);
       }
     });
   };
@@ -609,18 +549,9 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const isPro = user?.subscription?.tier === 'pro' || user?.subscription?.tier === 'max';
 
   return (
-    <div className="h-screen w-full relative overflow-hidden" style={{ background: DESIGN.colors.background }}>
-      {/* Map Container - Full screen behind everything */}
-      <div 
-        ref={mapContainer} 
-        className="absolute inset-0 w-full h-full"
-        style={{ 
-          zIndex: 0,
-          position: 'fixed', // Changed to fixed to ensure map stays in background
-          top: 0,
-          left: 0
-        }}
-      />
+    <div className="h-screen w-full relative overflow-hidden bg-transparent">
+      {/* Persistent map lives in MapContext (rendered globally); nothing to mount here */}
+
       
       {/* Map attribution */}
       <div className="absolute bottom-4 right-2 z-10 text-[12px] px-2 py-1 rounded backdrop-blur-sm"

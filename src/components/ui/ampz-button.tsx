@@ -14,7 +14,7 @@ const ampzButtonVariants = cva(
         outline: "border border-border bg-transparent text-foreground hover:bg-muted active:scale-[0.98]",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 active:scale-[0.98]",
         link: "text-primary underline-offset-4 hover:underline",
-        gradient: "gradient-primary text-white hover:opacity-90 active:scale-[0.98] shadow-ampz-glow",
+        gradient: "gradient-primary text-primary-foreground hover:opacity-90 active:scale-[0.98] shadow-ampz-glow",
       },
       size: {
         default: "h-11 px-5 py-2 text-sm rounded-ampz-md",

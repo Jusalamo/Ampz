@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, X, Plus } from 'lucide-react';
+import { ArrowLeft, Camera, X, Plus, Loader2 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -24,6 +24,7 @@ export default function EditProfile() {
   
   const [newInterest, setNewInterest] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -52,22 +53,30 @@ export default function EditProfile() {
     setHasChanges(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name.trim()) {
       toast({ title: 'Name is required', variant: 'destructive' });
       return;
     }
-    
-    updateUser({
-      profile: {
-        ...user!.profile,
-        ...formData,
-      }
-    });
-    
-    toast({ title: 'Profile updated successfully!' });
-    navigate('/profile');
+
+    setIsSaving(true);
+    try {
+      await updateUser({
+        profile: {
+          ...user!.profile,
+          ...formData,
+        }
+      });
+      toast({ title: 'Profile updated successfully!' });
+      navigate('/profile');
+    } catch (err) {
+      console.error('Profile save failed:', err);
+      toast({ title: 'Could not save profile', description: 'Please try again.', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
   };
+
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -235,9 +244,13 @@ export default function EditProfile() {
         <Button
           onClick={handleSave}
           className="w-full h-14 text-lg font-semibold gradient-pro glow-purple"
-          disabled={!hasChanges}
+          disabled={!hasChanges || isSaving}
         >
-          Save Changes
+          {isSaving ? (
+            <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Saving...</>
+          ) : (
+            'Save Changes'
+          )}
         </Button>
       </div>
     </div>
