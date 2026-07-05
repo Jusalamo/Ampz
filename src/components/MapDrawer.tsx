@@ -176,92 +176,33 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     }
   }, [search, events]);
 
-  // Initialize map immediately on component mount
+  // Show the persistent map on mount, hide on unmount
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
-
-    // Check if Mapbox token is available
-    if (!isMapboxAvailable) {
-      console.warn('VITE_MAPBOX_TOKEN environment variable is not set. Map will not be displayed.');
-      setMapReady(true);
-      return;
-    }
-
-    try {
-      mapboxgl.accessToken = MAPBOX_TOKEN;
-      
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/streets-v12',
-        center: [17.0658, -22.5609], // Windhoek
-        zoom: 12,
-        pitch: 45,
-        bearing: -17.6,
-        antialias: true,
-        attributionControl: false,
-      });
-
-      // Hide map loading tiles
-      map.current.on('load', () => {
-        setMapReady(true);
-        // Add controls after map is loaded
-        map.current!.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
-
-        // Add geolocate control
-        const geolocate = new mapboxgl.GeolocateControl({
-          positionOptions: { enableHighAccuracy: true },
-          trackUserLocation: true,
-          showUserLocation: true,
-          showUserHeading: true,
-        });
-        map.current!.addControl(geolocate, 'top-right');
-        
-        // Auto-trigger geolocation
-        setTimeout(() => {
-          try {
-            geolocate.trigger();
-          } catch (e) {
-            console.log('Geolocation not available');
-          }
-        }, 1000);
-
-        updateEventMarkers();
-      });
-
-      // Handle map click to clear selection
-      map.current.on('click', (e) => {
-        // Only clear if clicking on the map (not on markers)
-        const target = e.originalEvent.target as HTMLElement;
-        if (!target.closest('.event-marker') && !target.closest('.event-card-3d')) {
-          clearEventSelection();
-        }
-      });
-
-    } catch (error) {
-      console.error('Failed to initialize map:', error);
-      setMapReady(true);
-    }
-
+    setMapVisible(true);
     return () => {
-      // Clean up all markers
+      setMapVisible(false);
+      // Clear only markers we added (persistent map instance stays alive)
       markersRef.current.forEach(marker => marker.remove());
       markersRef.current = [];
-      
-      // Clean up 3D card markers
       cardMarkersRef.current.forEach(marker => marker.remove());
       cardMarkersRef.current.clear();
-      
-      if (userMarkerRef.current) {
-        userMarkerRef.current.remove();
-        userMarkerRef.current = null;
-      }
-      
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
+    };
+  }, [setMapVisible]);
+
+  // Attach click-to-clear-selection handler once map is ready
+  useEffect(() => {
+    if (!map || !mapReady) return;
+    const handler = (e: mapboxgl.MapMouseEvent) => {
+      const target = e.originalEvent.target as HTMLElement;
+      if (!target.closest('.event-marker') && !target.closest('.event-card-3d')) {
+        clearEventSelection();
       }
     };
-  }, []);
+    map.on('click', handler);
+    return () => {
+      map.off('click', handler);
+    };
+  }, [map, mapReady]);
 
   // Clear event selection
   const clearEventSelection = () => {
