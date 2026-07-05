@@ -549,18 +549,9 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const isPro = user?.subscription?.tier === 'pro' || user?.subscription?.tier === 'max';
 
   return (
-    <div className="h-screen w-full relative overflow-hidden" style={{ background: DESIGN.colors.background }}>
-      {/* Map Container - Full screen behind everything */}
-      <div 
-        ref={mapContainer} 
-        className="absolute inset-0 w-full h-full"
-        style={{ 
-          zIndex: 0,
-          position: 'fixed', // Changed to fixed to ensure map stays in background
-          top: 0,
-          left: 0
-        }}
-      />
+    <div className="h-screen w-full relative overflow-hidden bg-transparent">
+      {/* Persistent map lives in MapContext (rendered globally); nothing to mount here */}
+
       
       {/* Map attribution */}
       <div className="absolute bottom-4 right-2 z-10 text-[12px] px-2 py-1 rounded backdrop-blur-sm"
