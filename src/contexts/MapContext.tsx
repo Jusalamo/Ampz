@@ -108,11 +108,12 @@ export function MapProvider({ children }: { children: ReactNode }) {
       isInitialized,
       setMapVisible 
     }}>
-      {/* Hidden persistent map container */}
+      {/* Persistent map container - never unmounted, toggled via visibility */}
       <div 
         ref={mapContainer}
-        className="fixed inset-0 -z-10"
+        className="fixed inset-0"
         style={{ 
+          zIndex: 0,
           visibility: isVisible ? 'visible' : 'hidden',
           pointerEvents: isVisible ? 'auto' : 'none'
         }}
