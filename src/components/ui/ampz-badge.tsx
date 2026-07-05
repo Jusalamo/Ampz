@@ -12,10 +12,10 @@ const ampzBadgeVariants = cva(
         outline: "border border-border text-foreground bg-transparent",
         muted: "bg-muted text-muted-foreground",
         destructive: "bg-destructive text-destructive-foreground",
-        success: "bg-brand-green text-white",
+        success: "bg-brand-green text-primary-foreground",
         warning: "bg-brand-yellow text-black",
         // Pro/Max subscription badges
-        pro: "gradient-pro text-white",
+        pro: "gradient-pro text-primary-foreground",
         max: "gradient-max text-black",
         // Featured star badge - yellow with black text (never recolor)
         featured: "bg-brand-yellow text-black",
