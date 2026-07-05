@@ -389,7 +389,7 @@ export function useAuth() {
 
     const { error } = await supabase
       .from('profiles')
-      .update(dbUpdates)
+      .update(dbUpdates as any)
       .eq('id', state.user.id);
 
     if (error) {

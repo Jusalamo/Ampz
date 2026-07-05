@@ -198,7 +198,7 @@ export function useEvents(userId?: string, isDemo?: boolean) {
 
       const { error } = await supabase
         .from('events')
-        .update(dbUpdates)
+        .update(dbUpdates as any)
         .eq('id', eventId);
 
       if (error) {

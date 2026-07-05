@@ -517,7 +517,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     if (Object.keys(dbUpdates).length > 0) {
-      await supabase.from('profiles').update(dbUpdates).eq('id', user.id);
+      await supabase.from('profiles').update(dbUpdates as any).eq('id', user.id);
     }
 
     setUser({ ...user, ...updates });
@@ -635,7 +635,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Add updated_at timestamp
     dbUpdates.updated_at = new Date().toISOString();
 
-    const { error } = await supabase.from('events').update(dbUpdates).eq('id', eventId);
+    const { error } = await supabase.from('events').update(dbUpdates as any).eq('id', eventId);
     
     if (!error) {
       // Update local state immediately for optimistic UI
