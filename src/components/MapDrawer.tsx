@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Search, SlidersHorizontal, Plus, MapPin, Calendar, Clock, Heart, ChevronRight, Star } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
+import { useMapContext } from '@/contexts/MapContext';
 import { EventCard } from './EventCard';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
