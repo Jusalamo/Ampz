@@ -78,7 +78,7 @@ export default function Events() {
   }, [events]);
 
   return (
-    <div className="app-container h-screen bg-background overflow-hidden flex flex-col">
+    <div className="app-container h-screen overflow-hidden flex flex-col bg-transparent">
       {/* Map Drawer - Takes full height but allows events to show */}
       <div className="flex-1 relative">
         <MapDrawer 
