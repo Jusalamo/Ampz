@@ -951,6 +951,7 @@ export type Database = {
           subscription_expires_at: string | null
           subscription_tier: string | null
           updated_at: string | null
+          username: string | null
         }
         Insert: {
           age?: number | null
@@ -980,6 +981,7 @@ export type Database = {
           subscription_expires_at?: string | null
           subscription_tier?: string | null
           updated_at?: string | null
+          username?: string | null
         }
         Update: {
           age?: number | null
@@ -1009,6 +1011,7 @@ export type Database = {
           subscription_expires_at?: string | null
           subscription_tier?: string | null
           updated_at?: string | null
+          username?: string | null
         }
         Relationships: []
       }
@@ -1078,6 +1081,63 @@ export type Database = {
             columns: ["swiper_id"]
             isOneToOne: false
             referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_tiers: {
+        Row: {
+          available_count: number
+          created_at: string
+          currency: string
+          event_id: string
+          id: string
+          is_active: boolean
+          name: string
+          price: number
+          sold_count: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          available_count?: number
+          created_at?: string
+          currency?: string
+          event_id: string
+          id?: string
+          is_active?: boolean
+          name: string
+          price?: number
+          sold_count?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          available_count?: number
+          created_at?: string
+          currency?: string
+          event_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          price?: number
+          sold_count?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_tiers_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_tiers_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events_public"
             referencedColumns: ["id"]
           },
         ]
@@ -1429,6 +1489,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_attendee_count: {
+        Args: { p_event_id: string }
+        Returns: undefined
+      }
+      purchase_ticket: {
+        Args: { p_event_id: string; p_tier_id: string }
+        Returns: string
+      }
       search_users_by_email_or_name: {
         Args: { search_query: string }
         Returns: {
@@ -1461,10 +1529,13 @@ export type Database = {
         }
         Returns: string
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       validate_event_token: {
         Args: { p_event_id: string; p_token_hash: string }
         Returns: boolean
       }
+      verify_ticket_qr: { Args: { p_qr: string }; Returns: Json }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
