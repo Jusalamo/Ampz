@@ -20,6 +20,13 @@ import Social from "./pages/Social";
 import Activity from "./pages/Activity";
 import EventManager from "./pages/EventManager";
 import EventCheckIn from "./pages/EventCheckIn";
+import TicketScreen from "./pages/TicketScreen";
+import BuyTicketScreen from "./pages/BuyTicketScreen";
+import OrganiserScanScreen from "./pages/OrganiserScanScreen";
+import OrganiserDashboard from "./pages/OrganiserDashboard";
+import UserSearchScreen from "./pages/UserSearchScreen";
+import PublicProfileScreen from "./pages/PublicProfileScreen";
+import AttendeesScreen from "./pages/AttendeesScreen";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -69,6 +76,13 @@ function AppRoutes() {
       <Route path="/chats" element={<ProtectedRoute><Chats /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/event/:id" element={<ProtectedRoute><EventDetail /></ProtectedRoute>} />
+      <Route path="/event/:eventId/buy" element={<ProtectedRoute><BuyTicketScreen /></ProtectedRoute>} />
+      <Route path="/event/:eventId/attendees" element={<ProtectedRoute><AttendeesScreen /></ProtectedRoute>} />
+      <Route path="/ticket/:ticketId" element={<ProtectedRoute><TicketScreen /></ProtectedRoute>} />
+      <Route path="/user/:userId" element={<ProtectedRoute><PublicProfileScreen /></ProtectedRoute>} />
+      <Route path="/search" element={<ProtectedRoute><UserSearchScreen /></ProtectedRoute>} />
+      <Route path="/organiser/scan" element={<ProtectedRoute><OrganiserScanScreen /></ProtectedRoute>} />
+      <Route path="/organiser/dashboard" element={<ProtectedRoute><OrganiserDashboard /></ProtectedRoute>} />
       <Route path="/social" element={<ProtectedRoute><Social /></ProtectedRoute>} />
       <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
       <Route path="/event-manager" element={<ProtectedRoute><EventManager /></ProtectedRoute>} />
