@@ -105,7 +105,7 @@ export default function OrganiserScanScreen() {
               <>
                 <XCircle className="w-12 h-12 text-destructive mx-auto mb-2" />
                 <p className="font-bold text-lg">Invalid ticket</p>
-                <p className="text-sm text-muted-foreground">{result.reason === 'already_used' ? 'Ticket has already been used.' : 'Ticket not found.'}</p>
+                <p className="text-sm text-muted-foreground">{(result as any).reason === 'already_used' ? 'Ticket has already been used.' : 'Ticket not found.'}</p>
               </>
             )}
             <Button variant="outline" className="mt-4" onClick={() => { setResult(null); startScanner(); }}>Scan another</Button>
