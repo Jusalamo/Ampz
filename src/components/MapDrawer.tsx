@@ -189,6 +189,12 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     };
   }, [setMapVisible]);
 
+  // Toggle map interactivity based on drawer position (allow scroll inside drawer content)
+  useEffect(() => {
+    setMapInteractive(drawerPosition === 'minimum');
+  }, [drawerPosition, setMapInteractive]);
+
+
   // Attach click-to-clear-selection handler once map is ready
   useEffect(() => {
     if (!map || !mapReady) return;
