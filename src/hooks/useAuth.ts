@@ -106,7 +106,7 @@ export function useAuth() {
         location: profile.location || 'Windhoek, Namibia',
         gender: profile.gender || '',
         interests: profile.interests || [],
-        profilePhoto: profile.profile_photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${supabaseUser.email}`,
+        profilePhoto: profile.profile_photo || '/default-avatar.png',
         phone: profile.phone || '',
       },
       subscription: {
