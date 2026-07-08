@@ -62,7 +62,7 @@ export function CommunityComments({ eventId, comments }: CommunityCommentsProps)
   const rootComments = comments.filter((c) => !c.replyTo);
   const replyComments = comments.filter((c) => c.replyTo);
   const getCommentReplies = (commentId: string) => replyComments.filter((r) => r.replyTo === commentId);
-  const onlineCount = Math.floor(Math.random() * 50) + 20;
+  const onlineCount = comments.length;
 
   return (
     <div className="mb-24">
