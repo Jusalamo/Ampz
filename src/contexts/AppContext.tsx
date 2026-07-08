@@ -494,7 +494,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       lastMessage: '',
       lastMessageTime: 'Just now',
       unread: false,
-      online: Math.random() > 0.5,
+      online: false,
     };
     setMatches(prev => [...prev, newMatch]);
   };
