@@ -8,6 +8,7 @@ interface MapContextType {
   isReady: boolean;
   isInitialized: boolean;
   setMapVisible: (visible: boolean) => void;
+  setMapInteractive: (enabled: boolean) => void;
 }
 
 const MapContext = createContext<MapContextType | undefined>(undefined);
@@ -20,6 +21,8 @@ export function MapProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [isInteractive, setIsInteractive] = useState(true);
+
 
   // Initialize map once on first visibility
   const initializeMap = useCallback(() => {
