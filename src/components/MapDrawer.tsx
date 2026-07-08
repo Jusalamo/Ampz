@@ -116,7 +116,7 @@ const SNAP_POSITIONS = {
 export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const navigate = useNavigate();
   const { user, events } = useApp();
-  const { map, isReady: mapReady, setMapVisible } = useMapContext();
+  const { map, isReady: mapReady, setMapVisible, setMapInteractive } = useMapContext();
   const { getSuggestedEvents, getUpcomingEvents } = useEvents(user?.id, user?.isDemo);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
