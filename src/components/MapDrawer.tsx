@@ -116,7 +116,7 @@ const SNAP_POSITIONS = {
 export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const navigate = useNavigate();
   const { user, events } = useApp();
-  const { map, isReady: mapReady, setMapVisible } = useMapContext();
+  const { map, isReady: mapReady, setMapVisible, setMapInteractive } = useMapContext();
   const { getSuggestedEvents, getUpcomingEvents } = useEvents(user?.id, user?.isDemo);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -188,6 +188,12 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
       cardMarkersRef.current.clear();
     };
   }, [setMapVisible]);
+
+  // Toggle map interactivity based on drawer position (allow scroll inside drawer content)
+  useEffect(() => {
+    setMapInteractive(drawerPosition === 'minimum');
+  }, [drawerPosition, setMapInteractive]);
+
 
   // Attach click-to-clear-selection handler once map is ready
   useEffect(() => {
@@ -573,14 +579,16 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         style={{
           height: '100%',
           transform: `translateY(${translateY}px)`,
-          touchAction: 'none',
+          touchAction: drawerPosition === 'minimum' ? 'none' : 'pan-y',
           background: DESIGN.colors.background,
           borderTopLeftRadius: DESIGN.borderRadius.large,
           borderTopRightRadius: DESIGN.borderRadius.large,
           borderTop: `1px solid ${DESIGN.colors.textSecondary}20`,
           boxShadow: DESIGN.shadows.card,
-          position: 'relative' // Ensure it's above the map
+          position: 'relative',
+          pointerEvents: drawerPosition === 'minimum' ? 'none' : 'auto',
         }}
+
       >
         {/* Drawer Handle - Always visible at top when drawer is up */}
         <div
@@ -588,8 +596,11 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
           style={{ 
             background: DESIGN.colors.background,
             borderTopLeftRadius: DESIGN.borderRadius.large,
-            borderTopRightRadius: DESIGN.borderRadius.large
+            borderTopRightRadius: DESIGN.borderRadius.large,
+            pointerEvents: 'auto',
+            touchAction: 'none',
           }}
+
           role="button"
           tabIndex={0}
           aria-label={`Drawer position: ${drawerPosition}. Drag to adjust.`}

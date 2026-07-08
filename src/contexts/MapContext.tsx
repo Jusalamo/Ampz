@@ -8,6 +8,7 @@ interface MapContextType {
   isReady: boolean;
   isInitialized: boolean;
   setMapVisible: (visible: boolean) => void;
+  setMapInteractive: (enabled: boolean) => void;
 }
 
 const MapContext = createContext<MapContextType | undefined>(undefined);
@@ -20,6 +21,8 @@ export function MapProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [isInteractive, setIsInteractive] = useState(true);
+
 
   // Initialize map once on first visibility
   const initializeMap = useCallback(() => {
@@ -90,6 +93,25 @@ export function MapProvider({ children }: { children: ReactNode }) {
     setIsVisible(visible);
   }, []);
 
+  const setMapInteractive = useCallback((enabled: boolean) => {
+    setIsInteractive(enabled);
+    const m = map.current;
+    if (!m) return;
+    try {
+      if (enabled) {
+        m.dragPan.enable();
+        m.touchZoomRotate.enable();
+        m.scrollZoom.enable();
+        m.doubleClickZoom.enable();
+      } else {
+        m.dragPan.disable();
+        m.touchZoomRotate.disable();
+        m.scrollZoom.disable();
+        m.doubleClickZoom.disable();
+      }
+    } catch {}
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -106,7 +128,8 @@ export function MapProvider({ children }: { children: ReactNode }) {
       mapContainer, 
       isReady, 
       isInitialized,
-      setMapVisible 
+      setMapVisible,
+      setMapInteractive,
     }}>
       {/* Persistent map container - never unmounted, toggled via visibility */}
       <div 
@@ -115,13 +138,15 @@ export function MapProvider({ children }: { children: ReactNode }) {
         style={{ 
           zIndex: 0,
           visibility: isVisible ? 'visible' : 'hidden',
-          pointerEvents: isVisible ? 'auto' : 'none'
+          pointerEvents: isVisible && isInteractive ? 'auto' : 'none',
+          touchAction: isInteractive ? 'pan-x pan-y' : 'none',
         }}
       />
       {children}
     </MapContext.Provider>
   );
 }
+
 
 export function useMapContext() {
   const context = useContext(MapContext);
