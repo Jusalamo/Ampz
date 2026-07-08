@@ -596,8 +596,11 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
           style={{ 
             background: DESIGN.colors.background,
             borderTopLeftRadius: DESIGN.borderRadius.large,
-            borderTopRightRadius: DESIGN.borderRadius.large
+            borderTopRightRadius: DESIGN.borderRadius.large,
+            pointerEvents: 'auto',
+            touchAction: 'none',
           }}
+
           role="button"
           tabIndex={0}
           aria-label={`Drawer position: ${drawerPosition}. Drag to adjust.`}
