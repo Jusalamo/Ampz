@@ -86,7 +86,7 @@ export function useCommunityRealtime({ eventId, userId }: UseCommunityRealtimePr
         eventId: c.event_id || eventId,
         userId: c.user_id || '',
         userName: profile?.name || 'Anonymous',
-        userPhoto: profile?.profile_photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user_id}`,
+        userPhoto: profile?.profile_photo || '/default-avatar.png',
         text: c.content,
         timestamp: c.created_at || new Date().toISOString(),
         likes: c.likes_count || 0,
