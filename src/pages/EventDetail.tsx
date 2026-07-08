@@ -823,8 +823,12 @@ export default function EventDetail() {
                   loading="eager"
                   decoding="async"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = `https://via.placeholder.com/400x256/2D2D2D/FFFFFF?text=${encodeURIComponent(event.name.substring(0, 30))}`;
+                    const img = e.currentTarget;
+                    if (img.dataset.fallback === '1') return;
+                    img.dataset.fallback = '1';
+                    img.src = '/placeholder.svg';
                   }}
+
                 />
                 
                 {/* Carousel Controls */}
