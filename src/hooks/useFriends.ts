@@ -33,6 +33,8 @@ interface SuggestedUser {
   sharedEvents: number;
 }
 
+let friendsRealtimeChannelSequence = 0;
+
 export function useFriends(userId?: string) {
   const { toast } = useToast();
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -437,8 +439,11 @@ export function useFriends(userId?: string) {
   useEffect(() => {
     if (!userId) return;
 
+    friendsRealtimeChannelSequence += 1;
+    const channelName = `friends-updates-${userId}-${Date.now()}-${friendsRealtimeChannelSequence}`;
+
     const channel = supabase
-      .channel(`friends-updates-${userId}`)
+      .channel(channelName)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -456,7 +461,7 @@ export function useFriends(userId?: string) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
     // Only re-subscribe when the user changes; fetchers are stable via useCallback
     // eslint-disable-next-line react-hooks/exhaustive-deps
