@@ -579,14 +579,16 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         style={{
           height: '100%',
           transform: `translateY(${translateY}px)`,
-          touchAction: 'none',
+          touchAction: drawerPosition === 'minimum' ? 'none' : 'pan-y',
           background: DESIGN.colors.background,
           borderTopLeftRadius: DESIGN.borderRadius.large,
           borderTopRightRadius: DESIGN.borderRadius.large,
           borderTop: `1px solid ${DESIGN.colors.textSecondary}20`,
           boxShadow: DESIGN.shadows.card,
-          position: 'relative' // Ensure it's above the map
+          position: 'relative',
+          pointerEvents: drawerPosition === 'minimum' ? 'none' : 'auto',
         }}
+
       >
         {/* Drawer Handle - Always visible at top when drawer is up */}
         <div
