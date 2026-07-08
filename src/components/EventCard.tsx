@@ -41,7 +41,7 @@ export function EventCard({ event, variant = 'default', onClick }: EventCardProp
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = `https://via.placeholder.com/200x120/2D2D2D/FFFFFF?text=${encodeURIComponent(event.name.substring(0, 20))}`;
+              handleImgError(e);
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
@@ -73,7 +73,7 @@ export function EventCard({ event, variant = 'default', onClick }: EventCardProp
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
           onError={(e) => {
-            (e.target as HTMLImageElement).src = `https://via.placeholder.com/300x180/2D2D2D/FFFFFF?text=${encodeURIComponent(event.name.substring(0, 30))}`;
+            handleImgError(e);
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
@@ -128,7 +128,7 @@ export function EventCard({ event, variant = 'default', onClick }: EventCardProp
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           loading="lazy"
           onError={(e) => {
-            (e.target as HTMLImageElement).src = `https://via.placeholder.com/400x144/2D2D2D/FFFFFF?text=${encodeURIComponent(event.name.substring(0, 30))}`;
+            handleImgError(e);
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
