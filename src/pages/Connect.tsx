@@ -369,12 +369,9 @@ export default function Connect() {
         }).then(() => {});
       }
 
-      if (Math.random() > 0.7) {
-        addMatch(profile);
-        setMatchModal(profile);
-      } else {
-        toast({ title: `Liked ${profile.name} ❤️`, duration: 1500 });
-      }
+      // Matches are created server-side by the create_match_on_mutual_swipe trigger.
+      // Realtime subscription on `matches` will surface the match modal if mutual.
+      toast({ title: `Liked ${profile.name} ❤️`, duration: 1500 });
     } else {
       // Record left swipe
       const profile = availableProfiles[currentIndex];
