@@ -438,7 +438,7 @@ export function useFriends(userId?: string) {
     if (!userId) return;
 
     const channel = supabase
-      .channel('friends-updates')
+      .channel(`friends-updates-${userId}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -458,7 +458,9 @@ export function useFriends(userId?: string) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, fetchFriends, fetchRequests]);
+    // Only re-subscribe when the user changes; fetchers are stable via useCallback
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   return {
     friends,
