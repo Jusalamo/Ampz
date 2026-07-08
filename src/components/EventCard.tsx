@@ -18,9 +18,15 @@ export function EventCard({ event, variant = 'default', onClick }: EventCardProp
     bookmarkEvent(event.id);
   };
 
-  const coverImage = event.coverImage || 
-    event.images?.[0] || 
-    `https://via.placeholder.com/400x225/2D2D2D/FFFFFF?text=${encodeURIComponent(event.name)}`;
+  const FALLBACK_IMG = '/placeholder.svg';
+  const coverImage = event.coverImage || event.images?.[0] || FALLBACK_IMG;
+  const handleImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.dataset.fallback === '1') return;
+    img.dataset.fallback = '1';
+    img.src = FALLBACK_IMG;
+  };
+
 
   if (variant === 'compact') {
     return (
