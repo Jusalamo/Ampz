@@ -555,8 +555,10 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   const isPro = user?.subscription?.tier === 'pro' || user?.subscription?.tier === 'max';
 
   return (
-    <div className="h-screen w-full relative overflow-hidden bg-transparent">
+    <div className="h-screen w-full relative overflow-hidden bg-transparent" style={{ pointerEvents: 'none' }}>
       {/* Persistent map lives in MapContext (rendered globally); nothing to mount here */}
+
+
 
       
       {/* Map attribution */}
