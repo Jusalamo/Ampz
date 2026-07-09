@@ -223,39 +223,31 @@ export function useFriends(userId?: string) {
     }
   }, [userId]);
 
-  // Search users - uses profiles_public view for RLS compatibility
+  // Search users - uses secure RPC (matches by name / bio / email)
   const searchUsers = useCallback(async (query: string): Promise<SuggestedUser[]> => {
     if (!query || query.length < 2 || !userId) return [];
 
     try {
-      // Use profiles_public view which is accessible to all authenticated users
-      const { data, error } = await supabase
-        .from('profiles_public')
-        .select('id, name, profile_photo, bio')
-        .or(`name.ilike.%${query}%,bio.ilike.%${query}%`)
-        .neq('id', userId)
-        .order('name')
-        .limit(20);
+      const { data, error } = await (supabase.rpc as any)('search_users_simple', {
+        search_query: query,
+        current_user_id: userId,
+      });
 
       if (error) {
         console.error('Search error:', error);
         return [];
       }
 
-      // Filter out existing friends and pending requests
       const friendIds = friends.map(f => f.friendId);
       const sentIds = sentRequests.map(r => r.receiverId);
       const receivedIds = receivedRequests.map(r => r.senderId);
 
-      const filteredData = (data || []).filter(p => 
-        p.id &&
-        !friendIds.includes(p.id) &&
-        !sentIds.includes(p.id) &&
-        !receivedIds.includes(p.id)
+      const filtered = (data || []).filter((p: any) =>
+        p.id && !friendIds.includes(p.id) && !sentIds.includes(p.id) && !receivedIds.includes(p.id)
       );
 
-      return filteredData.map(p => ({
-        id: p.id || '',
+      return filtered.map((p: any) => ({
+        id: p.id,
         name: p.name || 'User',
         photo: p.profile_photo || '/default-avatar.png',
         bio: p.bio || '',
@@ -267,6 +259,7 @@ export function useFriends(userId?: string) {
       return [];
     }
   }, [userId, friends, sentRequests, receivedRequests]);
+
 
   // Send friend request
   const sendFriendRequest = useCallback(async (receiverId: string): Promise<boolean> => {
@@ -481,5 +474,7 @@ export function useFriends(userId?: string) {
     getRelationshipStatus,
     refreshFriends: fetchFriends,
     refreshRequests: fetchRequests,
+    fetchSuggestedUsers,
   };
+
 }

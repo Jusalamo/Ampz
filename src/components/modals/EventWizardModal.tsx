@@ -93,15 +93,10 @@ const generateQRCodeUrl = (eventId: string, qrCode: string): string => {
   return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(eventDetailsUrl)}&format=png&bgcolor=ffffff&color=000000&qzone=1&margin=10&ecc=H`;
 };
 
-// Helper function to convert File to Base64 for persistent storage
-const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = error => reject(error);
-  });
-};
+// Upload media to the community-photos bucket; returns a stable public URL.
+import { uploadEventMedia } from '@/lib/upload-media';
+const fileToBase64 = (file: File): Promise<string> => uploadEventMedia(file, 'events');
+
 
 // Helper function to check if a string is a base64 image
 const isBase64Image = (str: string): boolean => {

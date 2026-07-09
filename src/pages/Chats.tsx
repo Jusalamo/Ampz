@@ -31,26 +31,38 @@ function QuickAddModal({
   onClose: () => void;
   userId?: string;
 }) {
-  const { searchUsers, sendFriendRequest } = useFriends(userId);
+  const { searchUsers, sendFriendRequest, suggestedUsers, fetchSuggestedUsers } = useFriends(userId);
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<Array<{ id: string; name: string; photo: string; bio: string }>>([]);
   const [sendingId, setSendingId] = useState<string | null>(null);
 
+  // Fetch suggestions on open
   useEffect(() => {
-    if (!searchQuery.trim() || searchQuery.trim().length < 2) {
+    if (isOpen && fetchSuggestedUsers) fetchSuggestedUsers();
+  }, [isOpen, fetchSuggestedUsers]);
+
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
       setResults([]);
+      setIsSearching(false);
       return;
     }
     setIsSearching(true);
     const t = setTimeout(async () => {
-      const found = await searchUsers(searchQuery.trim());
+      const found = await searchUsers(q);
       setResults(found.map(u => ({ id: u.id, name: u.name, photo: u.photo, bio: u.bio })));
       setIsSearching(false);
-    }, 300);
+    }, 250);
     return () => clearTimeout(t);
   }, [searchQuery, searchUsers]);
+
+  const displayList = searchQuery.trim()
+    ? results
+    : (suggestedUsers || []).map((u: any) => ({ id: u.id, name: u.name, photo: u.photo, bio: u.bio }));
+
 
   const handleAdd = async (targetId: string) => {
     setSendingId(targetId);
@@ -98,17 +110,21 @@ function QuickAddModal({
             </>
           )}
 
-          {!isSearching && searchQuery.length >= 2 && results.length === 0 && (
+          {!isSearching && searchQuery.trim() && displayList.length === 0 && (
             <p className="text-sm text-center py-6 text-muted-foreground">No users found</p>
           )}
 
-          {!isSearching && searchQuery.length < 2 && (
+          {!isSearching && !searchQuery.trim() && displayList.length === 0 && (
             <p className="text-sm text-center py-6 text-muted-foreground">
-              Type at least 2 characters to search
+              Search by name, username or email
             </p>
           )}
 
-          {!isSearching && results.map(user => (
+          {!isSearching && !searchQuery.trim() && displayList.length > 0 && (
+            <p className="text-xs uppercase tracking-wide text-muted-foreground px-1 pt-1">Suggested</p>
+          )}
+
+          {!isSearching && displayList.map(user => (
             <div key={user.id} className="flex items-center gap-3 p-3 rounded-lg bg-card">
               <img
                 src={user.photo || DEFAULT_AVATAR}
@@ -130,6 +146,7 @@ function QuickAddModal({
             </div>
           ))}
         </div>
+
       </DialogContent>
     </Dialog>
   );

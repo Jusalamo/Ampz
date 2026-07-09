@@ -1,74 +1,65 @@
-## Ampz Full-System Audit — Remaining Fixes
+## Scope — Finish the outstanding fixes
 
-Surgical fixes only. No rebuild. No new mock data. Auth + routing structure untouched (only additions).
+Surgical fixes only. No rebuilds, no schema changes beyond one small migration for the events-bucket policy if missing.
 
----
+### 1. Map interaction (can't touch/scroll map)
+- `MapContext.tsx`: default `isInteractive` stays true, but the persistent map `div` currently sits at `zIndex: 0` behind everything. On `/events` the page content above has its own background covering it. Add a dedicated wrapper with `zIndex` that lifts to `1` only when visible, and ensure `Events.tsx` root does not paint an opaque `bg-background` over the map area (use transparent for the map region).
+- `MapDrawer.tsx`: confirm the drawer sheet uses `touchAction: pan-y` only on the handle, and `pointer-events-none` on the transparent spacer above the sheet so map taps pass through.
+- Call `setMapInteractive(true)` on mount of Events page; only disable while drawer is fully expanded.
 
-### 1. Map ↔ Drawer touch conflict (SYSTEM 3)
-**Files:** `src/contexts/MapContext.tsx`, `src/components/MapDrawer.tsx`
+### 2. Buy Tickets → 404
+- Root cause: `Home.tsx` "Tickets" quick action and Event Detail "Buy Tickets" button both navigate to a route that doesn't exist or opens `TicketsModal` (which is empty for users with no ticket).
+- Fix: wire both to `/event/:id/buy` (`BuyTicketScreen`). When invoked from Home with no event context, open a lightweight "Select an event" sheet listing upcoming events → then navigate to `/event/:id/buy`.
+- Ensure `BuyTicketScreen` shows a friendly empty state (already does) — no 404.
 
-- Add `setMapInteractive(enabled: boolean)` to `MapContext` that calls `map.dragPan.enable/disable()`, `map.touchZoomRotate.enable/disable()`, `map.scrollZoom.enable/disable()`.
-- In `MapDrawer`, when drawer is `expanded` OR mid-drag, call `setMapInteractive(false)`; on collapse re-enable.
-- Wrap the map's persistent `<div>` with inline `style={{ touchAction: isDrawerOpen ? 'none' : 'pan-x pan-y' }}` and toggle `pointerEvents` via context flag.
-- Drawer handle: add `onTouchStartCapture={e => e.stopPropagation()}` on the pill and drag region so the map never receives those events.
-- Confirm map is mounted once (already in `MapProvider`) — just verify no unmount on route change.
+### 3. Event Detail + Events page theming & hardcoded data
+- `EventDetail.tsx` and `Events.tsx`: replace hardcoded hex/`text-white`/`bg-black` with semantic tokens (`bg-background`, `text-foreground`, `bg-card`, `border-border`, `text-muted-foreground`).
+- Remove mock organiser photo/name/attendee avatars in `EventDetail.tsx`; fetch real `organizer_id` → `profiles` (name, profile_photo) and real attendee thumbnails via `check_ins` join `profiles` (limit 6).
+- Fix profile photo `<img>` with `onError` → `/default-avatar.png` and skeleton while loading.
+- "See All" button on attendees → navigate to `/event/:id/attendees` (route exists).
 
-### 2. Event Manager radius → live map (user's specific bug)
-**File:** `src/pages/EventManager.tsx` + `src/components/MapDrawer.tsx`
+### 4. Event photos not displaying (bucket)
+- Photos are stored as base64 or blob URLs in some paths → they don't persist.
+- Fix upload in `EventWizardModal.tsx` and `EditEventModal.tsx`: upload files to existing `community-photos` bucket under `events/{eventId}/{uuid}.jpg`, save the public URL string in `events.cover_image` / `events.gallery_images`.
+- Add graceful fallback to `/placeholder.svg` on `onError`.
+- If bucket policy blocks anon read (it's public per config), no migration needed. If insert policy missing for authenticated, add one.
 
-- `handleSaveEvent` currently writes `geofence_radius` to DB and calls `updateEvent`, but `MapDrawer`'s geofence circle uses cached `event.geofenceRadius` — after edit, existing marker's circle is stale.
-- Fix: in `MapDrawer`, watch `events` list; when `selectedEvent.geofenceRadius` changes, call `addGeofenceCircle(updatedEvent)` again (re-render source data). Also clear + rebuild the 3D card so displayed radius text updates.
-- Ensure `updateEvent` in `AppContext` emits new object reference so subscribers re-render.
+### 5. Event-Manager radius live-sync
+- `EventManager.tsx`: on radius change (slider) update local state, patch `events.geofence_radius`, and emit an event on `MapContext` so the visible mapbox circle source (`geofence-{eventId}`) re-renders with the new radius. Add a `updateGeofenceCircle(eventId, radius)` helper in `MapContext`.
 
-### 3. QR check-in flow simplification (SYSTEM 1 — still messing up)
-**Files:** `src/components/modals/QRScannerModal.tsx`, `src/hooks/useCheckIn.ts`, `src/pages/EventCheckIn.tsx`
+### 6. Chat quick-add: search + suggestions
+- `Chats.tsx` quick-add: currently calls `useFriends.searchUsers`. Verify it hits `search_users_simple` RPC with `current_user_id`. If empty query, call `get_suggested_users` RPC to show "People you may know".
+- Debounce input (250ms), skeleton while loading, empty state after 400ms of no results.
 
-- Trim + normalise scanned token everywhere (`code.trim()`), and accept both raw UUIDs and `/event/<id>/checkin` URLs (already there — verify).
-- Preflight geofence uses the **event's current `geofence_radius` from DB**, not cached client value. Re-fetch in `preflightGeofenceCheck` via `secure_check_in` RPC / `events.geofence_radius` before comparing distance.
-- Remove the mandatory photo-capture step when the user's device denies camera — fall back straight to `checking_in` (photo optional, not blocking).
-- Add explicit error surface: if `secure_check_in` RPC returns `outside_geofence`, show real distance + required radius from server response.
-- Add try/catch around scanner init so a permission denial shows "Enable camera or paste code" instead of blank state.
+### 7. QR check-in → Event Manager sync (guest just added)
+- Confirm flow: user scans event QR → `QRScannerModal` calls `secure_check_in` RPC → inserts `check_ins` row → trigger `notify_organizer_on_check_in` creates notification → organiser realtime channel picks it up.
+- Fix: `EventManager.tsx` currently polls; add realtime subscription to `check_ins` filtered by `event_id in (my events)` → prepend new attendee card with profile photo + toast. Also increment attendee count locally.
+- Fix scanner: `QRScannerModal` should hand off to `OrganiserScanScreen` behavior when the current user is the organiser; otherwise run guest check-in flow with live photo → `match_profiles` upsert (already in `useCheckIn`).
+- Ensure `verify_ticket_qr` path also triggers `check_ins` insert for the ticket holder so they appear in Event Manager (currently it only flips ticket status). Add insert in the RPC via migration.
 
-### 4. "Buy Ticket" wiring (user's specific bug)
-**Files:** `src/pages/Home.tsx`, `src/pages/EventDetail.tsx`, `src/components/modals/TicketsModal.tsx`
+### 8. Organiser scan flow polish
+- `OrganiserScanScreen.tsx`: after successful scan, show attendee card for 2s then auto-restart camera. Add sound + haptic. Show running count of scanned tickets for this session.
 
-- Home quick-action "Tickets" currently opens `TicketsModal` (user's ticket list). Split into behaviour: keep "My Tickets" as list, and make **EventDetail's "Buy Ticket" CTA** navigate to `/event/:id/buy` (already routed). Wire the button `onClick` to `navigate(\`/event/\${event.id}/buy\`)` when `event.price > 0` or when tiers exist.
-- In `TicketsModal`, add a "Browse events to buy" CTA that navigates to `/events` when the user has no tickets, so the quick-action and Buy flow feel connected.
+### 9. Settings redundancy pass
+- `Settings.tsx`: remove duplicate/empty items (verify against `PrivacySettings.tsx` and `EditProfile.tsx` — deduplicate any "Account" links that go nowhere). Keep: Edit Profile, Privacy, Notifications toggle, Theme, Sign Out.
 
-### 5. Event cover / carousel image glitching (user's specific bug)
-**Files:** `src/components/EventCard.tsx`, `src/pages/EventDetail.tsx`
+### Files to edit
+- `src/contexts/MapContext.tsx` (+ helper for geofence circle)
+- `src/components/MapDrawer.tsx` (touch pass-through)
+- `src/pages/Events.tsx` (theme tokens, transparent map region)
+- `src/pages/EventDetail.tsx` (tokens, real organiser, real attendees, See All, buy button)
+- `src/pages/Home.tsx` (Tickets quick action)
+- `src/pages/BuyTicketScreen.tsx` (verify empty state)
+- `src/pages/EventManager.tsx` (radius live-sync, realtime check_ins)
+- `src/pages/Chats.tsx` (search + suggestions)
+- `src/pages/Settings.tsx` (redundancy)
+- `src/pages/OrganiserScanScreen.tsx` (polish loop)
+- `src/components/modals/EventWizardModal.tsx` + `EditEventModal.tsx` (bucket upload)
+- `src/components/modals/QRScannerModal.tsx` (organiser vs guest branch)
 
-- Root cause: images fall back to `via.placeholder.com` on `onError`, which sometimes 404s or rate-limits → looks like flickering. Also the carousel remounts `<img>` on every parent re-render because `key` is index-based and `src` string is recomputed inline.
-- Fix in `EventCard`:
-  - Compute `coverImage` once via `useMemo`.
-  - Replace `via.placeholder.com` fallback with a local inline SVG data-URI (already used elsewhere) or `/default-event-cover.png` in `public/`.
-  - Guard `onError` so it only fires once (`if (img.dataset.fallback) return; img.dataset.fallback='1';`) to stop infinite error → src reset loops.
-- Fix in `EventDetail` carousel:
-  - Use stable `key={url}` not index.
-  - Keep the array in `useMemo`.
-  - Preload next image (`<link rel="preload">` or hidden `<img>`) so swipes don't flash empty.
+### One migration
+- Update `verify_ticket_qr` RPC to also `INSERT INTO check_ins` on successful scan so ticketed attendees appear in Event Manager live list.
+- Add storage policy on `community-photos` for authenticated INSERT under `events/*` if missing.
 
-### 6. Settings redundancy (user's specific bug)
-**File:** `src/pages/Settings.tsx`
-
-- Remove non-functional stubs (`Change Email`, `Change Password`, `Emergency Contact`, `Blocked Users`, `Currency`, `Help Center`, `Contact Support`, `Terms`, `Privacy Policy` all have empty `onClick`).
-- Consolidate to what actually works: **Edit Profile**, **Privacy Settings**, **Dark Mode toggle**, **Notifications toggle**, **Manage Subscription** (opens `SubscriptionModal`), **Log Out**, **Delete Account**.
-- Leave placeholders only if they route somewhere real; otherwise delete.
-
-### 7. Missing routes / 404s (SYSTEM 2)
-- Grep confirms `/organiser/scan`, `/organiser/dashboard`, `/ticket/:ticketId`, `/event/:eventId/buy`, `/user/:userId`, `/event/:eventId/attendees`, `/search` are all routed. Add a "Coming soon" stub for any nav target discovered during the pass that lacks a page (surgical, only if found).
-- `NotFound` already exists — verify it has a `navigate(-1)` back button (add if missing).
-
-### 8. Realtime subscription cleanup (already partially fixed)
-- Audit `useCheckIn`, `OrganiserDashboard`, `useFriends` (already fixed) for the same "add `.on()` after `subscribe()`" pattern. Ensure every `supabase.channel(name)` uses a unique per-mount name and single `subscribe()` call.
-
----
-
-### Out of scope this pass
-- Payment gateway integration (per prompt: "Payment collected at the door").
-- New email templates beyond what `send-notification` already sends.
-- Any mock data audit line-item already resolved in earlier turns — only re-check if I encounter one.
-
-### Verification
-- Run `tsgo` after edits.
-- Playwright: open `/home`, expand drawer, verify map is inert; edit an event radius in EventManager and confirm geofence circle updates; scan flow via manual token entry.
+### Out of scope
+- No new tables, no auth changes, no schema renames, no design-system overhaul.

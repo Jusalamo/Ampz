@@ -18,15 +18,10 @@ interface EditEventModalProps {
   event: Event | null;
 }
 
-// Convert File to Base64
-const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = error => reject(error);
-  });
-};
+// Upload File to Supabase bucket; returns a stable public URL.
+import { uploadEventMedia } from '@/lib/upload-media';
+const fileToBase64 = (file: File): Promise<string> => uploadEventMedia(file, 'events');
+
 
 export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) {
   const { updateEvent } = useApp();
