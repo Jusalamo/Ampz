@@ -110,17 +110,21 @@ function QuickAddModal({
             </>
           )}
 
-          {!isSearching && searchQuery.length >= 2 && results.length === 0 && (
+          {!isSearching && searchQuery.trim() && displayList.length === 0 && (
             <p className="text-sm text-center py-6 text-muted-foreground">No users found</p>
           )}
 
-          {!isSearching && searchQuery.length < 2 && (
+          {!isSearching && !searchQuery.trim() && displayList.length === 0 && (
             <p className="text-sm text-center py-6 text-muted-foreground">
-              Type at least 2 characters to search
+              Search by name, username or email
             </p>
           )}
 
-          {!isSearching && results.map(user => (
+          {!isSearching && !searchQuery.trim() && displayList.length > 0 && (
+            <p className="text-xs uppercase tracking-wide text-muted-foreground px-1 pt-1">Suggested</p>
+          )}
+
+          {!isSearching && displayList.map(user => (
             <div key={user.id} className="flex items-center gap-3 p-3 rounded-lg bg-card">
               <img
                 src={user.photo || DEFAULT_AVATAR}
@@ -142,6 +146,7 @@ function QuickAddModal({
             </div>
           ))}
         </div>
+
       </DialogContent>
     </Dialog>
   );
