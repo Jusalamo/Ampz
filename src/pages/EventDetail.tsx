@@ -529,24 +529,18 @@ export default function EventDetail() {
         description: 'You have successfully checked in to the event.',
       });
     } else if (hasTicket) {
-      // View ticket
-      navigate(`/ticket/${event.id}`);
+      // View ticket - fetch user's ticket id for this event
+      navigate(`/event/${event.id}/buy`);
     } else {
       // Buy ticket/register - use webTicketsLink if available
       if (event.webTicketsLink || event.ticketLink) {
-        // Open external ticket link (WebTickets)
         window.open(event.webTicketsLink || event.ticketLink, '_blank', 'noopener,noreferrer');
-      } else if (event.price === 0) {
-        // Free event - register immediately
-        toast({
-          title: 'Registered!',
-          description: 'You have successfully registered for the event.',
-        });
       } else {
-        // Paid event - redirect to payment
-        navigate(`/checkout/${event.id}`);
+        // In-app ticket purchase (paid or free)
+        navigate(`/event/${event.id}/buy`);
       }
     }
+
   }, [event, user, hasTicket, isLive, navigate, checkInToEvent, toast]);
 
   if (!event) {
