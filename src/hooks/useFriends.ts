@@ -481,5 +481,7 @@ export function useFriends(userId?: string) {
     getRelationshipStatus,
     refreshFriends: fetchFriends,
     refreshRequests: fetchRequests,
+    fetchSuggestedUsers,
   };
+
 }
