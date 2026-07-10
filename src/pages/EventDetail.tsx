@@ -623,8 +623,8 @@ export default function EventDetail() {
             : 'bg-transparent py-3'
         )}
         style={{
-          background: isScrolled ? `${DESIGN.colors.background}F2` : 'transparent',
-          borderBottom: isScrolled ? `1px solid ${DESIGN.colors.textSecondary}20` : 'none'
+          background: isScrolled ? 'hsl(var(--background) / 0.949)' : 'transparent',
+          borderBottom: isScrolled ? `1px solid hsl(var(--muted-foreground) / 0.125)` : 'none'
         }}
       >
         <div className="flex items-center justify-between max-w-7xl mx-auto">
@@ -948,7 +948,7 @@ export default function EventDetail() {
                     background: DESIGN.colors.card,
                     color: DESIGN.colors.primary,
                     borderRadius: DESIGN.borderRadius.button,
-                    border: `1px solid ${DESIGN.colors.textSecondary}20`
+                    border: `1px solid hsl(var(--muted-foreground) / 0.125)`
                   }}
                 >
                   {event.price === 0 ? 'FREE' : `₦${event.price}`}
@@ -971,7 +971,7 @@ export default function EventDetail() {
                   background: DESIGN.colors.card,
                   color: DESIGN.colors.textPrimary,
                   borderRadius: DESIGN.borderRadius.button,
-                  border: `1px solid ${DESIGN.colors.textSecondary}20`
+                  border: `1px solid hsl(var(--muted-foreground) / 0.125)`
                 }}
               >
                 {event.category}
@@ -983,7 +983,7 @@ export default function EventDetail() {
           <nav 
             className="flex border-b mb-6"
             style={{ 
-              borderBottom: `2px solid ${DESIGN.colors.textSecondary}20`
+              borderBottom: `2px solid hsl(var(--muted-foreground) / 0.125)`
             }}
             aria-label="Event details tabs"
           >
@@ -1070,7 +1070,7 @@ export default function EventDetail() {
                     style={{
                       background: DESIGN.colors.card,
                       borderRadius: DESIGN.borderRadius.cardInner,
-                      border: `1px solid ${DESIGN.colors.textSecondary}20`
+                      border: `1px solid hsl(var(--muted-foreground) / 0.125)`
                     }}
                   >
                     <div className="flex items-start gap-3">
@@ -1078,7 +1078,7 @@ export default function EventDetail() {
                         className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" 
                         aria-hidden="true"
                         style={{
-                          background: `${DESIGN.colors.primary}20`,
+                          background: 'hsl(var(--primary) / 0.125)',
                           borderRadius: DESIGN.borderRadius.button
                         }}
                       >
@@ -1107,7 +1107,7 @@ export default function EventDetail() {
                     style={{
                       background: DESIGN.colors.card,
                       borderRadius: DESIGN.borderRadius.cardInner,
-                      border: `1px solid ${DESIGN.colors.textSecondary}20`
+                      border: `1px solid hsl(var(--muted-foreground) / 0.125)`
                     }}
                   >
                     <div className="flex items-start gap-3">
@@ -1115,7 +1115,7 @@ export default function EventDetail() {
                         className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" 
                         aria-hidden="true"
                         style={{
-                          background: `${DESIGN.colors.primary}20`,
+                          background: 'hsl(var(--primary) / 0.125)',
                           borderRadius: DESIGN.borderRadius.button
                         }}
                       >
@@ -1144,7 +1144,7 @@ export default function EventDetail() {
                     style={{
                       background: DESIGN.colors.card,
                       borderRadius: DESIGN.borderRadius.cardInner,
-                      border: `1px solid ${DESIGN.colors.textSecondary}20`
+                      border: `1px solid hsl(var(--muted-foreground) / 0.125)`
                     }}
                   >
                     <div className="flex items-start gap-3">
@@ -1152,7 +1152,7 @@ export default function EventDetail() {
                         className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" 
                         aria-hidden="true"
                         style={{
-                          background: `${DESIGN.colors.primary}20`,
+                          background: 'hsl(var(--primary) / 0.125)',
                           borderRadius: DESIGN.borderRadius.button
                         }}
                       >
@@ -1182,7 +1182,7 @@ export default function EventDetail() {
                         onClick={handleNavigateToMap}
                         className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
                         style={{
-                          background: `${DESIGN.colors.primary}20`,
+                          background: 'hsl(var(--primary) / 0.125)',
                           borderRadius: DESIGN.borderRadius.button,
                           color: DESIGN.colors.primary
                         }}
@@ -1213,7 +1213,7 @@ export default function EventDetail() {
                         style={{
                           color: DESIGN.colors.primary,
                           fontSize: DESIGN.typography.small,
-                          background: `${DESIGN.colors.primary}10`
+                          background: 'hsl(var(--primary) / 0.063)'
                         }}
                         aria-expanded={showFullDescription}
                       >
@@ -1255,7 +1255,7 @@ export default function EventDetail() {
                             background: DESIGN.colors.card,
                             color: DESIGN.colors.textPrimary,
                             borderRadius: DESIGN.borderRadius.button,
-                            border: `1px solid ${DESIGN.colors.textSecondary}30`
+                            border: `1px solid hsl(var(--muted-foreground) / 0.188)`
                           }}
                         >
                           {tag}
@@ -1271,7 +1271,7 @@ export default function EventDetail() {
                   style={{
                     background: DESIGN.colors.card,
                     borderRadius: DESIGN.borderRadius.cardInner,
-                    border: `1px solid ${DESIGN.colors.textSecondary}20`
+                    border: `1px solid hsl(var(--muted-foreground) / 0.125)`
                   }}
                 >
                   <div className="flex items-center justify-between mb-4">
@@ -1279,7 +1279,7 @@ export default function EventDetail() {
                       <div 
                         className="w-10 h-10 rounded-lg flex items-center justify-center"
                         style={{
-                          background: `${DESIGN.colors.primary}20`,
+                          background: 'hsl(var(--primary) / 0.125)',
                           borderRadius: DESIGN.borderRadius.button
                         }}
                       >
@@ -1307,7 +1307,7 @@ export default function EventDetail() {
                       className="text-sm font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg px-3 py-1.5"
                       style={{
                         color: DESIGN.colors.primary,
-                        background: `${DESIGN.colors.primary}10`
+                        background: 'hsl(var(--primary) / 0.063)'
                       }}
                       onClick={() => {/* TODO: Implement see all attendees */}}
                     >
@@ -1371,8 +1371,8 @@ export default function EventDetail() {
       <footer 
         className="fixed bottom-0 left-0 right-0 backdrop-blur-xl border-t z-50"
         style={{
-          background: `${DESIGN.colors.background}F2`,
-          borderTop: `1px solid ${DESIGN.colors.textSecondary}20`,
+          background: 'hsl(var(--background) / 0.949)',
+          borderTop: `1px solid hsl(var(--muted-foreground) / 0.125)`,
           padding: `${DESIGN.spacing.app} ${DESIGN.spacing.app} max(env(safe-area-inset-bottom), ${DESIGN.spacing.app})`
         }}
       >
