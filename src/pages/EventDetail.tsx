@@ -1418,12 +1418,10 @@ export default function EventDetail() {
               style={{
                 borderRadius: DESIGN.borderRadius.cardInner,
                 height: '56px',
-                background: hasTicket && isLive 
-                  ? `linear-gradient(135deg, ${DESIGN.colors.success} 0%, #059669 100%)`
-                  : `linear-gradient(135deg, ${DESIGN.colors.primary} 0%, ${DESIGN.colors.lavenderLight} 100%)`,
-                color: DESIGN.colors.background,
-                boxShadow: '0 8px 32px rgba(196, 181, 253, 0.4)'
+                background: hasTicket && isLive ? DESIGN.colors.success : DESIGN.colors.primary,
+                color: 'hsl(var(--primary-foreground))',
               }}
+
               size="lg"
               onClick={handleCTAClick}
             >
