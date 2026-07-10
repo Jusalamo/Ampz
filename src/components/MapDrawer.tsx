@@ -229,7 +229,7 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
   // Live-sync geofence circle when EditEventModal slider changes
   useEffect(() => {
     if (!map || !mapReady) return;
-    const handler = (e: Event) => {
+    const handler = (e: any) => {
       const { eventId, radius, coordinates } = (e as CustomEvent).detail || {};
       if (!eventId || !radius) return;
       const target = events.find(ev => ev.id === eventId);
@@ -240,8 +240,9 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
         coordinates: coordinates || target.coordinates,
       } as any);
     };
-    window.addEventListener('ampz:geofence-preview', handler as any);
-    return () => window.removeEventListener('ampz:geofence-preview', handler as any);
+    window.addEventListener('ampz:geofence-preview', handler);
+    return () => window.removeEventListener('ampz:geofence-preview', handler);
+
   }, [map, mapReady, events]);
 
 
