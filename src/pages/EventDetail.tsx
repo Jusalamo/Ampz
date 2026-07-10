@@ -66,7 +66,9 @@ export default function EventDetail() {
   const navigate = useNavigate();
   const { events, user, bookmarkEvent, communityPhotos, communityComments, tickets, checkInToEvent } = useApp();
   const { toast } = useToast();
+  const { attendees: realAttendees } = useEventAttendees(id);
   const [showFullDescription, setShowFullDescription] = useState(false);
+
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'comments'>('details');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
