@@ -13,19 +13,19 @@ import { CommunityComments } from '@/components/CommunityComments';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
-// Design Constants
+// Design Constants — mapped to semantic theme tokens so light/dark themes apply automatically
 const DESIGN = {
   colors: {
-    primary: '#C4B5FD',
-    lavenderLight: '#E9D5FF',
-    accentPink: '#FFB8E6',
-    background: '#1A1A1A',
-    card: '#2D2D2D',
-    textPrimary: '#FFFFFF',
-    textSecondary: '#B8B8B8',
+    primary: 'hsl(var(--primary))',
+    lavenderLight: 'hsl(var(--primary))',
+    accentPink: 'hsl(var(--primary))',
+    background: 'hsl(var(--background))',
+    card: 'hsl(var(--card))',
+    textPrimary: 'hsl(var(--foreground))',
+    textSecondary: 'hsl(var(--muted-foreground))',
     success: '#10B981',
     warning: '#F59E0B',
-    danger: '#EF4444'
+    danger: 'hsl(var(--destructive))'
   },
   spacing: {
     app: '16px',
@@ -54,6 +54,7 @@ const DESIGN = {
     caption: '12px'
   }
 };
+
 
 // Import Event type from lib
 import { Event as EventType } from '@/lib/types';
