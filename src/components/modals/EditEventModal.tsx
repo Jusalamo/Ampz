@@ -641,12 +641,18 @@ export function EditEventModal({ isOpen, onClose, event }: EditEventModalProps) 
                 </label>
                 <Slider
                   value={[formData.geofenceRadius]}
-                  onValueChange={([value]) => handleChange('geofenceRadius', value)}
+                  onValueChange={([value]) => {
+                    handleChange('geofenceRadius', value);
+                    window.dispatchEvent(new CustomEvent('ampz:geofence-preview', {
+                      detail: { eventId: event?.id, radius: value, coordinates: formData.coordinates },
+                    }));
+                  }}
                   min={10}
                   max={500}
                   step={10}
                   className="py-2"
                 />
+
                 <p className="text-xs text-muted-foreground mt-1">
                   Attendees must be within this distance to check in
                 </p>
