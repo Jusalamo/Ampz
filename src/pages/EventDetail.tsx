@@ -12,6 +12,8 @@ import { CommunityPhotos } from '@/components/CommunityPhotos';
 import { CommunityComments } from '@/components/CommunityComments';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useEventAttendees } from '@/hooks/useEventAttendees';
+
 
 // Design Constants — mapped to semantic theme tokens so light/dark themes apply automatically
 const DESIGN = {
