@@ -1311,43 +1311,47 @@ export default function EventDetail() {
                       className="text-sm font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg px-3 py-1.5"
                       style={{
                         color: DESIGN.colors.primary,
-                        background: 'hsl(var(--primary) / 0.063)'
+                        background: 'hsl(var(--primary) / 0.1)'
                       }}
-                      onClick={() => {/* TODO: Implement see all attendees */}}
+                      onClick={() => navigate(`/event/${event.id}/attendees`)}
                     >
                       See all
                     </button>
                   </div>
                   <div className="flex -space-x-3">
-                    {[1, 2, 3, 4, 5].map((i) => (
+                    {realAttendees.slice(0, 5).map((a) => (
                       <div
-                        key={i}
-                        className="w-10 h-10 rounded-full border-2 overflow-hidden transition-transform hover:scale-110"
-                        style={{
-                          background: '#4A4A4A',
-                          borderColor: DESIGN.colors.card
-                        }}
+                        key={a.id}
+                        className="w-10 h-10 rounded-full border-2 overflow-hidden bg-muted transition-transform hover:scale-110"
+                        style={{ borderColor: DESIGN.colors.card }}
                         aria-hidden="true"
                       >
                         <img
-                          src={`https://i.pravatar.cc/100?img=${i + 10}`}
-                          alt=""
+                          src={a.profilePhoto || '/default-avatar.png'}
+                          alt={a.name || ''}
                           className="w-full h-full object-cover"
                           loading="lazy"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/default-avatar.png'; }}
                         />
                       </div>
                     ))}
-                    {event.attendees > 5 && (
+                    {realAttendees.length === 0 && (
+                      <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                        No check-ins yet — be the first!
+                      </p>
+                    )}
+                    {realAttendees.length > 5 && (
                       <div 
-                        className="w-10 h-10 rounded-full flex items-center justify-center border-2 text-sm font-bold text-white transition-transform hover:scale-110"
+                        className="w-10 h-10 rounded-full flex items-center justify-center border-2 text-sm font-bold text-primary-foreground transition-transform hover:scale-110"
                         style={{
                           background: DESIGN.colors.primary,
                           borderColor: DESIGN.colors.card
                         }}
-                        aria-label={`${event.attendees - 5} more attendees`}
+                        aria-label={`${realAttendees.length - 5} more attendees`}
                       >
-                        +{event.attendees - 5}
+                        +{realAttendees.length - 5}
                       </div>
+
                     )}
                   </div>
                 </div>
