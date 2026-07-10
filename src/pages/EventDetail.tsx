@@ -12,20 +12,22 @@ import { CommunityPhotos } from '@/components/CommunityPhotos';
 import { CommunityComments } from '@/components/CommunityComments';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useEventAttendees } from '@/hooks/useEventAttendees';
 
-// Design Constants
+
+// Design Constants — mapped to semantic theme tokens so light/dark themes apply automatically
 const DESIGN = {
   colors: {
-    primary: '#C4B5FD',
-    lavenderLight: '#E9D5FF',
-    accentPink: '#FFB8E6',
-    background: '#1A1A1A',
-    card: '#2D2D2D',
-    textPrimary: '#FFFFFF',
-    textSecondary: '#B8B8B8',
+    primary: 'hsl(var(--primary))',
+    lavenderLight: 'hsl(var(--primary))',
+    accentPink: 'hsl(var(--primary))',
+    background: 'hsl(var(--background))',
+    card: 'hsl(var(--card))',
+    textPrimary: 'hsl(var(--foreground))',
+    textSecondary: 'hsl(var(--muted-foreground))',
     success: '#10B981',
     warning: '#F59E0B',
-    danger: '#EF4444'
+    danger: 'hsl(var(--destructive))'
   },
   spacing: {
     app: '16px',
@@ -55,6 +57,7 @@ const DESIGN = {
   }
 };
 
+
 // Import Event type from lib
 import { Event as EventType } from '@/lib/types';
 
@@ -63,7 +66,9 @@ export default function EventDetail() {
   const navigate = useNavigate();
   const { events, user, bookmarkEvent, communityPhotos, communityComments, tickets, checkInToEvent } = useApp();
   const { toast } = useToast();
+  const { attendees: realAttendees } = useEventAttendees(id);
   const [showFullDescription, setShowFullDescription] = useState(false);
+
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'comments'>('details');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -622,8 +627,8 @@ export default function EventDetail() {
             : 'bg-transparent py-3'
         )}
         style={{
-          background: isScrolled ? `${DESIGN.colors.background}F2` : 'transparent',
-          borderBottom: isScrolled ? `1px solid ${DESIGN.colors.textSecondary}20` : 'none'
+          background: isScrolled ? 'hsl(var(--background) / 0.949)' : 'transparent',
+          borderBottom: isScrolled ? `1px solid hsl(var(--muted-foreground) / 0.125)` : 'none'
         }}
       >
         <div className="flex items-center justify-between max-w-7xl mx-auto">
@@ -947,7 +952,7 @@ export default function EventDetail() {
                     background: DESIGN.colors.card,
                     color: DESIGN.colors.primary,
                     borderRadius: DESIGN.borderRadius.button,
-                    border: `1px solid ${DESIGN.colors.textSecondary}20`
+                    border: `1px solid hsl(var(--muted-foreground) / 0.125)`
                   }}
                 >
                   {event.price === 0 ? 'FREE' : `₦${event.price}`}
@@ -970,7 +975,7 @@ export default function EventDetail() {
                   background: DESIGN.colors.card,
                   color: DESIGN.colors.textPrimary,
                   borderRadius: DESIGN.borderRadius.button,
-                  border: `1px solid ${DESIGN.colors.textSecondary}20`
+                  border: `1px solid hsl(var(--muted-foreground) / 0.125)`
                 }}
               >
                 {event.category}
@@ -982,7 +987,7 @@ export default function EventDetail() {
           <nav 
             className="flex border-b mb-6"
             style={{ 
-              borderBottom: `2px solid ${DESIGN.colors.textSecondary}20`
+              borderBottom: `2px solid hsl(var(--muted-foreground) / 0.125)`
             }}
             aria-label="Event details tabs"
           >
@@ -1069,7 +1074,7 @@ export default function EventDetail() {
                     style={{
                       background: DESIGN.colors.card,
                       borderRadius: DESIGN.borderRadius.cardInner,
-                      border: `1px solid ${DESIGN.colors.textSecondary}20`
+                      border: `1px solid hsl(var(--muted-foreground) / 0.125)`
                     }}
                   >
                     <div className="flex items-start gap-3">
@@ -1077,7 +1082,7 @@ export default function EventDetail() {
                         className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" 
                         aria-hidden="true"
                         style={{
-                          background: `${DESIGN.colors.primary}20`,
+                          background: 'hsl(var(--primary) / 0.125)',
                           borderRadius: DESIGN.borderRadius.button
                         }}
                       >
@@ -1106,7 +1111,7 @@ export default function EventDetail() {
                     style={{
                       background: DESIGN.colors.card,
                       borderRadius: DESIGN.borderRadius.cardInner,
-                      border: `1px solid ${DESIGN.colors.textSecondary}20`
+                      border: `1px solid hsl(var(--muted-foreground) / 0.125)`
                     }}
                   >
                     <div className="flex items-start gap-3">
@@ -1114,7 +1119,7 @@ export default function EventDetail() {
                         className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" 
                         aria-hidden="true"
                         style={{
-                          background: `${DESIGN.colors.primary}20`,
+                          background: 'hsl(var(--primary) / 0.125)',
                           borderRadius: DESIGN.borderRadius.button
                         }}
                       >
@@ -1143,7 +1148,7 @@ export default function EventDetail() {
                     style={{
                       background: DESIGN.colors.card,
                       borderRadius: DESIGN.borderRadius.cardInner,
-                      border: `1px solid ${DESIGN.colors.textSecondary}20`
+                      border: `1px solid hsl(var(--muted-foreground) / 0.125)`
                     }}
                   >
                     <div className="flex items-start gap-3">
@@ -1151,7 +1156,7 @@ export default function EventDetail() {
                         className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" 
                         aria-hidden="true"
                         style={{
-                          background: `${DESIGN.colors.primary}20`,
+                          background: 'hsl(var(--primary) / 0.125)',
                           borderRadius: DESIGN.borderRadius.button
                         }}
                       >
@@ -1181,7 +1186,7 @@ export default function EventDetail() {
                         onClick={handleNavigateToMap}
                         className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-primary hover:bg-primary/10 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
                         style={{
-                          background: `${DESIGN.colors.primary}20`,
+                          background: 'hsl(var(--primary) / 0.125)',
                           borderRadius: DESIGN.borderRadius.button,
                           color: DESIGN.colors.primary
                         }}
@@ -1212,7 +1217,7 @@ export default function EventDetail() {
                         style={{
                           color: DESIGN.colors.primary,
                           fontSize: DESIGN.typography.small,
-                          background: `${DESIGN.colors.primary}10`
+                          background: 'hsl(var(--primary) / 0.063)'
                         }}
                         aria-expanded={showFullDescription}
                       >
@@ -1254,7 +1259,7 @@ export default function EventDetail() {
                             background: DESIGN.colors.card,
                             color: DESIGN.colors.textPrimary,
                             borderRadius: DESIGN.borderRadius.button,
-                            border: `1px solid ${DESIGN.colors.textSecondary}30`
+                            border: `1px solid hsl(var(--muted-foreground) / 0.188)`
                           }}
                         >
                           {tag}
@@ -1270,7 +1275,7 @@ export default function EventDetail() {
                   style={{
                     background: DESIGN.colors.card,
                     borderRadius: DESIGN.borderRadius.cardInner,
-                    border: `1px solid ${DESIGN.colors.textSecondary}20`
+                    border: `1px solid hsl(var(--muted-foreground) / 0.125)`
                   }}
                 >
                   <div className="flex items-center justify-between mb-4">
@@ -1278,7 +1283,7 @@ export default function EventDetail() {
                       <div 
                         className="w-10 h-10 rounded-lg flex items-center justify-center"
                         style={{
-                          background: `${DESIGN.colors.primary}20`,
+                          background: 'hsl(var(--primary) / 0.125)',
                           borderRadius: DESIGN.borderRadius.button
                         }}
                       >
@@ -1306,43 +1311,47 @@ export default function EventDetail() {
                       className="text-sm font-medium hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg px-3 py-1.5"
                       style={{
                         color: DESIGN.colors.primary,
-                        background: `${DESIGN.colors.primary}10`
+                        background: 'hsl(var(--primary) / 0.1)'
                       }}
-                      onClick={() => {/* TODO: Implement see all attendees */}}
+                      onClick={() => navigate(`/event/${event.id}/attendees`)}
                     >
                       See all
                     </button>
                   </div>
                   <div className="flex -space-x-3">
-                    {[1, 2, 3, 4, 5].map((i) => (
+                    {realAttendees.slice(0, 5).map((a) => (
                       <div
-                        key={i}
-                        className="w-10 h-10 rounded-full border-2 overflow-hidden transition-transform hover:scale-110"
-                        style={{
-                          background: '#4A4A4A',
-                          borderColor: DESIGN.colors.card
-                        }}
+                        key={a.id}
+                        className="w-10 h-10 rounded-full border-2 overflow-hidden bg-muted transition-transform hover:scale-110"
+                        style={{ borderColor: DESIGN.colors.card }}
                         aria-hidden="true"
                       >
                         <img
-                          src={`https://i.pravatar.cc/100?img=${i + 10}`}
-                          alt=""
+                          src={a.profilePhoto || '/default-avatar.png'}
+                          alt={a.name || ''}
                           className="w-full h-full object-cover"
                           loading="lazy"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/default-avatar.png'; }}
                         />
                       </div>
                     ))}
-                    {event.attendees > 5 && (
+                    {realAttendees.length === 0 && (
+                      <p className="text-xs" style={{ color: DESIGN.colors.textSecondary }}>
+                        No check-ins yet — be the first!
+                      </p>
+                    )}
+                    {realAttendees.length > 5 && (
                       <div 
-                        className="w-10 h-10 rounded-full flex items-center justify-center border-2 text-sm font-bold text-white transition-transform hover:scale-110"
+                        className="w-10 h-10 rounded-full flex items-center justify-center border-2 text-sm font-bold text-primary-foreground transition-transform hover:scale-110"
                         style={{
                           background: DESIGN.colors.primary,
                           borderColor: DESIGN.colors.card
                         }}
-                        aria-label={`${event.attendees - 5} more attendees`}
+                        aria-label={`${realAttendees.length - 5} more attendees`}
                       >
-                        +{event.attendees - 5}
+                        +{realAttendees.length - 5}
                       </div>
+
                     )}
                   </div>
                 </div>
@@ -1370,8 +1379,8 @@ export default function EventDetail() {
       <footer 
         className="fixed bottom-0 left-0 right-0 backdrop-blur-xl border-t z-50"
         style={{
-          background: `${DESIGN.colors.background}F2`,
-          borderTop: `1px solid ${DESIGN.colors.textSecondary}20`,
+          background: 'hsl(var(--background) / 0.949)',
+          borderTop: `1px solid hsl(var(--muted-foreground) / 0.125)`,
           padding: `${DESIGN.spacing.app} ${DESIGN.spacing.app} max(env(safe-area-inset-bottom), ${DESIGN.spacing.app})`
         }}
       >
@@ -1409,12 +1418,10 @@ export default function EventDetail() {
               style={{
                 borderRadius: DESIGN.borderRadius.cardInner,
                 height: '56px',
-                background: hasTicket && isLive 
-                  ? `linear-gradient(135deg, ${DESIGN.colors.success} 0%, #059669 100%)`
-                  : `linear-gradient(135deg, ${DESIGN.colors.primary} 0%, ${DESIGN.colors.lavenderLight} 100%)`,
-                color: DESIGN.colors.background,
-                boxShadow: '0 8px 32px rgba(196, 181, 253, 0.4)'
+                background: hasTicket && isLive ? DESIGN.colors.success : DESIGN.colors.primary,
+                color: 'hsl(var(--primary-foreground))',
               }}
+
               size="lg"
               onClick={handleCTAClick}
             >

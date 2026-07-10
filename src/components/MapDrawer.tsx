@@ -226,6 +226,26 @@ export function MapDrawer({ onCreateEvent, onOpenFilters }: MapDrawerProps) {
     }
   }, [events, selectedCategory, filteredEvents, mapReady]);
 
+  // Live-sync geofence circle when EditEventModal slider changes
+  useEffect(() => {
+    if (!map || !mapReady) return;
+    const handler = (e: any) => {
+      const { eventId, radius, coordinates } = (e as CustomEvent).detail || {};
+      if (!eventId || !radius) return;
+      const target = events.find(ev => ev.id === eventId);
+      if (!target) return;
+      addGeofenceCircle({
+        ...target,
+        geofenceRadius: radius,
+        coordinates: coordinates || target.coordinates,
+      } as any);
+    };
+    window.addEventListener('ampz:geofence-preview', handler);
+    return () => window.removeEventListener('ampz:geofence-preview', handler);
+
+  }, [map, mapReady, events]);
+
+
   const updateEventMarkers = () => {
     if (!map || !mapReady) return;
     
